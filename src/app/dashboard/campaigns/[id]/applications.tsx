@@ -38,6 +38,8 @@ const statusConfig: Record<string, { bg: string; label: string }> = {
   submitted: { bg: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400", label: "Submitted — Review Deliverables" },
   revision_needed: { bg: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400", label: "Revision Needed" },
   accepted: { bg: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400", label: "Accepted" },
+  live_submitted: { bg: "bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400", label: "Live Links Submitted" },
+  payment: { bg: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400", label: "Payment Processing" },
   completed: { bg: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400", label: "Completed" },
   rejected: { bg: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400", label: "Rejected" },
   withdrawn: { bg: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400", label: "Withdrawn" },
@@ -357,12 +359,13 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
             ))}
           </div>
 
+          {/* Submitted: Accept / Need Revision / Reject */}
           {application.status === "submitted" && !showRevision && (
             <div className="px-4 pb-4 flex flex-wrap gap-2">
               <button onClick={() => handleAction("accepted")} disabled={loading}
                 className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100`}>
                 {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
-                Accept & Release Payment
+                Accept Deliverables
               </button>
               <button onClick={() => { setShowRevision(true); setShowReject(false); }} disabled={loading}
                 className={`${btnBase} bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100`}>
@@ -377,8 +380,35 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
             </div>
           )}
 
+          {/* Live Links Submitted: Release Payment / Need Revision / Reject */}
+          {application.status === "live_submitted" && !showRevision && (
+            <div className="px-4 pb-4 flex flex-wrap gap-2">
+              <button onClick={() => handleAction("payment")} disabled={loading}
+                className={`${btnBase} bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100`}>
+                {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                Release Payment
+              </button>
+              <button onClick={() => { setShowRevision(true); setShowReject(false); }} disabled={loading}
+                className={`${btnBase} bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100`}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Need Revision
+              </button>
+            </div>
+          )}
+
+          {/* Payment: Initiate Payment */}
+          {application.status === "payment" && (
+            <div className="px-4 pb-4 flex flex-wrap gap-2">
+              <button onClick={() => handleAction("completed")} disabled={loading}
+                className={`${btnBase} bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100`}>
+                {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                Mark as Completed
+              </button>
+            </div>
+          )}
+
           {/* Revision Selection Panel */}
-          {showRevision && application.status === "submitted" && application.submission_links && (
+          {showRevision && ["submitted", "live_submitted"].includes(application.status) && application.submission_links && (
             <div className="px-4 pb-4 space-y-3">
               <div className="p-4 bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-100 dark:border-orange-900/30 space-y-3">
                 <h4 className="text-xs font-semibold text-orange-700 dark:text-orange-300">Select deliverables that need revision:</h4>
@@ -484,12 +514,32 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
         </div>
       )}
 
-      {/* Accepted — payment released */}
-      {application.status === "accepted" && application.final_agreed_rate != null && (
+      {/* Accepted — waiting for live links */}
+      {application.status === "accepted" && (
         <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30">
           <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <span className="text-xs text-emerald-700 dark:text-emerald-300">
-            <span className="font-semibold">₹{application.final_agreed_rate.toLocaleString()}</span> released to influencer
+            Deliverables accepted. Waiting for influencer to post live and submit links.
+          </span>
+        </div>
+      )}
+
+      {/* Live links submitted — review */}
+      {application.status === "live_submitted" && (
+        <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-cyan-50 dark:bg-cyan-900/10 border border-cyan-100 dark:border-cyan-900/30">
+          <svg className="w-4 h-4 text-cyan-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /></svg>
+          <span className="text-xs text-cyan-700 dark:text-cyan-300">
+            Live links submitted. Verify posts are published and release payment.
+          </span>
+        </div>
+      )}
+
+      {/* Payment processing */}
+      {application.status === "payment" && (
+        <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
+          <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span className="text-xs text-amber-700 dark:text-amber-300">
+            Payment released{application.final_agreed_rate ? ` — ₹${application.final_agreed_rate.toLocaleString()}` : ""}. Mark as completed after payment is transferred.
           </span>
         </div>
       )}
