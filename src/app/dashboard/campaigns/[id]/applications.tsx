@@ -331,15 +331,15 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
       )}
 
       {/* ====== SUBMISSION REVIEW (when influencer submits deliverables) ====== */}
-      {(application.status === "submitted" || (application.status === "revision_needed" && application.submission_links?.length)) && application.submission_links && application.submission_links.length > 0 && (
+      {application.submission_links && application.submission_links.length > 0 && ["submitted", "revision_needed", "accepted", "live_submitted", "payment", "completed"].includes(application.status) && (
         <div className="mt-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-900/30 overflow-hidden">
           <div className="px-5 py-4 border-b border-purple-100 dark:border-purple-800/30 flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
               <svg className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
             </div>
             <div>
-              <h4 className="text-xs font-semibold text-gray-900 dark:text-white">Deliverable Links</h4>
-              <p className="text-[10px] text-gray-400">{application.submission_links.length} link{application.submission_links.length > 1 ? "s" : ""} submitted by influencer</p>
+              <h4 className="text-xs font-semibold text-gray-900 dark:text-white">{application.status === "live_submitted" ? "Live Links for Review" : "Deliverable Links"}</h4>
+              <p className="text-[10px] text-gray-400">{application.submission_links.length} link{application.submission_links.length > 1 ? "s" : ""} {application.status === "live_submitted" ? "posted live" : "submitted"} by influencer</p>
             </div>
           </div>
           <div className="p-4 space-y-2">
