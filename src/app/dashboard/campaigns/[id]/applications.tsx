@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { updateApplicationStatus } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
+import { Avatar } from "@/components/avatar";
 
 interface Application {
   id: string;
@@ -148,13 +149,7 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <Link href={`/dashboard/influencers/${application.influencer_id}`}>
-            {inf?.profile_photo_url ? (
-              <img src={inf.profile_photo_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-colors" />
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                <span className="text-sm font-bold text-white">{inf?.full_name?.[0]?.toUpperCase() || "?"}</span>
-              </div>
-            )}
+            <Avatar src={inf?.profile_photo_url} name={inf?.full_name} size="md" shape="rounded" className="hover:border-indigo-400 transition-colors" />
           </Link>
           <div className="min-w-0">
             <Link href={`/dashboard/influencers/${application.influencer_id}`} className="text-sm font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate block">

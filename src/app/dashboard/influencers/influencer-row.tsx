@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { toggleInfluencerStatus } from "./actions";
+import { Avatar } from "@/components/avatar";
 
 interface Influencer {
   influencer_id: string;
@@ -39,17 +40,7 @@ export function InfluencerRow({ inf }: { inf: Influencer }) {
           href={`/dashboard/influencers/${inf.influencer_id}`}
           className="flex items-center gap-3 group"
         >
-          {inf.profile_photo_url ? (
-            <img
-              src={inf.profile_photo_url}
-              alt=""
-              className="w-8 h-8 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
-              {inf.full_name?.[0] || "?"}
-            </div>
-          )}
+          <Avatar src={inf.profile_photo_url} name={inf.full_name} size="sm" shape="circle" />
           <span className="text-sm text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {inf.full_name || "—"}
           </span>

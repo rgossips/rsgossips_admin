@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { EditInfluencerButton } from "./edit-influencer";
+import { Avatar } from "@/components/avatar";
 
 export default async function InfluencerDetailPage({
   params,
@@ -41,13 +42,7 @@ export default async function InfluencerDetailPage({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" /></svg>
           </Link>
           <div className="flex items-center gap-4">
-            {inf.profile_photo_url ? (
-              <img src={inf.profile_photo_url} alt="" className="w-16 h-16 rounded-2xl object-cover border-2 border-white dark:border-gray-800 shadow-lg" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
-                <span className="text-xl font-bold text-white">{inf.full_name?.[0]?.toUpperCase() || "?"}</span>
-              </div>
-            )}
+            <Avatar src={inf.profile_photo_url} name={inf.full_name} size="xl" shape="rounded" className="!border-2 !border-white dark:!border-gray-800 shadow-lg" />
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{inf.full_name || "Unknown"}</h1>

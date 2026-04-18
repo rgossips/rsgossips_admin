@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ButtonSpinner } from "@/components/spinner";
 import { deleteInfluencerInvitation, updateInfluencerInvitation } from "./actions";
+import { Avatar } from "@/components/avatar";
 
 interface Invitation {
   id: string;
@@ -47,13 +48,7 @@ export function InvitedInfluencerRow({ invitation }: { invitation: Invitation })
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-900/50 transition-all duration-300">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            {invitation.profile_photo_url ? (
-              <img src={invitation.profile_photo_url} alt="" className="w-11 h-11 rounded-xl object-cover border border-gray-200 dark:border-gray-700" />
-            ) : (
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                <span className="text-sm font-bold text-white">{invitation.full_name[0]?.toUpperCase()}</span>
-              </div>
-            )}
+            <Avatar src={invitation.profile_photo_url} name={invitation.full_name} size="lg" shape="rounded" />
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{invitation.full_name}</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500">@{invitation.instagram_username}</p>
