@@ -600,22 +600,14 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                 />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Expiry Date <span className="text-red-400">*</span></label>
+                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline <span className="text-red-400">*</span></label>
                 <input
                   name="campaign_end_date"
                   type="date"
                   required
                   className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
                 />
-              </div>
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Application Deadline <span className="text-red-400">*</span></label>
-                <input
-                  name="application_deadline"
-                  type="date"
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                />
+                <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">Applications close and the campaign ends on this date.</p>
               </div>
             </div>
           </div>

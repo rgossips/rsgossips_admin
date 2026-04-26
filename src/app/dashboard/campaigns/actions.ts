@@ -77,8 +77,11 @@ export async function createCampaign(formData: FormData) {
   if (!title) return { error: "Title is required" };
   if (!brandId) return { error: "Brand is required" };
   if (!startDate) return { error: "Start date is required" };
-  if (!endDate) return { error: "Expiry date is required" };
-  if (!deadline) return { error: "Application deadline is required" };
+  if (!endDate) return { error: "Deadline is required" };
+  // Single deadline: applications close and the campaign ends on the same date.
+  // We still write to both DB columns for backward compatibility with any
+  // reader still consuming application_deadline.
+  const finalDeadline = deadline || endDate;
 
   // Parse brand selection — format is "type:id" (e.g. "registered:uuid" or "invited:uuid")
   const [brandType, brandUuid] = brandId.includes(":") ? brandId.split(":", 2) : ["registered", brandId];
@@ -120,7 +123,7 @@ export async function createCampaign(formData: FormData) {
     max_influencers: maxInfluencers ? parseInt(maxInfluencers) : 10,
     campaign_start_date: startDate,
     campaign_end_date: endDate,
-    application_deadline: deadline,
+    application_deadline: finalDeadline,
     content_types_required: contentTypes.length > 0 ? contentTypes : ["reels"],
     budget_total: budgetTotal ? parseInt(budgetTotal) : 0,
     budget_per_influencer: budgetPerInfluencer ? parseInt(budgetPerInfluencer) : 0,
@@ -243,8 +246,12 @@ export async function updateCampaign(campaignId: string, formData: FormData) {
     updated_at: new Date().toISOString(),
   };
   if (startDate) updates.campaign_start_date = startDate;
-  if (endDate) updates.campaign_end_date = endDate;
-  if (deadline) updates.application_deadline = deadline;
+  if (endDate) {
+    updates.campaign_end_date = endDate;
+    // Mirror to application_deadline so the two stay consistent
+    updates.application_deadline = endDate;
+  }
+  if (deadline && !endDate) updates.application_deadline = deadline;
   if (status) updates.status = status;
 
   const { error } = await adminClient.from("campaigns").update(updates).eq("campaign_id", campaignId);
