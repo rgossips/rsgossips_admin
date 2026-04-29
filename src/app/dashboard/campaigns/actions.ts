@@ -64,6 +64,7 @@ export async function createCampaign(formData: FormData) {
   const posts = formData.get("num_posts") as string;
   const stories = formData.get("num_stories") as string;
   const videos = formData.get("num_videos") as string;
+  const blogs = formData.get("num_blogs") as string;
 
   // Requirements
   const minFollowers = formData.get("target_follower_min") as string;
@@ -74,14 +75,42 @@ export async function createCampaign(formData: FormData) {
   const bannerUrl = formData.get("banner_image_url") as string | null;
   const galleryUrls = formData.getAll("gallery_image_urls") as string[];
 
+  // Audit / extended fields
+  const offeringType = formData.get("offering_type") as string;
+  const productName = formData.get("product_name") as string;
+  const productValue = formData.get("product_value") as string;
+  const shippingRequired = formData.get("shipping_required") as string;
+  const shippingTimelineDays = formData.get("shipping_timeline_days") as string;
+  const serviceLocation = formData.get("service_location") as string;
+  const barterCompensation = formData.get("barter_compensation") as string;
+  const contentDos = formData.get("content_dos") as string;
+  const contentDonts = formData.get("content_donts") as string;
+  const requiredHashtags = formData.get("required_hashtags") as string;
+  const brandHandlesToTag = formData.get("brand_handles_to_tag") as string;
+  const usageRights = formData.get("usage_rights") as string;
+  const keepupDuration = formData.get("keepup_duration") as string;
+  const exclusivityDays = formData.get("exclusivity_days") as string;
+  const paymentTimeline = formData.get("payment_timeline") as string;
+  const platformsJson = formData.get("platforms_json") as string;
+  const gendersJson = formData.get("genders_json") as string;
+  const languagesJson = formData.get("languages_json") as string;
+
+  const safeJsonArr = (raw: string) => {
+    try { const v = JSON.parse(raw || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+  };
+  const platforms = safeJsonArr(platformsJson);
+  const genders = safeJsonArr(gendersJson);
+  const languages = safeJsonArr(languagesJson);
+
   if (!title) return { error: "Title is required" };
   if (!brandId) return { error: "Brand is required" };
   if (!startDate) return { error: "Start date is required" };
-  if (!endDate) return { error: "Deadline is required" };
-  // Single deadline: applications close and the campaign ends on the same date.
-  // We still write to both DB columns for backward compatibility with any
-  // reader still consuming application_deadline.
-  const finalDeadline = deadline || endDate;
+  if (!deadline) return { error: "Application deadline is required" };
+  if (!endDate) return { error: "Campaign end date is required" };
+  if (new Date(deadline) > new Date(endDate)) {
+    return { error: "Application deadline must be on or before the campaign end date" };
+  }
+  const finalDeadline = deadline;
 
   // Parse brand selection — format is "type:id" (e.g. "registered:uuid" or "invited:uuid")
   const [brandType, brandUuid] = brandId.includes(":") ? brandId.split(":", 2) : ["registered", brandId];
@@ -94,14 +123,40 @@ export async function createCampaign(formData: FormData) {
   if (posts && parseInt(posts) > 0) contentTypes.push(`posts:${posts}`);
   if (stories && parseInt(stories) > 0) contentTypes.push(`stories:${stories}`);
   if (videos && parseInt(videos) > 0) contentTypes.push(`videos:${videos}`);
+  if (blogs && parseInt(blogs) > 0) contentTypes.push(`blogs:${blogs}`);
 
-  // Build description with metadata (banner + gallery URLs) if images were uploaded
+  // Build description with metadata if any extras provided
   let fullDescription = description || "";
   const metadata: Record<string, unknown> = {};
   if (bannerUrl) metadata.banner_image = bannerUrl;
   const validGalleryUrls = galleryUrls.filter(Boolean);
   if (validGalleryUrls.length > 0) metadata.gallery_images = validGalleryUrls;
   if (minEngagement) metadata.min_engagement_rate = parseFloat(minEngagement);
+
+  // Extended audit fields
+  if (platforms.length > 0) metadata.platforms = platforms;
+  if (genders.length > 0) metadata.target_gender = genders;
+  if (languages.length > 0) metadata.target_languages = languages;
+  if (offeringType) metadata.offering_type = offeringType;
+  if (productName) metadata.product_name = productName;
+  if (productValue) metadata.product_value = parseInt(productValue);
+  // Shipping fields only apply to product offerings; service uses service_location.
+  if (offeringType === "product") {
+    if (shippingRequired) metadata.shipping_required = shippingRequired;
+    if (shippingTimelineDays) metadata.shipping_timeline_days = parseInt(shippingTimelineDays);
+  } else if (offeringType === "service") {
+    if (serviceLocation) metadata.service_location = serviceLocation;
+  }
+  if (barterCompensation) metadata.barter_compensation = barterCompensation;
+  if (contentDos) metadata.content_dos = contentDos;
+  if (contentDonts) metadata.content_donts = contentDonts;
+  if (requiredHashtags) metadata.required_hashtags = requiredHashtags;
+  if (brandHandlesToTag) metadata.brand_handles_to_tag = brandHandlesToTag;
+  if (usageRights) metadata.usage_rights = usageRights;
+  if (keepupDuration) metadata.keepup_duration = keepupDuration;
+  if (exclusivityDays && exclusivityDays !== "0") metadata.exclusivity_days = exclusivityDays;
+  if (paymentTimeline) metadata.payment_timeline = paymentTimeline;
+
   if (Object.keys(metadata).length > 0) {
     fullDescription = fullDescription
       ? `${fullDescription}\n\n---\n${JSON.stringify(metadata)}`
@@ -246,12 +301,8 @@ export async function updateCampaign(campaignId: string, formData: FormData) {
     updated_at: new Date().toISOString(),
   };
   if (startDate) updates.campaign_start_date = startDate;
-  if (endDate) {
-    updates.campaign_end_date = endDate;
-    // Mirror to application_deadline so the two stay consistent
-    updates.application_deadline = endDate;
-  }
-  if (deadline && !endDate) updates.application_deadline = deadline;
+  if (endDate) updates.campaign_end_date = endDate;
+  if (deadline) updates.application_deadline = deadline;
   if (status) updates.status = status;
 
   const { error } = await adminClient.from("campaigns").update(updates).eq("campaign_id", campaignId);

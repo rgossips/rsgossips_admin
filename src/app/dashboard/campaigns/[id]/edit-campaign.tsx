@@ -164,10 +164,11 @@ function EditCampaignModal({ campaign, description, bannerUrl, galleryUrls, enga
             </div>
           </div>
 
-          {/* Dates — single deadline (applications close + campaign ends) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Dates — application deadline (last day to apply) and campaign end date (final delivery) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div><label className={labelClass}>Start Date</label><input name="campaign_start_date" type="date" defaultValue={campaign.campaign_start_date?.split("T")[0] || ""} className={inputClass} /></div>
-            <div><label className={labelClass}>Deadline</label><input name="campaign_end_date" type="date" defaultValue={(campaign.campaign_end_date || campaign.application_deadline)?.split("T")[0] || ""} className={inputClass} /></div>
+            <div><label className={labelClass}>Application Deadline</label><input name="application_deadline" type="date" defaultValue={campaign.application_deadline?.split("T")[0] || ""} className={inputClass} /></div>
+            <div><label className={labelClass}>Campaign End Date</label><input name="campaign_end_date" type="date" defaultValue={campaign.campaign_end_date?.split("T")[0] || ""} className={inputClass} /></div>
           </div>
 
           {/* Deliverables */}

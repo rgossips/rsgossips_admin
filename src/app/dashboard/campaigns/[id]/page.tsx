@@ -323,7 +323,8 @@ export default async function CampaignDetailPage({
             </div>
             <div className="p-5 space-y-4">
               <DateItem label="Start Date" date={formatDate(campaign.campaign_start_date)} />
-              <DateItem label="Deadline" date={formatDate(campaign.campaign_end_date || campaign.application_deadline)} />
+              <DateItem label="Application Deadline" date={formatDate(campaign.application_deadline)} />
+              <DateItem label="Campaign End Date" date={formatDate(campaign.campaign_end_date)} />
               {daysRemaining !== null && (
                 <div className={`mt-2 px-4 py-3 rounded-xl text-center ${
                   daysRemaining > 7

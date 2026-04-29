@@ -1,11 +1,30 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createCampaign, uploadCampaignImage } from "../actions";
 import { FullPageLoader } from "@/components/spinner";
 
 import { CATEGORIES } from "@/lib/categories";
+
+const PLATFORMS = ["Instagram", "YouTube", "TikTok", "LinkedIn", "X (Twitter)", "Blog"];
+const CITIES = [
+  "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai",
+  "Kolkata", "Ahmedabad", "Jaipur", "Lucknow", "Chandigarh", "Indore",
+  "Bhopal", "Kochi", "Remote",
+];
+const LANGUAGES = [
+  "Hindi", "English", "Tamil", "Telugu", "Marathi", "Kannada",
+  "Bengali", "Gujarati", "Punjabi", "Malayalam",
+];
+const GENDERS = ["Male", "Female", "Any"];
+
+const TIER_RANGES: Record<string, { min: number; max: number }> = {
+  nano: { min: 1000, max: 10000 },
+  micro: { min: 10000, max: 100000 },
+  macro: { min: 100000, max: 1000000 },
+  mega: { min: 1000000, max: 10000000 },
+};
 
 async function uploadImage(file: File, folder: string): Promise<string | null> {
   const fd = new FormData();
@@ -30,18 +49,73 @@ interface ImagePreview {
   url: string;
 }
 
+const DESCRIPTION_TEMPLATE =
+  "What is this campaign about?\n\nWhat do you want the influencer to highlight?\n\nAny specific messaging or hashtags?";
+
 export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("Creating campaign...");
+
+  const [campaignType, setCampaignType] = useState<"barter" | "paid" | "hybrid">("barter");
+  const [budgetTotal, setBudgetTotal] = useState("");
+  const [maxInfluencers, setMaxInfluencers] = useState("");
+  const [tier, setTier] = useState("all");
+  const [followerMin, setFollowerMin] = useState("");
+  const [followerMax, setFollowerMax] = useState("");
+
+  const [numReels, setNumReels] = useState("");
+  const [numPosts, setNumPosts] = useState("");
+  const [numStories, setNumStories] = useState("");
+  const [numVideos, setNumVideos] = useState("");
+  const [numBlogs, setNumBlogs] = useState("");
+
+  const [shippingRequired, setShippingRequired] = useState<"no" | "yes" | "pickup">("no");
+  const [offeringType, setOfferingType] = useState<"product" | "service">("product");
+
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [allIndia, setAllIndia] = useState(false);
+  const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+
   const [bannerImage, setBannerImage] = useState<ImagePreview | null>(null);
   const [galleryImages, setGalleryImages] = useState<ImagePreview[]>([]);
   const [bannerDragOver, setBannerDragOver] = useState(false);
   const [galleryDragOver, setGalleryDragOver] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const isBarter = campaignType === "barter";
+  const isHybrid = campaignType === "hybrid";
+
+  // Auto-fill follower min/max when tier changes
+  useEffect(() => {
+    const range = TIER_RANGES[tier];
+    if (range) {
+      setFollowerMin(String(range.min));
+      setFollowerMax(String(range.max));
+    }
+  }, [tier]);
+
+  // Auto-calc Budget / Influencer
+  const budgetPerInfluencer = useMemo(() => {
+    const total = Number(budgetTotal) || 0;
+    const slots = Number(maxInfluencers) || 0;
+    if (total > 0 && slots > 0) return Math.round(total / slots);
+    return 0;
+  }, [budgetTotal, maxInfluencers]);
+
+  const totalDeliverables = useMemo(() => {
+    return [numReels, numPosts, numStories, numVideos, numBlogs]
+      .reduce((s, v) => s + (Number(v) || 0), 0);
+  }, [numReels, numPosts, numStories, numVideos, numBlogs]);
+
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (val: string) => {
+    setter((prev) => (prev.includes(val) ? prev.filter((x) => x !== val) : [...prev, val]));
+  };
 
   const handleBannerSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -87,21 +161,40 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
     }
   }, [bannerImage]);
 
-  const toggleCategory = (cat: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
-  };
-
   const handleSubmit = async (formData: FormData) => {
     setError("");
-    setLoading(true);
 
+    if (totalDeliverables < 1) {
+      setError("Add at least 1 deliverable");
+      return;
+    }
+    if (selectedCategories.length < 1) {
+      setError("Select at least 1 category");
+      return;
+    }
+    if (selectedPlatforms.length < 1) {
+      setError("Select at least 1 platform");
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Append categories
+      // Categories
       selectedCategories.forEach((cat) => formData.append("category", cat));
 
-      // Upload images one-by-one via server action, then pass URLs
+      // Cities
+      const finalCities = allIndia ? ["All India"] : selectedCities;
+      formData.set("target_cities", finalCities.join(","));
+
+      // Auto-calc'd budget per influencer (overwrite manual)
+      formData.set("budget_per_influencer", String(budgetPerInfluencer));
+
+      // Extras (packed into description metadata server-side)
+      formData.append("platforms_json", JSON.stringify(selectedPlatforms));
+      formData.append("genders_json", JSON.stringify(selectedGenders));
+      formData.append("languages_json", JSON.stringify(selectedLanguages));
+      formData.append("offering_type", offeringType);
+
       if (bannerImage) {
         setLoadingMsg("Uploading banner image...");
         const bannerUrl = await uploadImage(bannerImage.file, "banners");
@@ -130,525 +223,551 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
     }
   };
 
+  const inputClass =
+    "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all";
+  const labelClass = "block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
+
+  const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
+    </div>
+  );
+
+  const Chip = ({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
+        on
+          ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300"
+          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300"
+      }`}
+    >
+      {on ? "✓ " : ""}{label}
+    </button>
+  );
+
   return (
     <form action={handleSubmit} className="space-y-6">
       {loading && <FullPageLoader message={loadingMsg} />}
       {error && (
         <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <svg className="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column — main info */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Basic Info Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Basic Information</h2>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500">Campaign title, description, and brand</p>
-                </div>
+          <Card title="Basic information">
+            <div>
+              <label className={labelClass}>Campaign Title <span className="text-red-400">*</span></label>
+              <input name="title" type="text" required placeholder="e.g. Summer Fashion 2026" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Description</label>
+              <textarea name="description" rows={5} placeholder={DESCRIPTION_TEMPLATE} className={`${inputClass} resize-none`} />
+              <p className="text-[11px] text-gray-400 mt-1">A guided template helps creators understand what you need.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Brand <span className="text-red-400">*</span></label>
+                <select name="brand_id" required className={inputClass}>
+                  <option value="">Select a brand</option>
+                  {brands.map((b) => (
+                    <option key={b.id} value={`${b.type}:${b.id}`}>
+                      {b.name || b.id}{b.type === "invited" ? " (Invited)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Campaign Type <span className="text-red-400">*</span></label>
+                <select
+                  name="campaign_type"
+                  value={campaignType}
+                  onChange={(e) => setCampaignType(e.target.value as any)}
+                  required
+                  className={inputClass}
+                >
+                  <option value="barter">Barter</option>
+                  <option value="paid">Paid</option>
+                  <option value="hybrid">Hybrid</option>
+                </select>
               </div>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Campaign Title <span className="text-red-400">*</span>
-                </label>
+                <label className={labelClass}>Total Slots</label>
                 <input
-                  name="title"
-                  type="text"
-                  required
-                  placeholder="e.g. Summer Fashion Collection 2026"
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
+                  name="max_influencers"
+                  type="number"
+                  min="1"
+                  value={maxInfluencers}
+                  onChange={(e) => setMaxInfluencers(e.target.value)}
+                  placeholder="10"
+                  className={inputClass}
                 />
               </div>
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  rows={4}
-                  placeholder="Describe the campaign goals, expectations, and any special instructions for influencers..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all resize-none"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {!isBarter && (
                 <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Brand <span className="text-red-400">*</span>
-                  </label>
-                  <select
-                    name="brand_id"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all appearance-none"
-                  >
-                    <option value="">Select a brand</option>
-                    {brands.map((b) => (
-                      <option key={b.id} value={`${b.type}:${b.id}`}>
-                        {b.name || b.id}{b.type === "invited" ? " (Invited)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Campaign Type <span className="text-red-400">*</span>
-                  </label>
-                  <select
-                    name="campaign_type"
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all appearance-none"
-                  >
-                    <option value="barter">Barter</option>
-                    <option value="paid">Paid</option>
-                    <option value="hybrid">Hybrid</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Total Slots
-                  </label>
-                  <input
-                    name="max_influencers"
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 10"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Total Budget
-                  </label>
+                  <label className={labelClass}>Total Budget</label>
                   <input
                     name="budget_total"
                     type="number"
                     min="0"
-                    placeholder="e.g. 50000"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
+                    value={budgetTotal}
+                    onChange={(e) => setBudgetTotal(e.target.value)}
+                    placeholder="50000"
+                    className={inputClass}
                   />
                 </div>
+              )}
+              {!isBarter && (
                 <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Budget Per Influencer
-                  </label>
+                  <label className={labelClass}>Budget / Influencer</label>
                   <input
                     name="budget_per_influencer"
                     type="number"
-                    min="0"
-                    placeholder="e.g. 5000"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
+                    value={budgetPerInfluencer || ""}
+                    readOnly
+                    placeholder="—"
+                    className={`${inputClass} bg-gray-100 dark:bg-gray-700 cursor-not-allowed`}
                   />
+                  <p className="text-[10px] text-gray-400 mt-1">Auto-calculated from total ÷ slots</p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Banner Image Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
+              )}
+              {(isBarter || isHybrid) && (
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Banner Image</h2>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500">Main campaign cover image</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6">
-              {bannerImage ? (
-                <div className="relative group rounded-xl overflow-hidden">
-                  <img
-                    src={bannerImage.url}
-                    alt="Banner preview"
-                    className="w-full h-48 object-cover"
+                  <label className={labelClass}>Product value (approx.)</label>
+                  <input
+                    name="product_value"
+                    type="number"
+                    min="0"
+                    placeholder="3500"
+                    className={inputClass}
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={removeBanner}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-full bg-white/90 text-red-600 hover:bg-white cursor-pointer shadow-lg"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm">
-                    <p className="text-[11px] text-white font-medium truncate max-w-[200px]">{bannerImage.file.name}</p>
-                  </div>
                 </div>
-              ) : (
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setBannerDragOver(true); }}
-                  onDragLeave={() => setBannerDragOver(false)}
-                  onDrop={(e) => handleDrop(e, "banner")}
-                  onClick={() => bannerInputRef.current?.click()}
-                  className={`flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
-                    bannerDragOver
-                      ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/10"
-                      : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+              )}
+            </div>
+          </Card>
+
+          <Card title="Product / service">
+            <div>
+              <label className={labelClass}>What are you promoting? <span className="text-red-400">*</span></label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setOfferingType("product")}
+                  className={`py-2 rounded-xl text-sm font-semibold border transition-colors cursor-pointer ${
+                    offeringType === "product"
+                      ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300"
+                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600"
                   }`}
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                    bannerDragOver ? "bg-indigo-100 dark:bg-indigo-900/30" : "bg-gray-100 dark:bg-gray-700"
-                  }`}>
-                    <svg className={`w-6 h-6 ${bannerDragOver ? "text-indigo-500" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {bannerDragOver ? "Drop image here" : "Click or drag to upload"}
-                  </p>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">PNG, JPG, WebP up to 5MB</p>
-                </div>
-              )}
+                  📦 Product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOfferingType("service")}
+                  className={`py-2 rounded-xl text-sm font-semibold border transition-colors cursor-pointer ${
+                    offeringType === "service"
+                      ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300"
+                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600"
+                  }`}
+                >
+                  🛎️ Service / Experience
+                </button>
+              </div>
               <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleBannerSelect(e.target.files)}
+                name="product_name"
+                type="text"
+                placeholder={offeringType === "product"
+                  ? 'e.g. "Moisturizing cream — 50ml tube"'
+                  : 'e.g. "Weekend stay at our Mussoorie resort"'}
+                className={inputClass}
               />
             </div>
-          </div>
 
-          {/* Gallery Images Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-900/30 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Gallery Images</h2>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Upload multiple reference or product images</p>
-                  </div>
+            {offeringType === "product" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Will product be shipped?</label>
+                  <select
+                    name="shipping_required"
+                    value={shippingRequired}
+                    onChange={(e) => setShippingRequired(e.target.value as any)}
+                    className={inputClass}
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                    <option value="pickup">Pickup required</option>
+                  </select>
                 </div>
-                {galleryImages.length > 0 && (
-                  <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-                    {galleryImages.length} image{galleryImages.length !== 1 ? "s" : ""}
-                  </span>
+                {shippingRequired === "yes" && (
+                  <div>
+                    <label className={labelClass}>Shipping timeline (days)</label>
+                    <input
+                      name="shipping_timeline_days"
+                      type="number"
+                      min="1"
+                      placeholder="3"
+                      className={inputClass}
+                    />
+                  </div>
                 )}
               </div>
-            </div>
-            <div className="p-6">
-              {/* Gallery grid */}
-              {galleryImages.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
-                  {galleryImages.map((img, i) => (
-                    <div key={i} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
-                      <img src={img.url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => removeGalleryImage(i)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full bg-white/90 text-red-600 hover:bg-white cursor-pointer shadow-lg"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-md bg-black/60 flex items-center justify-center">
-                        <span className="text-[9px] font-bold text-white">{i + 1}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            )}
 
-              {/* Upload zone */}
+            {offeringType === "service" && (
+              <div>
+                <label className={labelClass}>Service location</label>
+                <input
+                  name="service_location"
+                  type="text"
+                  placeholder='e.g. "Mussoorie, India" or "Online / virtual"'
+                  className={inputClass}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Where the influencer experiences the service.</p>
+              </div>
+            )}
+
+            {(isBarter || isHybrid) && (
+              <div>
+                <label className={labelClass}>What does the influencer get? (compensation)</label>
+                <textarea
+                  name="barter_compensation"
+                  rows={2}
+                  placeholder={offeringType === "product"
+                    ? 'e.g. "Full skincare kit worth ₹3,500"'
+                    : 'e.g. "Free 2-night stay + meals + spa session"'}
+                  className={`${inputClass} resize-none`}
+                />
+              </div>
+            )}
+          </Card>
+
+          <Card title="Banner image">
+            {bannerImage ? (
+              <div className="relative group rounded-xl overflow-hidden">
+                <img src={bannerImage.url} alt="Banner preview" className="w-full h-48 object-cover" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={removeBanner}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-red-600 font-medium text-sm cursor-pointer shadow-lg"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
               <div
-                onDragOver={(e) => { e.preventDefault(); setGalleryDragOver(true); }}
-                onDragLeave={() => setGalleryDragOver(false)}
-                onDrop={(e) => handleDrop(e, "gallery")}
-                onClick={() => galleryInputRef.current?.click()}
-                className={`flex flex-col items-center justify-center py-8 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
-                  galleryDragOver
-                    ? "border-teal-400 bg-teal-50 dark:bg-teal-900/10"
-                    : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onDragOver={(e) => { e.preventDefault(); setBannerDragOver(true); }}
+                onDragLeave={() => setBannerDragOver(false)}
+                onDrop={(e) => handleDrop(e, "banner")}
+                onClick={() => bannerInputRef.current?.click()}
+                className={`flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
+                  bannerDragOver
+                    ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/10"
+                    : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-gray-300"
                 }`}
               >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                  galleryDragOver ? "bg-teal-100 dark:bg-teal-900/30" : "bg-gray-100 dark:bg-gray-700"
-                }`}>
-                  <svg className={`w-5 h-5 ${galleryDragOver ? "text-teal-500" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {galleryDragOver ? "Drop images here" : galleryImages.length > 0 ? "Add more images" : "Click or drag to upload images"}
-                </p>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Select multiple files at once</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Click or drag to upload</p>
+                <p className="text-[11px] text-gray-400 mt-1">PNG, JPG, WebP up to 10MB</p>
               </div>
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleGallerySelect(e.target.files)}
-              />
-            </div>
-          </div>
+            )}
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleBannerSelect(e.target.files)}
+            />
+          </Card>
 
-          {/* Content Deliverables Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Content Deliverables</h2>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500">What influencers need to create</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  { name: "num_reels", label: "Reels", icon: "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z", color: "text-rose-500" },
-                  { name: "num_posts", label: "Posts", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z", color: "text-blue-500" },
-                  { name: "num_stories", label: "Stories", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z", color: "text-amber-500" },
-                  { name: "num_videos", label: "Videos", icon: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z", color: "text-purple-500" },
-                ].map((item) => (
-                  <div key={item.name} className="relative">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <svg className={`w-3.5 h-3.5 ${item.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                      </svg>
-                      <label className="text-[13px] font-medium text-gray-700 dark:text-gray-300">{item.label}</label>
-                    </div>
-                    <input
-                      name={item.name}
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                    />
+          <Card title="Gallery">
+            {galleryImages.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {galleryImages.map((img, i) => (
+                  <div key={i} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    <img src={img.url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryImage(i)}
+                      className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-white/90 text-red-600 cursor-pointer shadow"
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>
+            )}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setGalleryDragOver(true); }}
+              onDragLeave={() => setGalleryDragOver(false)}
+              onDrop={(e) => handleDrop(e, "gallery")}
+              onClick={() => galleryInputRef.current?.click()}
+              className={`flex flex-col items-center justify-center py-8 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
+                galleryDragOver
+                  ? "border-teal-400 bg-teal-50 dark:bg-teal-900/10"
+                  : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-gray-300"
+              }`}
+            >
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {galleryImages.length > 0 ? "Add more images" : "Click or drag to upload images"}
+              </p>
             </div>
-          </div>
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleGallerySelect(e.target.files)}
+            />
+          </Card>
 
-          {/* Requirements Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Influencer Requirements</h2>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500">Set minimum criteria for applicants</p>
-                </div>
+          <Card title={`Content deliverables · ${totalDeliverables} piece${totalDeliverables !== 1 ? "s" : ""}`}>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div>
+                <label className={labelClass}>Reels</label>
+                <input name="num_reels" type="number" min="0" value={numReels} onChange={(e) => setNumReels(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
+              </div>
+              <div>
+                <label className={labelClass}>Posts</label>
+                <input name="num_posts" type="number" min="0" value={numPosts} onChange={(e) => setNumPosts(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
+              </div>
+              <div>
+                <label className={labelClass}>Stories</label>
+                <input name="num_stories" type="number" min="0" value={numStories} onChange={(e) => setNumStories(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
+              </div>
+              <div>
+                <label className={labelClass}>Videos</label>
+                <input name="num_videos" type="number" min="0" value={numVideos} onChange={(e) => setNumVideos(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
+              </div>
+              <div>
+                <label className={labelClass}>Blogs</label>
+                <input name="num_blogs" type="number" min="0" value={numBlogs} onChange={(e) => setNumBlogs(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
               </div>
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Min. Followers</label>
+            {totalDeliverables === 0 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">At least 1 deliverable is required.</p>
+            )}
+          </Card>
+
+          <Card title="Influencer requirements">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Influencer Tier</label>
+                <select
+                  name="target_influencer_tier"
+                  value={tier}
+                  onChange={(e) => setTier(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="all">All Tiers</option>
+                  <option value="nano">Nano (1K-10K)</option>
+                  <option value="micro">Micro (10K-100K)</option>
+                  <option value="macro">Macro (100K-1M)</option>
+                  <option value="mega">Mega (1M+)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Min. Followers</label>
+                <input
+                  name="target_follower_min"
+                  type="number"
+                  min="0"
+                  value={followerMin}
+                  onChange={(e) => setFollowerMin(e.target.value)}
+                  placeholder="1000"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Max. Followers</label>
+                <input
+                  name="target_follower_max"
+                  type="number"
+                  min="0"
+                  value={followerMax}
+                  onChange={(e) => setFollowerMax(e.target.value)}
+                  placeholder="100000"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Min. Engagement Rate (%)</label>
+              <input name="min_engagement_rate" type="number" min="0" step="0.1" placeholder="2.5" className={inputClass} />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className={labelClass} style={{ marginBottom: 0 }}>Locations</label>
+                <label className="flex items-center gap-2 text-[11px] font-medium text-gray-600 dark:text-gray-400 cursor-pointer">
                   <input
-                    name="target_follower_min"
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 1000"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
+                    type="checkbox"
+                    checked={allIndia}
+                    onChange={(e) => setAllIndia(e.target.checked)}
+                    className="w-4 h-4 accent-indigo-500"
                   />
+                  All India
+                </label>
+              </div>
+              {!allIndia && (
+                <div className="flex flex-wrap gap-2">
+                  {CITIES.map((c) => (
+                    <Chip key={c} label={c} on={selectedCities.includes(c)} onClick={() => toggle(setSelectedCities)(c)} />
+                  ))}
                 </div>
+              )}
+            </div>
+            <div>
+              <label className={labelClass}>Preferred gender</label>
+              <div className="flex flex-wrap gap-2">
+                {GENDERS.map((g) => (
+                  <Chip key={g} label={g} on={selectedGenders.includes(g)} onClick={() => toggle(setSelectedGenders)(g)} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Preferred languages</label>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGES.map((l) => (
+                  <Chip key={l} label={l} on={selectedLanguages.includes(l)} onClick={() => toggle(setSelectedLanguages)(l)} />
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Content guidelines">
+            <div>
+              <label className={labelClass}>Must include (Do&apos;s)</label>
+              <textarea name="content_dos" rows={2} placeholder='"Show product packaging, mention discount code SAVE20"' className={`${inputClass} resize-none`} />
+            </div>
+            <div>
+              <label className={labelClass}>Must avoid (Don&apos;ts)</label>
+              <textarea name="content_donts" rows={2} placeholder='"No competitor products, no copyrighted music"' className={`${inputClass} resize-none`} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Required hashtags</label>
+                <input name="required_hashtags" type="text" placeholder="#RGossips #Ad #Paidpartnership" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Brand handle(s) to tag</label>
+                <input name="brand_handles_to_tag" type="text" placeholder="@yourbrand" className={inputClass} />
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Terms & rights">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Content usage rights</label>
+                <select name="usage_rights" defaultValue="creator_only" className={inputClass}>
+                  <option value="creator_only">Influencer&apos;s page only</option>
+                  <option value="brand_repost">Brand can repost</option>
+                  <option value="paid_ads">Brand can use in paid ads</option>
+                  <option value="full_rights">Full rights transfer</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Content keep-up duration</label>
+                <select name="keepup_duration" defaultValue="permanent" className={inputClass}>
+                  <option value="24h">24 hours (stories)</option>
+                  <option value="7d">7 days</option>
+                  <option value="30d">30 days</option>
+                  <option value="permanent">Permanent</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Exclusivity (no competing brands)</label>
+                <select name="exclusivity_days" defaultValue="0" className={inputClass}>
+                  <option value="0">No exclusivity</option>
+                  <option value="7">7 days</option>
+                  <option value="15">15 days</option>
+                  <option value="30">30 days</option>
+                  <option value="60">60 days</option>
+                  <option value="90">90 days</option>
+                </select>
+              </div>
+              {!isBarter && (
                 <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Max. Followers</label>
-                  <input
-                    name="target_follower_max"
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 100000"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Influencer Tier</label>
-                  <select
-                    name="target_influencer_tier"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all appearance-none"
-                  >
-                    <option value="all">All Tiers</option>
-                    <option value="nano">Nano (1K-10K)</option>
-                    <option value="micro">Micro (10K-100K)</option>
-                    <option value="macro">Macro (100K-1M)</option>
-                    <option value="mega">Mega (1M+)</option>
+                  <label className={labelClass}>Payment timeline</label>
+                  <select name="payment_timeline" defaultValue="on_approval" className={inputClass}>
+                    <option value="advance">Advance</option>
+                    <option value="on_approval">On content approval</option>
+                    <option value="7_days">Within 7 days of posting</option>
+                    <option value="30_days">Within 30 days</option>
                   </select>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Min. Engagement Rate (%)</label>
-                  <input
-                    name="min_engagement_rate"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    placeholder="e.g. 2.5"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Location (comma-separated)</label>
-                  <input
-                    name="target_cities"
-                    type="text"
-                    placeholder="e.g. Mumbai, Delhi, Bangalore"
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                  />
-                </div>
-              </div>
+              )}
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* Right column — sidebar */}
         <div className="space-y-6">
-          {/* Categories Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Categories</h2>
-              </div>
-            </div>
-            <div className="p-5 space-y-2">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => toggleCategory(cat)}
-                  className={`flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer border ${
-                    selectedCategories.includes(cat)
-                      ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
-                      : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:bg-white dark:hover:bg-gray-750"
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                    selectedCategories.includes(cat)
-                      ? "bg-indigo-600 border-indigo-600"
-                      : "border-gray-300 dark:border-gray-600"
-                  }`}>
-                    {selectedCategories.includes(cat) && (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                  {cat}
-                </button>
+          <Card title="Platforms *">
+            <div className="flex flex-wrap gap-2">
+              {PLATFORMS.map((p) => (
+                <Chip key={p} label={p} on={selectedPlatforms.includes(p)} onClick={() => toggle(setSelectedPlatforms)(p)} />
               ))}
             </div>
-          </div>
+            {selectedPlatforms.length === 0 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">Select at least 1 platform.</p>
+            )}
+          </Card>
 
-          {/* Dates Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-cyan-50 dark:bg-cyan-900/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Schedule</h2>
-              </div>
+          <Card title={`Categories · ${selectedCategories.length} of ${CATEGORIES.length}`}>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((cat) => (
+                <Chip key={cat} label={cat} on={selectedCategories.includes(cat)} onClick={() => toggle(setSelectedCategories)(cat)} />
+              ))}
             </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Start Date <span className="text-red-400">*</span></label>
-                <input
-                  name="campaign_start_date"
-                  type="date"
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline <span className="text-red-400">*</span></label>
-                <input
-                  name="campaign_end_date"
-                  type="date"
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
-                />
-                <p className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">Applications close and the campaign ends on this date.</p>
-              </div>
-            </div>
-          </div>
+            {selectedCategories.length === 0 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">Select at least 1 category.</p>
+            )}
+          </Card>
 
-          {/* Submit Card */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5">
-            <div className="space-y-3">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-indigo-300 disabled:to-purple-300 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all duration-200 cursor-pointer shadow-lg shadow-indigo-200/50 dark:shadow-indigo-900/30 hover:shadow-xl hover:shadow-indigo-200/60"
-              >
-                {loading ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Create Campaign
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard/campaigns")}
-                className="w-full px-6 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium transition-all duration-200 cursor-pointer"
-              >
-                Cancel
-              </button>
+          <Card title="Schedule">
+            <div>
+              <label className={labelClass}>Start Date <span className="text-red-400">*</span></label>
+              <input name="campaign_start_date" type="date" required className={inputClass} />
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-gray-600 text-center mt-3">
-              Campaign will be created as a draft
-            </p>
-          </div>
+            <div>
+              <label className={labelClass}>Application Deadline <span className="text-red-400">*</span></label>
+              <input name="application_deadline" type="date" required className={inputClass} />
+              <p className="text-[11px] text-gray-400 mt-1">Last day for influencers to apply.</p>
+            </div>
+            <div>
+              <label className={labelClass}>Campaign End Date <span className="text-red-400">*</span></label>
+              <input name="campaign_end_date" type="date" required className={inputClass} />
+              <p className="text-[11px] text-gray-400 mt-1">All content must be delivered by this date.</p>
+            </div>
+          </Card>
+
+          <Card title="Submit">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-sm font-semibold cursor-pointer shadow-lg"
+            >
+              {loading ? "Creating..." : "Create Campaign"}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/campaigns")}
+              className="w-full px-6 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 text-sm font-medium cursor-pointer"
+            >
+              Cancel
+            </button>
+            <p className="text-[11px] text-gray-400 text-center">Campaign will be created as a draft</p>
+          </Card>
         </div>
       </div>
     </form>
