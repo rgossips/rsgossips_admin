@@ -5,6 +5,7 @@ import { inviteInfluencer, uploadInfluencerPhoto } from "./actions";
 import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 
 import { CATEGORIES } from "@/lib/categories";
+import { INDIAN_CITIES } from "@/lib/cities";
 
 const LANGUAGES = [
   "English", "Hindi", "Tamil", "Telugu", "Kannada", "Malayalam",
@@ -183,12 +184,29 @@ export function InviteInfluencerForm() {
               </div>
             </div>
 
-            {/* Row 2: City + Categories + Languages */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Row 2: City + Gender */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>City</label>
-                <input name="city" type="text" placeholder="e.g. Mumbai" className={inputClass} />
+                <label className={labelClass}>City <span className="text-red-400">*</span></label>
+                <select name="city" required defaultValue="" className={`${inputClass} appearance-none`}>
+                  <option value="" disabled>Select a city</option>
+                  {INDIAN_CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
+              <div>
+                <label className={labelClass}>Gender <span className="text-red-400">*</span></label>
+                <select name="gender" required defaultValue="" className={`${inputClass} appearance-none`}>
+                  <option value="" disabled>Select gender</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="non_binary">Non-binary</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Row 3: Categories + Languages */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <MultiSelectChips label="Categories" options={CATEGORIES} selected={selectedCategories} onChange={setSelectedCategories} />
               <MultiSelectChips label="Content Language" options={LANGUAGES} selected={selectedLanguages} onChange={setSelectedLanguages} />
             </div>

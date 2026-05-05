@@ -73,16 +73,20 @@ export async function inviteInfluencer(formData: FormData) {
   const profilePhotoUrl = (formData.get("profile_photo_url") as string) || "";
   const notesText = (formData.get("notes") as string) || "";
   const city = (formData.get("city") as string) || "";
+  const gender = (formData.get("gender") as string) || "";
   const categories = formData.getAll("categories") as string[];
   const languages = formData.getAll("languages") as string[];
   const tags = formData.getAll("tags") as string[];
 
   if (!fullName) return { error: "Name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
+  if (!city) return { error: "City is required" };
+  if (!gender) return { error: "Gender is required" };
 
   // Build notes with metadata
   const metadata: Record<string, unknown> = {};
   if (city) metadata.city = city;
+  if (gender) metadata.gender = gender;
   if (categories.length > 0) metadata.categories = categories;
   if (languages.length > 0) metadata.languages = languages;
   if (tags.length > 0) metadata.tags = tags;
@@ -137,6 +141,7 @@ export async function updateInfluencerInvitation(invitationId: string, formData:
   const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();
   const notesText = (formData.get("notes") as string) || "";
   const city = (formData.get("city") as string) || "";
+  const gender = (formData.get("gender") as string) || "";
   const categoriesCsv = (formData.get("categories_csv") as string || "").split(",").map(c => c.trim()).filter(Boolean);
   const languagesCsv = (formData.get("languages_csv") as string || "").split(",").map(l => l.trim()).filter(Boolean);
   const tagsCsv = (formData.get("tags_csv") as string || "").split(",").map(t => t.trim()).filter(Boolean);
@@ -146,6 +151,7 @@ export async function updateInfluencerInvitation(invitationId: string, formData:
 
   const metadata: Record<string, unknown> = {};
   if (city) metadata.city = city;
+  if (gender) metadata.gender = gender;
   if (categoriesCsv.length > 0) metadata.categories = categoriesCsv;
   if (languagesCsv.length > 0) metadata.languages = languagesCsv;
   if (tagsCsv.length > 0) metadata.tags = tagsCsv;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ButtonSpinner } from "@/components/spinner";
 import { deleteInfluencerInvitation, updateInfluencerInvitation } from "./actions";
 import { Avatar } from "@/components/avatar";
+import { INDIAN_CITIES } from "@/lib/cities";
 
 interface Invitation {
   id: string;
@@ -133,9 +134,24 @@ function EditInfluencerInviteModal({ invitation, text, meta, onClose }: { invita
               <input name="instagram_username" required defaultValue={invitation.instagram_username} className={inputClass} />
             </div>
           </div>
-          <div>
-            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">City</label>
-            <input name="city" defaultValue={meta?.city || ""} placeholder="e.g. Mumbai" className={inputClass} />
+          <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">City</label>
+                <select name="city" defaultValue={meta?.city || ""} className={`${inputClass} appearance-none`}>
+                  <option value="">Select a city</option>
+                  {INDIAN_CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Gender</label>
+                <select name="gender" defaultValue={meta?.gender || ""} className={`${inputClass} appearance-none`}>
+                  <option value="">Select gender</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="non_binary">Non-binary</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </div>
           </div>
           <div>
             <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Categories <span className="text-gray-400 font-normal">(comma-separated)</span></label>
