@@ -7,7 +7,7 @@ import { FullPageLoader } from "@/components/spinner";
 
 import { CATEGORIES } from "@/lib/categories";
 
-const PLATFORMS = ["Instagram", "YouTube", "TikTok", "LinkedIn", "X (Twitter)", "Blog"];
+const PLATFORMS = ["Instagram"];
 const CITIES = [
   "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai",
   "Kolkata", "Ahmedabad", "Jaipur", "Lucknow", "Chandigarh", "Indore",
@@ -75,7 +75,7 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const [offeringType, setOfferingType] = useState<"product" | "service">("product");
 
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["Instagram"]);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [allIndia, setAllIndia] = useState(false);
   const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
