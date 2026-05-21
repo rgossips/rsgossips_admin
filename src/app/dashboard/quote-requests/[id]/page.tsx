@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { QuoteResponseForm } from "../_components/quote-response-form";
+import { acceptCounterOffer } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,14 @@ export default async function QuoteRequestDetailPage({
     .select("*")
     .eq("order_id", id)
     .order("occurred_at", { ascending: true });
+
+  // Platform fee % for live preview in the response form
+  const { data: feeRow } = await admin
+    .from("platform_config")
+    .select("value")
+    .eq("key", "service_platform_fee_pct")
+    .maybeSingle();
+  const platformFeePct = Number((feeRow as any)?.value) || 15;
 
   return (
     <div className="space-y-6">
@@ -151,11 +161,76 @@ export default async function QuoteRequestDetailPage({
             />
           </Card>
 
-          <Card title="Next step" subtitle="Quote response UI ships in Phase 2.">
-            <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed">
-              Sending a quote (amount + delivery date + revisions + validity), or declining the request, will be available here once Phase 2 lands.
-            </p>
-          </Card>
+          {/* Status-dependent action card. pending_quote → send quote /
+              decline; counter_offered → accept counter, send new quote, or
+              decline; everything else → read-only summary card. */}
+          {order.status === "pending_quote" && (
+            <QuoteResponseForm
+              orderId={order.id}
+              serviceTitle={order.service_title || ""}
+              desiredDeliveryDate={order.desired_delivery_date}
+              platformFeePct={platformFeePct}
+            />
+          )}
+
+          {order.status === "counter_offered" && (
+            <div className="space-y-3">
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
+                <p className="text-[11px] font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wider">
+                  Counter offer received
+                </p>
+                <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">
+                  ₹{Number(order.counter_amount || 0).toLocaleString("en-IN")}
+                </p>
+                {order.counter_message && (
+                  <p className="text-[12px] text-gray-600 dark:text-gray-300 mt-2 italic">
+                    "{order.counter_message}"
+                  </p>
+                )}
+                <form
+                  action={async () => {
+                    "use server";
+                    await acceptCounterOffer(order.id);
+                  }}
+                  className="mt-3"
+                >
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold cursor-pointer"
+                  >
+                    Accept counter — ₹{Number(order.counter_amount || 0).toLocaleString("en-IN")}
+                  </button>
+                </form>
+              </div>
+              <QuoteResponseForm
+                orderId={order.id}
+                serviceTitle={order.service_title || ""}
+                desiredDeliveryDate={order.desired_delivery_date}
+                platformFeePct={platformFeePct}
+              />
+            </div>
+          )}
+
+          {!["pending_quote", "counter_offered"].includes(order.status) && (
+            <Card title="Quote summary">
+              {order.quoted_amount ? (
+                <>
+                  <Field label="Quoted" value={`₹${Number(order.quoted_amount).toLocaleString("en-IN")}`} />
+                  <Field label="Platform fee" value={`₹${Number(order.platform_fee_amount || 0).toLocaleString("en-IN")}`} />
+                  <Field label="Total" value={`₹${Number(order.total_amount || 0).toLocaleString("en-IN")}`} />
+                  <Field label="Advance" value={`${order.advance_pct}%`} />
+                  <Field
+                    label="Valid until"
+                    value={order.quote_valid_until ? new Date(order.quote_valid_until).toLocaleDateString("en-IN") : "—"}
+                  />
+                </>
+              ) : (
+                <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                  No quote was sent on this order.
+                </p>
+              )}
+            </Card>
+          )}
         </div>
       </div>
     </div>
