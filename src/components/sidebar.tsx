@@ -1,17 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
-const mainNav = [
+type NavSpec = { label: string; href: string; icon: string; badgeKey?: string };
+
+const mainNav: NavSpec[] = [
   { label: "Dashboard", href: "/dashboard", icon: "grid" },
   { label: "Influencers", href: "/dashboard/influencers", icon: "users" },
   { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
   { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
+  { label: "Services", href: "/dashboard/services", icon: "sparkles" },
+  { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
 ];
 
-const adminNav = [
+const adminNav: NavSpec[] = [
   { label: "Admin Users", href: "/dashboard/admins", icon: "shield" },
 ];
 
@@ -41,14 +46,26 @@ const icons: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
     </svg>
   ),
+  sparkles: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L23 12l-6.714 2.143L14 21l-2.286-6.857L5 12l6.714-2.143L14 3z" />
+    </svg>
+  ),
+  inbox: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-5l-2 2h-2l-2-2H4" />
+    </svg>
+  ),
 };
 
 function NavItem({
   item,
   isActive,
+  badge,
 }: {
-  item: { label: string; href: string; icon: string };
+  item: { label: string; href: string; icon: string; badgeKey?: string };
   isActive: boolean;
+  badge?: number;
 }) {
   return (
     <Link
@@ -62,7 +79,16 @@ function NavItem({
       <span className={isActive ? "text-white" : "text-gray-400 dark:text-gray-500"}>
         {icons[item.icon]}
       </span>
-      {item.label}
+      <span className="flex-1">{item.label}</span>
+      {badge != null && badge > 0 && (
+        <span
+          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+            isActive ? "bg-white/20 text-white" : "bg-rose-500 text-white"
+          }`}
+        >
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -78,6 +104,32 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+
+  // Live counts used by nav badges. Currently just the inbox of pending
+  // quote requests; refresh every 30 s so admins see new submissions
+  // without a full reload.
+  const [badges, setBadges] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const fetchBadges = async () => {
+      try {
+        const supabase = createClient();
+        const { count } = await supabase
+          .from("service_orders")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending_quote");
+        if (!cancelled) setBadges((prev) => ({ ...prev, pendingQuotes: count ?? 0 }));
+      } catch {
+        // Non-fatal — leave previous count in place.
+      }
+    };
+    fetchBadges();
+    const t = setInterval(fetchBadges, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -143,7 +195,12 @@ export function Sidebar({
           </p>
           <div className="space-y-0.5">
             {mainNav.map((item) => (
-              <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
+              <NavItem
+                key={item.href}
+                item={item}
+                isActive={isActive(item.href)}
+                badge={item.badgeKey ? badges[item.badgeKey] : undefined}
+              />
             ))}
           </div>
 
