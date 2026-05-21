@@ -178,6 +178,76 @@ export async function acceptCounterOffer(orderId: string) {
   return { ok: true };
 }
 
+// ── Deliver a draft (Phase 4) ────────────────────────────────────────────
+// Admin pastes a URL to the watermarked preview + optional editor note.
+// Flips status to 'draft_ready', clears any prior revision_requested state,
+// fires a notification to the user.
+
+const URL_RE = /^https?:\/\/\S+\.\S+/i;
+
+export async function deliverDraft(orderId: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const url = ((formData.get("draft_url") as string) || "").trim();
+  const note = ((formData.get("draft_note") as string) || "").trim();
+  if (!url || !URL_RE.test(url)) {
+    return { error: "Paste a valid URL to the watermarked draft (Drive / Vimeo / Frame.io / etc.)" };
+  }
+
+  const admin = createAdminClient();
+  const { data: order, error: oErr } = await admin
+    .from("service_orders")
+    .select("id, user_id, status, service_title, revisions_used, revisions_allowed")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (oErr) return { error: oErr.message };
+  if (!order) return { error: "Order not found" };
+  if (!["in_progress", "revision_requested", "paid_advance"].includes(order.status)) {
+    return { error: `Can't deliver a draft in status "${order.status}"` };
+  }
+
+  const { error: uErr } = await admin
+    .from("service_orders")
+    .update({
+      draft_url: url,
+      draft_note: note || null,
+      status: "draft_ready",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+  if (uErr) return { error: uErr.message };
+
+  const isResend = order.status === "revision_requested";
+  await admin.from("service_order_events").insert({
+    order_id: orderId,
+    type: isResend ? "revision_delivered" : "draft_delivered",
+    label: isResend ? "Revised draft delivered" : "Draft delivered for review",
+    meta: { draft_url: url, revisions_used: order.revisions_used },
+  });
+
+  if (note) {
+    await admin.from("service_order_messages").insert({
+      order_id: orderId,
+      sender_id: user.id,
+      sender_role: "admin",
+      body: note,
+    });
+  }
+
+  await notifyUser(admin, order.user_id, "service_draft_ready", "Your draft is ready", {
+    text: `${order.service_title}: review the draft and either approve or request a revision.`,
+    link: `/influencer/services/orders/${orderId}`,
+    orderId,
+  });
+
+  revalidatePath(`/dashboard/quote-requests/${orderId}`);
+  return { ok: true };
+}
+
 // ── Decline the request ──────────────────────────────────────────────────
 
 export async function declineOrder(orderId: string, formData: FormData) {

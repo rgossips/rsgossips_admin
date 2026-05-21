@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { QuoteResponseForm } from "../_components/quote-response-form";
+import { DeliverDraftForm } from "../_components/deliver-draft-form";
 import { acceptCounterOffer } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -209,6 +210,16 @@ export default async function QuoteRequestDetailPage({
                 platformFeePct={platformFeePct}
               />
             </div>
+          )}
+
+          {["paid_advance", "in_progress", "revision_requested"].includes(order.status) && (
+            <DeliverDraftForm
+              orderId={order.id}
+              status={order.status}
+              revisionsUsed={order.revisions_used || 0}
+              revisionsAllowed={order.revisions_allowed || 0}
+              currentDraftUrl={order.draft_url}
+            />
           )}
 
           {!["pending_quote", "counter_offered"].includes(order.status) && (
