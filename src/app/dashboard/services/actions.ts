@@ -5,6 +5,38 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+// ── upload helper ────────────────────────────────────────────────────────
+// Uploads service-related images (featured + gallery) to the existing
+// campaign-images bucket under a services/ prefix. Reused both via a
+// dedicated server action and inline by the form component.
+
+export async function uploadServiceImage(formData: FormData): Promise<{ url?: string; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "No file provided" };
+  if (!file.type.startsWith("image/")) return { error: "Only images are allowed" };
+  if (file.size > 5 * 1024 * 1024) return { error: "File must be under 5MB" };
+
+  const admin = createAdminClient();
+  const timestamp = Date.now();
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `services/${timestamp}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const { error } = await admin.storage
+    .from("campaign-images")
+    .upload(path, Buffer.from(arrayBuffer), { contentType: file.type, upsert: true });
+  if (error) return { error: error.message };
+
+  const { data } = admin.storage.from("campaign-images").getPublicUrl(path);
+  return { url: data.publicUrl };
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 function parseJsonArray(raw: string | null, fieldLabel: string) {
@@ -51,14 +83,39 @@ function readForm(formData: FormData) {
   const is_active = formData.get("is_active") === "on" || formData.get("is_active") === "true";
   const display_order = parseInt((formData.get("display_order") as string) || "0", 10) || 0;
 
+  // Media — featured image + gallery (mixed images + video URLs)
+  const featured_image_url = ((formData.get("featured_image_url") as string) || "").trim() || null;
+  const galleryRaw = parseJsonArray(formData.get("gallery") as string, "Gallery");
+  const gallery = galleryRaw
+    .map((g: any) => ({
+      type: g?.type === "video" ? "video" : "image",
+      url: (g?.url || "").toString().trim(),
+      caption: (g?.caption || "").toString().trim(),
+    }))
+    .filter((g) => !!g.url);
+
+  // Normalise included → array of non-empty strings.
+  const includedClean = (Array.isArray(included) ? included : [])
+    .map((s: any) => (typeof s === "string" ? s.trim() : ""))
+    .filter(Boolean);
+
+  // Normalise packages → array of { name, spec, price }
+  const packagesClean = (Array.isArray(packages) ? packages : [])
+    .map((p: any) => ({
+      name: (p?.name || "").toString().trim(),
+      spec: (p?.spec || "").toString().trim(),
+      price: Number(p?.price) || 0,
+    }))
+    .filter((p) => !!p.name);
+
   return {
     slug,
     tag,
     title,
     description,
     about,
-    included,
-    packages,
+    included: includedClean,
+    packages: packagesClean,
     price_starting,
     price_to,
     price_suffix,
@@ -70,6 +127,8 @@ function readForm(formData: FormData) {
     icon_name,
     is_active,
     display_order,
+    featured_image_url,
+    gallery,
   };
 }
 

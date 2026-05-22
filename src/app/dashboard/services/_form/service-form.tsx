@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { uploadServiceImage } from "../actions";
 
-// Same shape as a service row. We only show the columns that the admin
-// actually edits — generated stuff (id, rating_avg, reviews_count,
-// booked_this_month, created_at, updated_at) is read-only / system-driven.
+type GalleryItem = { type: "image" | "video"; url: string; caption?: string };
+type Pkg = { name: string; spec: string; price: number | string };
+
 type Service = {
   id?: string;
   slug?: string;
@@ -13,8 +14,8 @@ type Service = {
   title?: string;
   description?: string;
   about?: string;
-  included?: any;
-  packages?: any;
+  included?: string[];
+  packages?: Pkg[];
   price_starting?: number;
   price_to?: number | null;
   price_suffix?: string | null;
@@ -26,6 +27,8 @@ type Service = {
   icon_name?: string;
   is_active?: boolean;
   display_order?: number;
+  featured_image_url?: string | null;
+  gallery?: GalleryItem[];
 };
 
 const ICONS = [
@@ -75,235 +78,428 @@ export function ServiceForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const [pending, startTransition] = useTransition();
 
-  // Pretty-print jsonb arrays for editing.
-  const includedDefault = JSON.stringify(initial?.included ?? [], null, 2);
-  const packagesDefault = JSON.stringify(initial?.packages ?? [], null, 2);
+  // Stateful arrays for the dynamic UIs.
+  const [included, setIncluded] = useState<string[]>(initial?.included?.length ? initial.included : [""]);
+  const [packages, setPackages] = useState<Pkg[]>(
+    initial?.packages?.length ? initial.packages : [{ name: "", spec: "", price: "" }]
+  );
+  const [featuredImage, setFeaturedImage] = useState<string>(initial?.featured_image_url || "");
+  const [gallery, setGallery] = useState<GalleryItem[]>(initial?.gallery?.length ? initial.gallery : []);
 
-  const onSubmit = async (formData: FormData) => {
+  // Uploads
+  const [featuredUploading, setFeaturedUploading] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+
+  const handleFeaturedUpload = async (file: File) => {
+    setFeaturedUploading(true);
+    const fd = new FormData();
+    fd.set("file", file);
+    const res = await uploadServiceImage(fd);
+    setFeaturedUploading(false);
+    if (res?.error) setError(res.error);
+    else if (res?.url) setFeaturedImage(res.url);
+  };
+
+  const handleGalleryUpload = async (file: File) => {
+    setGalleryUploading(true);
+    const fd = new FormData();
+    fd.set("file", file);
+    const res = await uploadServiceImage(fd);
+    setGalleryUploading(false);
+    if (res?.error) setError(res.error);
+    else if (res?.url) setGallery((prev) => [...prev, { type: "image", url: res.url!, caption: "" }]);
+  };
+
+  const onSubmit = (formData: FormData) => {
+    // Hydrate the FormData with our stateful arrays before sending.
+    formData.set(
+      "included",
+      JSON.stringify(included.map((s) => s.trim()).filter(Boolean))
+    );
+    formData.set(
+      "packages",
+      JSON.stringify(
+        packages
+          .map((p) => ({
+            name: (p.name || "").toString().trim(),
+            spec: (p.spec || "").toString().trim(),
+            price: Number(p.price) || 0,
+          }))
+          .filter((p) => p.name)
+      )
+    );
+    formData.set("featured_image_url", featuredImage);
+    formData.set("gallery", JSON.stringify(gallery));
+
     setError("");
-    setPending(true);
-    try {
+    startTransition(async () => {
       const res = await action(formData);
-      if (res?.error) {
-        setError(res.error);
-        setPending(false);
-      }
-      // On success the action redirects — no further state changes needed.
-    } catch (e: any) {
-      setError(e?.message || "Failed to save");
-      setPending(false);
-    }
+      if (res?.error) setError(res.error);
+    });
   };
 
   return (
-    <form action={onSubmit} className="space-y-6 max-w-3xl">
+    <form action={onSubmit} className="space-y-6">
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
           {error}
         </div>
       )}
 
-      {/* Basics */}
-      <Card title="Basics">
-        <Row>
-          <Field label="Title" required>
-            <input
-              name="title"
-              defaultValue={initial?.title || ""}
-              required
-              className="input"
-              placeholder="e.g. Aesthetic Reel Production — Pro Video Editing"
-            />
-          </Field>
-        </Row>
-        <Row cols={2}>
-          <Field label="Slug" hint="URL-safe identifier. Leave blank to auto-generate from title.">
-            <input
-              name="slug"
-              defaultValue={initial?.slug || ""}
-              className="input"
-              placeholder="aesthetic-reel"
-              pattern="^[a-z0-9-]+$"
-            />
-          </Field>
-          <Field label="Tag" required hint="Uppercase category (CONTENT / ADS / DESIGN …)">
-            <input
-              name="tag"
-              defaultValue={initial?.tag || ""}
-              required
-              className="input uppercase"
-              placeholder="CONTENT"
-            />
-          </Field>
-        </Row>
-        <Row>
-          <Field label="Short description" hint="Appears on the card under the title">
-            <input
-              name="description"
-              defaultValue={initial?.description || ""}
-              className="input"
-              placeholder="Cinematic Reel edits from your raw footage — trending audio, dynamic captions"
-            />
-          </Field>
-        </Row>
-        <Row>
-          <Field label="About this service" hint="Long-form paragraph shown on the detail page">
-            <textarea
-              name="about"
-              defaultValue={initial?.about || ""}
-              rows={4}
-              className="input resize-none"
-            />
-          </Field>
-        </Row>
-      </Card>
-
-      {/* Pricing */}
-      <Card title="Pricing">
-        <Row cols={3}>
-          <Field label="Starting price (₹)" required>
-            <input
-              name="price_starting"
-              defaultValue={initial?.price_starting ?? 0}
-              type="number"
-              min={0}
-              required
-              className="input"
-            />
-          </Field>
-          <Field label="Upper price (₹)" hint='Used for "Most X priced between Y–Z"'>
-            <input
-              name="price_to"
-              defaultValue={initial?.price_to ?? ""}
-              type="number"
-              min={0}
-              className="input"
-            />
-          </Field>
-          <Field label="Suffix" hint='e.g. "/mo" for subscription'>
-            <input
-              name="price_suffix"
-              defaultValue={initial?.price_suffix ?? ""}
-              className="input"
-              placeholder=""
-            />
-          </Field>
-        </Row>
-      </Card>
-
-      {/* What's included */}
-      <Card title="What's included" subtitle='JSON array of strings, e.g. ["First", "Second", …]'>
-        <textarea
-          name="included"
-          defaultValue={includedDefault}
-          rows={6}
-          className="input font-mono text-[12px]"
-          placeholder='["Full edit of provided raw footage", "Trending audio licensing & sync"]'
-        />
-      </Card>
-
-      {/* Packages */}
-      <Card title="Typical packages" subtitle='JSON array of { "name", "spec", "price" }'>
-        <textarea
-          name="packages"
-          defaultValue={packagesDefault}
-          rows={8}
-          className="input font-mono text-[12px]"
-          placeholder='[{"name":"Basic Reel","spec":"15-30 sec, 1 revision","price":2500}]'
-        />
-      </Card>
-
-      {/* Service-level metadata */}
-      <Card title="Logistics">
-        <Row cols={3}>
-          <Field label="Quote SLA (hours)" required>
-            <input
-              name="quote_sla_hours"
-              defaultValue={initial?.quote_sla_hours ?? 24}
-              type="number"
-              min={1}
-              required
-              className="input"
-            />
-          </Field>
-          <Field label="Delivery days" hint='Free text like "3-7 d" or "Ongoing"'>
-            <input
-              name="delivery_days"
-              defaultValue={initial?.delivery_days || ""}
-              className="input"
-              placeholder="3-7 d"
-            />
-          </Field>
-          <Field label="Payment split" hint='e.g. "50/50" or "100% upfront"'>
-            <input
-              name="payment_split"
-              defaultValue={initial?.payment_split || "50/50"}
-              className="input"
-              placeholder="50/50"
-            />
-          </Field>
-        </Row>
-      </Card>
-
-      {/* Visual */}
-      <Card title="Visual">
-        <Row cols={3}>
-          <Field label="Icon" hint="Lucide icon name">
-            <select name="icon_name" defaultValue={initial?.icon_name || "Sparkles"} className="input">
-              {ICONS.map((i) => (
-                <option key={i} value={i}>
-                  {i}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Accent (Tailwind classes)">
-            <select name="accent" defaultValue={initial?.accent || ACCENT_PRESETS[0]} className="input">
-              {ACCENT_PRESETS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Hero gradient (Tailwind from-via-to)">
-            <select name="hero_gradient" defaultValue={initial?.hero_gradient || GRADIENT_PRESETS[0]} className="input">
-              {GRADIENT_PRESETS.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </Row>
-      </Card>
-
-      {/* Visibility */}
-      <Card title="Visibility">
-        <Row cols={2}>
-          <Field label="Display order" hint="Lower = earlier in the list">
-            <input
-              name="display_order"
-              defaultValue={initial?.display_order ?? 0}
-              type="number"
-              className="input"
-            />
-          </Field>
-          <Field label="Active" hint="Inactive services are hidden from the influencer app">
-            <label className="inline-flex items-center gap-2 mt-2">
+      {/* ── TWO-COLUMN LAYOUT ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        {/* ── LEFT COLUMN ── */}
+        <div className="space-y-6">
+          <Card title="Basics">
+            <Field label="Title" required>
               <input
-                name="is_active"
-                type="checkbox"
-                defaultChecked={initial?.is_active ?? true}
-                className="w-4 h-4"
+                name="title"
+                defaultValue={initial?.title || ""}
+                required
+                className="input"
+                placeholder="e.g. Aesthetic Reel Production — Pro Video Editing"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-200">Service is active</span>
-            </label>
-          </Field>
-        </Row>
-      </Card>
+            </Field>
+            <Row cols={2}>
+              <Field label="Slug" hint="URL-safe identifier. Leave blank to auto-generate from title.">
+                <input
+                  name="slug"
+                  defaultValue={initial?.slug || ""}
+                  className="input"
+                  placeholder="aesthetic-reel"
+                  pattern="^[a-z0-9-]+$"
+                />
+              </Field>
+              <Field label="Tag" required hint="Uppercase category (CONTENT / ADS / DESIGN …)">
+                <input
+                  name="tag"
+                  defaultValue={initial?.tag || ""}
+                  required
+                  className="input uppercase"
+                  placeholder="CONTENT"
+                />
+              </Field>
+            </Row>
+            <Field label="Short description" hint="Appears on the card under the title">
+              <input
+                name="description"
+                defaultValue={initial?.description || ""}
+                className="input"
+                placeholder="Cinematic Reel edits from your raw footage — trending audio, dynamic captions"
+              />
+            </Field>
+            <Field label="About this service" hint="Long-form paragraph shown on the detail page">
+              <textarea
+                name="about"
+                defaultValue={initial?.about || ""}
+                rows={4}
+                className="input resize-none"
+              />
+            </Field>
+          </Card>
+
+          <Card title="Pricing">
+            <Row cols={3}>
+              <Field label="Starting price (₹)" required>
+                <input
+                  name="price_starting"
+                  defaultValue={initial?.price_starting ?? 0}
+                  type="number"
+                  min={0}
+                  required
+                  className="input"
+                />
+              </Field>
+              <Field label="Upper price (₹)" hint='"X priced between Y–Z"'>
+                <input
+                  name="price_to"
+                  defaultValue={initial?.price_to ?? ""}
+                  type="number"
+                  min={0}
+                  className="input"
+                />
+              </Field>
+              <Field label="Suffix" hint='e.g. "/mo"'>
+                <input
+                  name="price_suffix"
+                  defaultValue={initial?.price_suffix ?? ""}
+                  className="input"
+                  placeholder=""
+                />
+              </Field>
+            </Row>
+          </Card>
+
+          <Card title="What's included" subtitle="One bullet per row — these appear with green checkmarks on the detail page.">
+            <div className="space-y-2">
+              {included.map((item, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={item}
+                    onChange={(e) => setIncluded((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
+                    placeholder={`Inclusion #${i + 1}`}
+                    className="input flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIncluded((prev) => prev.filter((_, idx) => idx !== i))}
+                    disabled={included.length === 1}
+                    className="shrink-0 px-2 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-rose-500 disabled:opacity-30 cursor-pointer"
+                    aria-label="Remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setIncluded((prev) => [...prev, ""])}
+                className="text-[12px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+              >
+                + Add another
+              </button>
+            </div>
+          </Card>
+
+          <Card title="Typical packages" subtitle='Name + spec + price — admin can re-order by drag in a future iteration.'>
+            <div className="space-y-3">
+              {packages.map((pkg, i) => (
+                <div key={i} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-lg p-3 space-y-2">
+                  <div className="grid grid-cols-12 gap-2">
+                    <input
+                      value={pkg.name}
+                      onChange={(e) =>
+                        setPackages((prev) => prev.map((x, idx) => (idx === i ? { ...x, name: e.target.value } : x)))
+                      }
+                      placeholder="Package name (e.g. Basic Reel)"
+                      className="input col-span-12 sm:col-span-5"
+                    />
+                    <input
+                      value={pkg.spec}
+                      onChange={(e) =>
+                        setPackages((prev) => prev.map((x, idx) => (idx === i ? { ...x, spec: e.target.value } : x)))
+                      }
+                      placeholder="Spec (e.g. 15-30 sec, 1 revision)"
+                      className="input col-span-9 sm:col-span-5"
+                    />
+                    <input
+                      value={pkg.price}
+                      onChange={(e) =>
+                        setPackages((prev) => prev.map((x, idx) => (idx === i ? { ...x, price: e.target.value } : x)))
+                      }
+                      placeholder="Price"
+                      type="number"
+                      className="input col-span-3 sm:col-span-2"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPackages((prev) => prev.filter((_, idx) => idx !== i))}
+                    disabled={packages.length === 1}
+                    className="text-[11px] font-bold text-rose-500 hover:underline disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    Remove package
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPackages((prev) => [...prev, { name: "", spec: "", price: "" }])}
+                className="text-[12px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+              >
+                + Add another package
+              </button>
+            </div>
+          </Card>
+        </div>
+
+        {/* ── RIGHT COLUMN ── */}
+        <div className="space-y-6">
+          <Card title="Featured image" subtitle="Optional. When set, replaces the gradient hero on the detail page.">
+            {featuredImage ? (
+              <div className="space-y-2">
+                <div className="aspect-[2.4/1] rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={featuredImage} alt="Featured" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex gap-2">
+                  <label className="flex-1 cursor-pointer text-center px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    Replace
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => e.target.files?.[0] && handleFeaturedUpload(e.target.files[0])}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFeaturedImage("")}
+                    className="px-3 py-2 rounded-lg border border-rose-200 text-rose-500 text-[12px] font-semibold hover:bg-rose-50 cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2 cursor-pointer aspect-[2.4/1] rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 bg-gray-50 dark:bg-gray-800/40 transition-colors">
+                {featuredUploading ? (
+                  <span className="text-[12px] font-semibold text-gray-500">Uploading…</span>
+                ) : (
+                  <>
+                    <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <p className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">Upload featured image</p>
+                    <p className="text-[10px] text-gray-400">JPG / PNG · up to 5 MB</p>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFeaturedUpload(e.target.files[0])}
+                />
+              </label>
+            )}
+          </Card>
+
+          <Card title="Gallery" subtitle="Showcase additional images and video. Drop image files, or paste video URLs (YouTube / Vimeo / Loom).">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {gallery.map((g, i) => (
+                <GalleryTile
+                  key={i}
+                  item={g}
+                  onUpdate={(patch) => setGallery((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))}
+                  onRemove={() => setGallery((prev) => prev.filter((_, idx) => idx !== i))}
+                />
+              ))}
+              {/* Upload tile */}
+              <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 bg-gray-50 dark:bg-gray-800/40">
+                {galleryUploading ? (
+                  <span className="text-[11px] font-semibold text-gray-500">Uploading…</span>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">Add image</p>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleGalleryUpload(e.target.files[0])}
+                />
+              </label>
+              {/* Add video tile */}
+              <button
+                type="button"
+                onClick={() =>
+                  setGallery((prev) => [...prev, { type: "video", url: "", caption: "" }])
+                }
+                className="aspect-[4/3] rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 bg-gray-50 dark:bg-gray-800/40"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">Add video URL</p>
+              </button>
+            </div>
+          </Card>
+
+          <Card title="Logistics">
+            <Row cols={3}>
+              <Field label="Quote SLA (hrs)" required>
+                <input
+                  name="quote_sla_hours"
+                  defaultValue={initial?.quote_sla_hours ?? 24}
+                  type="number"
+                  min={1}
+                  required
+                  className="input"
+                />
+              </Field>
+              <Field label="Delivery days" hint='Free text — "3-7 d", "Ongoing", "Setup in 3 d"…'>
+                <input
+                  name="delivery_days"
+                  defaultValue={initial?.delivery_days || ""}
+                  className="input"
+                  placeholder="3-7 d"
+                />
+              </Field>
+              <Field label="Payment split">
+                <input
+                  name="payment_split"
+                  defaultValue={initial?.payment_split || "50/50"}
+                  className="input"
+                  placeholder="50/50"
+                />
+              </Field>
+            </Row>
+          </Card>
+
+          <Card title="Visual presets" subtitle="Used when no featured image is set, plus on the catalogue tile.">
+            <Row cols={3}>
+              <Field label="Icon" hint="Lucide icon name">
+                <select name="icon_name" defaultValue={initial?.icon_name || "Sparkles"} className="input">
+                  {ICONS.map((i) => (
+                    <option key={i} value={i}>
+                      {i}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Accent (chip color)">
+                <select name="accent" defaultValue={initial?.accent || ACCENT_PRESETS[0]} className="input">
+                  {ACCENT_PRESETS.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Hero gradient">
+                <select name="hero_gradient" defaultValue={initial?.hero_gradient || GRADIENT_PRESETS[0]} className="input">
+                  {GRADIENT_PRESETS.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </Row>
+          </Card>
+
+          <Card title="Visibility">
+            <Row cols={2}>
+              <Field label="Display order" hint="Lower = earlier in the list">
+                <input
+                  name="display_order"
+                  defaultValue={initial?.display_order ?? 0}
+                  type="number"
+                  className="input"
+                />
+              </Field>
+              <Field label="Active">
+                <label className="inline-flex items-center gap-2 mt-2">
+                  <input
+                    name="is_active"
+                    type="checkbox"
+                    defaultChecked={initial?.is_active ?? true}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-200">Service is active</span>
+                </label>
+              </Field>
+            </Row>
+          </Card>
+        </div>
+      </div>
 
       <div className="flex gap-3">
         <button
@@ -344,6 +540,62 @@ export function ServiceForm({
         }
       `}</style>
     </form>
+  );
+}
+
+function GalleryTile({
+  item,
+  onUpdate,
+  onRemove,
+}: {
+  item: GalleryItem;
+  onUpdate: (patch: Partial<GalleryItem>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
+      <div className="aspect-[4/3] bg-gray-100 dark:bg-gray-800 relative">
+        {item.type === "image" && item.url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.url} alt={item.caption || ""} className="w-full h-full object-cover" />
+        )}
+        {item.type === "video" && (
+          <div className="w-full h-full flex items-center justify-center text-slate-400">
+            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        )}
+        <span className="absolute top-1.5 left-1.5 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/60 text-white">
+          {item.type}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white hover:bg-rose-500 flex items-center justify-center text-xs cursor-pointer"
+          aria-label="Remove"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="p-2 space-y-1.5">
+        {item.type === "video" && (
+          <input
+            value={item.url}
+            onChange={(e) => onUpdate({ url: e.target.value })}
+            placeholder="https://youtube.com/… / vimeo.com/…"
+            className="input text-[11px]"
+          />
+        )}
+        <input
+          value={item.caption || ""}
+          onChange={(e) => onUpdate({ caption: e.target.value })}
+          placeholder="Caption (optional)"
+          className="input text-[11px]"
+        />
+      </div>
+    </div>
   );
 }
 
