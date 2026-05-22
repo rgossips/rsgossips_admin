@@ -172,3 +172,79 @@ export async function updateInfluencerInvitation(invitationId: string, formData:
   revalidatePath("/dashboard/influencers");
   return { success: true };
 }
+
+interface BulkInfluencerRow {
+  full_name: string;
+  instagram_username: string;
+  city?: string;
+  gender?: string;
+  categories?: string;
+  languages?: string;
+  tags?: string;
+  notes?: string;
+}
+
+export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated", success: 0, failed: [] };
+
+  const adminClient = createAdminClient();
+  const results: { success: number; failed: Array<{ row: number; reason: string; data: BulkInfluencerRow }> } = { success: 0, failed: [] };
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2;
+    const fullName = (row.full_name || "").toString().trim();
+    const ig = (row.instagram_username || "").toString().replace(/^@/, "").trim();
+    const city = (row.city || "").toString().trim();
+    const gender = (row.gender || "").toString().trim().toLowerCase();
+
+    if (!fullName) { results.failed.push({ row: rowNum, reason: "Name is required", data: row }); continue; }
+    if (!ig) { results.failed.push({ row: rowNum, reason: "Instagram username is required", data: row }); continue; }
+    if (!city) { results.failed.push({ row: rowNum, reason: "City is required", data: row }); continue; }
+    if (!gender) { results.failed.push({ row: rowNum, reason: "Gender is required", data: row }); continue; }
+
+    const { data: existingInvite } = await adminClient.from("influencer_invitations").select("id").ilike("instagram_username", ig).limit(1);
+    if (existingInvite && existingInvite.length > 0) {
+      results.failed.push({ row: rowNum, reason: `Invitation for @${ig} already exists`, data: row });
+      continue;
+    }
+    const { data: existingProfile } = await adminClient.from("influencer_profiles").select("influencer_id").ilike("instagram_handle", ig).limit(1);
+    if (existingProfile && existingProfile.length > 0) {
+      results.failed.push({ row: rowNum, reason: `Influencer @${ig} already registered`, data: row });
+      continue;
+    }
+
+    const splitField = (val?: string) => (val || "").toString().split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+    const metadata: Record<string, unknown> = { city, gender };
+    const cats = splitField(row.categories);
+    if (cats.length > 0) metadata.categories = cats;
+    const langs = splitField(row.languages);
+    if (langs.length > 0) metadata.languages = langs;
+    const tagList = splitField(row.tags);
+    if (tagList.length > 0) metadata.tags = tagList;
+
+    const notesText = (row.notes || "").toString().trim();
+    const notes = notesText ? `${notesText}\n---\n${JSON.stringify(metadata)}` : JSON.stringify(metadata);
+
+    const { error } = await adminClient.from("influencer_invitations").insert({
+      full_name: fullName,
+      instagram_username: ig,
+      profile_photo_url: "",
+      notes,
+      created_by: user.id,
+      status: "pending",
+    });
+
+    if (error) {
+      results.failed.push({ row: rowNum, reason: error.message, data: row });
+    } else {
+      results.success++;
+    }
+  }
+
+  revalidatePath("/dashboard/influencers");
+  return results;
+}
+

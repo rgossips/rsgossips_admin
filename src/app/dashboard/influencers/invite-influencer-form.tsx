@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { inviteInfluencer, uploadInfluencerPhoto } from "./actions";
 import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
+import { BulkInviteInfluencers } from "./bulk-invite-influencers";
 
 import { CATEGORIES } from "@/lib/categories";
 import { INDIAN_CITIES } from "@/lib/cities";
@@ -141,10 +142,13 @@ export function InviteInfluencerForm() {
         </div>
       )}
       {!open ? (
-        <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-200/50 dark:shadow-indigo-900/30 cursor-pointer">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-          Invite Influencer
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-200/50 dark:shadow-indigo-900/30 cursor-pointer">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            Invite Influencer
+          </button>
+          <BulkInviteInfluencers />
+        </div>
       ) : (
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">

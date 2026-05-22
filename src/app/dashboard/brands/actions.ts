@@ -190,3 +190,70 @@ export async function addBrand(formData: FormData) {
   revalidatePath("/dashboard/brands");
   return { success: true };
 }
+
+interface BulkBrandRow {
+  brand_name: string;
+  instagram_username: string;
+  category?: string;
+  instagram_verified?: string;
+  notes?: string;
+}
+
+export async function bulkInviteBrands(rows: BulkBrandRow[]) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated", success: 0, failed: [] };
+
+  const adminClient = createAdminClient();
+  const results: { success: number; failed: Array<{ row: number; reason: string; data: BulkBrandRow }> } = { success: 0, failed: [] };
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2;
+    const brandName = (row.brand_name || "").toString().trim();
+    const ig = (row.instagram_username || "").toString().replace(/^@/, "").trim();
+
+    if (!brandName) { results.failed.push({ row: rowNum, reason: "Brand name is required", data: row }); continue; }
+    if (!ig) { results.failed.push({ row: rowNum, reason: "Instagram username is required", data: row }); continue; }
+
+    const { data: existingInvite } = await adminClient.from("brand_invitations").select("id").ilike("instagram_username", ig).limit(1);
+    if (existingInvite && existingInvite.length > 0) {
+      results.failed.push({ row: rowNum, reason: `Invitation for @${ig} already exists`, data: row });
+      continue;
+    }
+    const { data: existingProfile } = await adminClient.from("brand_profiles").select("brand_id").ilike("instagram_username", ig).limit(1);
+    if (existingProfile && existingProfile.length > 0) {
+      results.failed.push({ row: rowNum, reason: `Brand @${ig} already registered`, data: row });
+      continue;
+    }
+
+    const category = (row.category || "").toString().trim();
+    const igVerifiedStr = (row.instagram_verified || "").toString().trim().toLowerCase();
+    const igVerified = igVerifiedStr === "yes" || igVerifiedStr === "true" || igVerifiedStr === "1";
+
+    const metadata: Record<string, unknown> = {};
+    if (category) metadata.category = category;
+    metadata.instagram_verified = igVerified;
+
+    const notesText = (row.notes || "").toString().trim();
+    const notes = notesText ? `${notesText}\n---\n${JSON.stringify(metadata)}` : JSON.stringify(metadata);
+
+    const { error } = await adminClient.from("brand_invitations").insert({
+      brand_name: brandName,
+      instagram_username: ig,
+      logo_url: "",
+      notes,
+      created_by: user.id,
+      status: "pending",
+    });
+
+    if (error) {
+      results.failed.push({ row: rowNum, reason: error.message, data: row });
+    } else {
+      results.success++;
+    }
+  }
+
+  revalidatePath("/dashboard/brands");
+  return results;
+}
