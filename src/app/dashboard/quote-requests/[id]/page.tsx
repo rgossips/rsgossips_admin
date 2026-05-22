@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { QuoteResponseForm } from "../_components/quote-response-form";
 import { DeliverDraftForm } from "../_components/deliver-draft-form";
+import { DeliverFinalForm } from "../_components/deliver-final-form";
 import { acceptCounterOffer } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -220,6 +221,29 @@ export default async function QuoteRequestDetailPage({
               revisionsAllowed={order.revisions_allowed || 0}
               currentDraftUrl={order.draft_url}
             />
+          )}
+
+          {order.status === "paid_final" && <DeliverFinalForm orderId={order.id} />}
+
+          {order.status === "completed" && Array.isArray(order.final_files) && order.final_files.length > 0 && (
+            <Card title="Delivered files">
+              <ul className="space-y-1.5">
+                {order.final_files.map((f: any, i: number) => (
+                  <li key={i} className="flex items-center justify-between gap-2 text-[12px]">
+                    <span className="font-semibold text-gray-700 dark:text-gray-200 truncate">{f.name}</span>
+                    {f.size && <span className="text-gray-400">{f.size}</span>}
+                    <a
+                      href={f.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:underline font-semibold whitespace-nowrap"
+                    >
+                      Open ↗
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Card>
           )}
 
           {!["pending_quote", "counter_offered"].includes(order.status) && (

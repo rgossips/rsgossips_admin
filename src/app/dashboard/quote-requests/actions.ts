@@ -248,6 +248,78 @@ export async function deliverDraft(orderId: string, formData: FormData) {
   return { ok: true };
 }
 
+// ── Deliver final files (Phase 5) ────────────────────────────────────────
+// Admin pastes a JSON array of { name, size, url } files. We require at
+// least one entry with a valid URL. On success the order flips to
+// 'completed' and the user is notified.
+
+export async function deliverFinalFiles(orderId: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const raw = ((formData.get("final_files_json") as string) || "[]").trim();
+  let files: any;
+  try {
+    files = JSON.parse(raw);
+  } catch {
+    return { error: "Final files must be valid JSON" };
+  }
+  if (!Array.isArray(files) || files.length === 0) {
+    return { error: "Add at least one file" };
+  }
+  const cleaned: { name: string; size: string; url: string }[] = [];
+  for (const f of files) {
+    const name = (f?.name || "").toString().trim();
+    const size = (f?.size || "").toString().trim();
+    const url = (f?.url || "").toString().trim();
+    if (!name) return { error: "Each file needs a name" };
+    if (!URL_RE.test(url)) return { error: `Invalid URL for "${name}"` };
+    cleaned.push({ name, size, url });
+  }
+
+  const admin = createAdminClient();
+  const { data: order } = await admin
+    .from("service_orders")
+    .select("id, user_id, status, service_title")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { error: "Order not found" };
+  if (!["paid_final", "draft_ready"].includes(order.status)) {
+    return { error: `Final files can only be delivered after final payment (current: ${order.status})` };
+  }
+
+  const now = new Date().toISOString();
+  const { error: uErr } = await admin
+    .from("service_orders")
+    .update({
+      final_files: cleaned,
+      status: "completed",
+      completed_at: now,
+      updated_at: now,
+    })
+    .eq("id", orderId);
+  if (uErr) return { error: uErr.message };
+
+  await admin.from("service_order_events").insert({
+    order_id: orderId,
+    type: "completed",
+    label: `Order completed — ${cleaned.length} file${cleaned.length === 1 ? "" : "s"} delivered`,
+    meta: { count: cleaned.length },
+  });
+
+  await notifyUser(admin, order.user_id, "service_completed", "Your files are ready", {
+    text: `${order.service_title}: download your files and leave a quick review.`,
+    link: `/influencer/services/orders/${orderId}`,
+    orderId,
+  });
+
+  revalidatePath(`/dashboard/quote-requests/${orderId}`);
+  return { ok: true };
+}
+
 // ── Decline the request ──────────────────────────────────────────────────
 
 export async function declineOrder(orderId: string, formData: FormData) {
