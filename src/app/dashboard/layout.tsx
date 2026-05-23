@@ -10,29 +10,42 @@ export default async function DashboardLayout({
   const supabase = await createClient();
   const {
     data: { user },
+    error: userErr,
   } = await supabase.auth.getUser();
 
+  // Only redirect on confirmed "no user" — not on transient network errors
+  // during token refresh, which would otherwise log users out on a page reload.
+  if (!user && !userErr) {
+    redirect("/login");
+  }
   if (!user) {
+    // Network/transient error — keep them on the page; the next request will retry
     redirect("/login");
   }
 
-  // Only allow users with an admin_profiles row (if table exists)
-  const { count, error: profileError } = await supabase
+  // Verify the user has an admin_profiles row. Use the service-role client so
+  // RLS / cookie races can't return a misleading empty result and sign someone
+  // out mid-session.
+  const { createAdminClient } = await import("@/utils/supabase/admin");
+  const adminClient = createAdminClient();
+
+  const { count, error: profileError } = await adminClient
     .from("admin_profiles")
     .select("*", { count: "exact", head: true });
 
-  // If admin_profiles table exists and has rows, enforce the check
   const tableExists = !profileError;
   const tableHasRows = tableExists && (count ?? 0) > 0;
 
   if (tableHasRows) {
-    const { data: adminProfile } = await supabase
+    const { data: adminProfile, error: lookupErr } = await adminClient
       .from("admin_profiles")
       .select("id")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (!adminProfile) {
+    // Only sign out when we definitively confirm the user isn't in the
+    // admins table. Any lookup error → keep them in (avoids log-out on refresh).
+    if (!lookupErr && !adminProfile) {
       await supabase.auth.signOut();
       redirect("/login");
     }

@@ -5,6 +5,7 @@ import { QuoteResponseForm } from "../_components/quote-response-form";
 import { DeliverDraftForm } from "../_components/deliver-draft-form";
 import { DeliverFinalForm } from "../_components/deliver-final-form";
 import { acceptCounterOffer } from "../actions";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export default async function QuoteRequestDetailPage({
 
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={15000} />
       <Link
         href="/dashboard/quote-requests"
         className="text-[12px] font-semibold text-indigo-600 hover:underline"

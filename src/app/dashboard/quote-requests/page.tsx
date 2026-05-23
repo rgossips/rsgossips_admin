@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +41,14 @@ export default async function QuoteRequestsPage({
     .order("created_at", { ascending: false });
 
   if (filter === "active") {
-    q = q.in("status", ["quoted", "counter_offered", "paid_advance", "in_progress", "draft_ready", "revision_requested", "paid_final"]);
+    q = q.in("status", ["quoted", "paid_advance", "in_progress", "draft_ready", "revision_requested", "paid_final"]);
   } else if (filter === "completed") {
     q = q.eq("status", "completed");
   } else if (filter === "declined") {
     q = q.in("status", ["declined", "expired"]);
+  } else if (filter === "pending_quote") {
+    // Awaiting quote includes original requests + counter offers (both need admin action)
+    q = q.in("status", ["pending_quote", "counter_offered"]);
   } else if (filter !== "all") {
     q = q.eq("status", filter);
   }
@@ -80,7 +84,6 @@ export default async function QuoteRequestsPage({
   }
   const activeStatuses = new Set([
     "quoted",
-    "counter_offered",
     "paid_advance",
     "in_progress",
     "draft_ready",
@@ -90,12 +93,14 @@ export default async function QuoteRequestsPage({
   const countFor = (id: string) => {
     if (id === "active") return Object.entries(counts).reduce((s, [k, v]) => s + (activeStatuses.has(k) ? v : 0), 0);
     if (id === "declined") return (counts.declined || 0) + (counts.expired || 0);
+    if (id === "pending_quote") return (counts.pending_quote || 0) + (counts.counter_offered || 0);
     if (id === "all") return Object.values(counts).reduce((s, v) => s + v, 0);
     return counts[id] || 0;
   };
 
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={15000} />
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quote requests</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

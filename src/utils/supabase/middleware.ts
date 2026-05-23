@@ -29,13 +29,20 @@ export const updateSession = async (request: NextRequest) => {
     }
   );
 
+  // IMPORTANT: just refresh the session cookies here. Don't redirect on missing
+  // user — transient auth races during token refresh can briefly return null
+  // and would log users out on every page refresh. The dashboard layout does
+  // the actual auth gate with a proper retry-friendly check.
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
-  // If no user and trying to access protected routes, redirect to login
+  // Only redirect on "definitely not logged in" (no user AND no auth error).
+  // Auth errors usually mean the cookie is being refreshed mid-flight.
   if (
     !user &&
+    !error &&
     !request.nextUrl.pathname.startsWith("/login")
   ) {
     const url = request.nextUrl.clone();
