@@ -1,0 +1,316 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { searchInfluencersForFeature } from "../actions";
+
+type Initial = {
+  influencer_id?: string | null;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string;
+  followers_label?: string;
+  rating?: number | string | null;
+  verified?: boolean;
+  instagram_url?: string;
+  position?: number;
+  is_active?: boolean;
+};
+
+// Friendly "1.4M" / "23.5K" — matches the labels shown on the brand home page.
+const formatFollowers = (n: number) => {
+  if (!n) return "";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+};
+
+export function FeaturedCreatorForm({
+  action,
+  initial,
+  submitLabel,
+}: {
+  action: (formData: FormData) => Promise<{ error?: string }>;
+  initial?: Initial;
+  submitLabel: string;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // Local form state mirrors the eventual FormData fields. Useful for the
+  // "Pick existing influencer" autofill flow.
+  const [state, setState] = useState({
+    influencer_id: initial?.influencer_id || "",
+    username: initial?.username || "",
+    display_name: initial?.display_name || "",
+    avatar_url: initial?.avatar_url || "",
+    followers_label: initial?.followers_label || "",
+    rating: initial?.rating != null ? String(initial.rating) : "",
+    verified: initial?.verified ?? false,
+    instagram_url: initial?.instagram_url || "",
+    position: initial?.position ?? 0,
+    is_active: initial?.is_active ?? true,
+  });
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerResults, setPickerResults] = useState<any[]>([]);
+  const [pickerSearching, setPickerSearching] = useState(false);
+
+  const searchPicker = async (q: string) => {
+    setPickerQuery(q);
+    if (q.trim().length < 2) {
+      setPickerResults([]);
+      return;
+    }
+    setPickerSearching(true);
+    const rows = await searchInfluencersForFeature(q);
+    setPickerResults(rows);
+    setPickerSearching(false);
+  };
+
+  const pickInfluencer = (inf: any) => {
+    const handle = inf.instagram_handle || inf.username || "";
+    setState((prev) => ({
+      ...prev,
+      influencer_id: inf.influencer_id,
+      username: handle,
+      display_name: inf.full_name || prev.display_name,
+      avatar_url: inf.custom_profile_photo_url || inf.profile_photo_url || prev.avatar_url,
+      followers_label: formatFollowers(inf.followers_count || 0) || prev.followers_label,
+      instagram_url: handle ? `https://www.instagram.com/${handle}/` : prev.instagram_url,
+    }));
+    setPickerOpen(false);
+    setPickerQuery("");
+    setPickerResults([]);
+  };
+
+  const onSubmit = (formData: FormData) => {
+    setError(null);
+    startTransition(async () => {
+      const res = await action(formData);
+      if (res?.error) setError(res.error);
+    });
+  };
+
+  return (
+    <form action={onSubmit} className="space-y-6">
+      {/* Hidden mirror — keeps the server action receiving the chosen
+          influencer_id without rendering it as a visible field. */}
+      <input type="hidden" name="influencer_id" value={state.influencer_id} />
+
+      {/* Pick existing */}
+      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 flex items-center gap-4">
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Feature an existing influencer</p>
+          <p className="text-[12px] text-indigo-700 dark:text-indigo-300/80">Search the directory and auto-fill the display fields.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold cursor-pointer"
+        >
+          Search creators
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Instagram username" name="username" value={state.username} onChange={(v) => setState({ ...state, username: v.replace(/^@/, "") })} placeholder="cristiano" />
+        <Field label="Display name" name="display_name" value={state.display_name} onChange={(v) => setState({ ...state, display_name: v })} placeholder="Cristiano Ronaldo" />
+      </div>
+
+      <Field label="Avatar URL" name="avatar_url" value={state.avatar_url} onChange={(v) => setState({ ...state, avatar_url: v })} placeholder="https://…/photo.jpg" />
+      {state.avatar_url && (
+        <div className="flex items-center gap-3">
+          <img
+            src={state.avatar_url}
+            alt="avatar preview"
+            className="w-16 h-16 rounded-2xl object-cover border border-gray-200"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+          <span className="text-[11px] text-gray-400">preview</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Followers label" name="followers_label" value={state.followers_label} onChange={(v) => setState({ ...state, followers_label: v })} placeholder="1.4M" />
+        <Field label="Rating (0–5)" name="rating" value={state.rating} onChange={(v) => setState({ ...state, rating: v })} placeholder="4.2" type="number" step="0.1" />
+        <Field label="Position" name="position" value={String(state.position)} onChange={(v) => setState({ ...state, position: Number(v) || 0 })} type="number" hint="Lower numbers appear first." />
+      </div>
+
+      <Field label="Instagram URL" name="instagram_url" value={state.instagram_url} onChange={(v) => setState({ ...state, instagram_url: v })} placeholder="https://www.instagram.com/cristiano/" />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Toggle label="Verified badge" name="verified" checked={state.verified} onChange={(v) => setState({ ...state, verified: v })} />
+        <Toggle label="Active (visible to brands)" name="is_active" checked={state.is_active} onChange={(v) => setState({ ...state, is_active: v })} />
+      </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={pending}
+          className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold cursor-pointer"
+        >
+          {pending ? "Saving…" : submitLabel}
+        </button>
+      </div>
+
+      {pickerOpen && (
+        <PickerDialog
+          query={pickerQuery}
+          onQueryChange={searchPicker}
+          results={pickerResults}
+          searching={pickerSearching}
+          onPick={pickInfluencer}
+          onClose={() => {
+            setPickerOpen(false);
+            setPickerQuery("");
+            setPickerResults([]);
+          }}
+        />
+      )}
+    </form>
+  );
+}
+
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  step,
+  hint,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+  step?: string;
+  hint?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{label}</span>
+      <input
+        name={name}
+        type={type}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 outline-none"
+      />
+      {hint && <p className="text-[10px] text-gray-400 mt-1">{hint}</p>}
+    </label>
+  );
+}
+
+function Toggle({
+  label,
+  name,
+  checked,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer select-none p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+      <input
+        type="checkbox"
+        name={name}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded text-indigo-600 cursor-pointer"
+      />
+      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{label}</span>
+    </label>
+  );
+}
+
+function PickerDialog({
+  query,
+  onQueryChange,
+  results,
+  searching,
+  onPick,
+  onClose,
+}: {
+  query: string;
+  onQueryChange: (q: string) => void;
+  results: any[];
+  searching: boolean;
+  onPick: (inf: any) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 w-[min(560px,95vw)] max-h-[85vh] flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+          <input
+            type="text"
+            autoFocus
+            placeholder="Search by handle, name or username…"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:border-indigo-400"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {searching ? (
+            <div className="text-center text-sm text-gray-400 py-8">Searching…</div>
+          ) : results.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-8">
+              {query.trim().length < 2 ? "Type at least 2 characters." : "No matches."}
+            </div>
+          ) : (
+            results.map((inf) => {
+              const handle = inf.instagram_handle || inf.username || "—";
+              const photo = inf.custom_profile_photo_url || inf.profile_photo_url;
+              return (
+                <button
+                  key={inf.influencer_id}
+                  type="button"
+                  onClick={() => onPick(inf)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-left cursor-pointer"
+                >
+                  {photo ? (
+                    <img src={photo} alt={handle} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                      {handle.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{inf.full_name || handle}</p>
+                    <p className="text-[12px] text-gray-500 truncate">@{handle} · {formatFollowers(inf.followers_count || 0) || "?"} followers</p>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+        <div className="p-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
