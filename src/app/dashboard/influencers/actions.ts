@@ -24,7 +24,7 @@ export async function updateInfluencer(influencerId: string, formData: FormData)
   if (!user) return { error: "Not authenticated" };
 
   const updates: Record<string, unknown> = {};
-  const fields = ["full_name", "username", "instagram_handle", "email", "bio", "city_id", "location", "status", "verification_status", "tier", "gender", "date_of_birth"];
+  const fields = ["full_name", "username", "instagram_handle", "email", "bio", "city_id", "location", "status", "verification_status", "tier", "gender", "date_of_birth", "profile_photo_url"];
   for (const f of fields) {
     const v = formData.get(f);
     if (v !== null) updates[f] = (v as string) || null;

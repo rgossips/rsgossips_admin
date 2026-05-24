@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { updateInfluencer } from "../actions";
+import { updateInfluencer, uploadInfluencerPhoto } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 
 const inputClass = "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
@@ -31,10 +31,28 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string>(influencer.profile_photo_url || "");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = (files: FileList | null) => {
+    if (!files?.[0] || !files[0].type.startsWith("image/")) return;
+    setPhotoFile(files[0]);
+    setPhotoPreview(URL.createObjectURL(files[0]));
+  };
 
   const handleSubmit = async (formData: FormData) => {
     setError("");
     setLoading(true);
+    // Upload new photo first if selected
+    if (photoFile) {
+      const fd = new FormData();
+      fd.append("file", photoFile);
+      fd.append("folder", "influencer-photos");
+      const uploadResult = await uploadInfluencerPhoto(fd);
+      if (uploadResult.error) { setError(uploadResult.error); setLoading(false); return; }
+      if (uploadResult.url) formData.append("profile_photo_url", uploadResult.url);
+    }
     const result = await updateInfluencer(influencer.influencer_id, formData);
     if (result.error) {
       setError(result.error);
@@ -57,7 +75,29 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
         </div>
 
         <form action={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-          {error && <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">{error}</div>}
+          {error && <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-gray-800 text-red-600 dark:text-red-400 text-sm">{error}</div>}
+
+          {/* Profile photo */}
+          <div className="flex items-center gap-5">
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-500 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-gray-50 dark:bg-gray-800 shrink-0"
+            >
+              {photoPreview ? (
+                <img src={photoPreview} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoSelect(e.target.files)} />
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Profile Photo</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Click to change. JPG, PNG, WebP.</p>
+              {photoFile && <p className="text-[11px] text-emerald-600 mt-1">New photo selected — will upload on save</p>}
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
