@@ -126,6 +126,39 @@ export async function moveFeaturedCreator(id: string, direction: "up" | "down") 
   return { ok: true };
 }
 
+// Upload a featured creator avatar to Supabase Storage. Called from the
+// form before saving so the avatar_url field gets a stored URL (not a
+// short-lived Instagram CDN link that would expire).
+export async function uploadFeaturedCreatorAvatar(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "No file provided" };
+  if (!file.type.startsWith("image/")) return { error: "Only images are allowed" };
+  if (file.size > 5 * 1024 * 1024) return { error: "File must be under 5MB" };
+
+  const adminClient = createAdminClient();
+  await adminClient.storage.createBucket("featured-creator-avatars", {
+    public: true,
+    fileSizeLimit: 5 * 1024 * 1024,
+    allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+  }).catch(() => {});
+
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `avatars/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const arrayBuffer = await file.arrayBuffer();
+  const { error } = await adminClient.storage
+    .from("featured-creator-avatars")
+    .upload(path, Buffer.from(arrayBuffer), { contentType: file.type, upsert: true });
+
+  if (error) return { error: error.message };
+
+  const { data } = adminClient.storage.from("featured-creator-avatars").getPublicUrl(path);
+  return { url: data.publicUrl };
+}
+
 // Looks up influencers for the "pick existing" picker on the form. Searches
 // both registered influencers AND pending invitations so admin can feature
 // pre-onboarded creators too. Limited to 20 hits combined.

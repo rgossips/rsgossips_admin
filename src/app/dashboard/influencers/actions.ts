@@ -4,6 +4,31 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 
+// Admin-only override of an influencer's subscription plan. Bypasses
+// Stripe entirely — useful for comping accounts, granting trials, or
+// fixing data after a refund. Logs nothing extra; the column already
+// has updated_at tracking.
+const VALID_PLANS = new Set(["trial", "starter", "pro", "elite"]);
+export async function updateInfluencerPlan(influencerId: string, plan: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  if (!VALID_PLANS.has(plan)) return { error: "Invalid plan" };
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("influencer_profiles")
+    .update({ subscription_plan: plan, updated_at: new Date().toISOString() })
+    .eq("influencer_id", influencerId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/dashboard/influencers/${influencerId}`);
+  revalidatePath("/dashboard/influencers");
+  return { success: true };
+}
+
 export async function toggleInfluencerStatus(influencerId: string, currentStatus: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

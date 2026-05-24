@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { deleteFeaturedCreator, moveFeaturedCreator, toggleFeaturedCreatorActive } from "./actions";
+import { ActionButton } from "./_components/action-button";
 
 export const dynamic = "force-dynamic";
 
@@ -93,13 +94,9 @@ function CreatorRow({ creator }: { creator: any }) {
           await moveFeaturedCreator(creator.id, "up");
         }}
       >
-        <button
-          type="submit"
-          title="Move up"
-          className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
+        <ActionButton title="Move up" className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
           ↑
-        </button>
+        </ActionButton>
       </form>
       <form
         action={async () => {
@@ -107,13 +104,9 @@ function CreatorRow({ creator }: { creator: any }) {
           await moveFeaturedCreator(creator.id, "down");
         }}
       >
-        <button
-          type="submit"
-          title="Move down"
-          className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
+        <ActionButton title="Move down" className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
           ↓
-        </button>
+        </ActionButton>
       </form>
 
       <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${creator.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
@@ -133,12 +126,9 @@ function CreatorRow({ creator }: { creator: any }) {
           await toggleFeaturedCreatorActive(creator.id, !creator.is_active);
         }}
       >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
+        <ActionButton className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
           {creator.is_active ? "Hide" : "Show"}
-        </button>
+        </ActionButton>
       </form>
 
       <form
@@ -147,12 +137,9 @@ function CreatorRow({ creator }: { creator: any }) {
           await deleteFeaturedCreator(creator.id);
         }}
       >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
-        >
+        <ActionButton className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer">
           Delete
-        </button>
+        </ActionButton>
       </form>
     </div>
   );

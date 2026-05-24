@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { searchInfluencersForFeature } from "../actions";
+import { useState, useTransition, useRef } from "react";
+import { searchInfluencersForFeature, uploadFeaturedCreatorAvatar } from "../actions";
 
 type Initial = {
   influencer_id?: string | null;
@@ -56,6 +56,18 @@ export function FeaturedCreatorForm({
   const [pickerResults, setPickerResults] = useState<any[]>([]);
   const [pickerSearching, setPickerSearching] = useState(false);
 
+  // Avatar upload — pick a local file, upload to Supabase Storage on submit
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarSelect = (files: FileList | null) => {
+    if (!files?.[0] || !files[0].type.startsWith("image/")) return;
+    setAvatarFile(files[0]);
+    // Show local preview immediately
+    setState((prev) => ({ ...prev, avatar_url: URL.createObjectURL(files[0]) }));
+  };
+
   const searchPicker = async (q: string) => {
     setPickerQuery(q);
     if (q.trim().length < 2) {
@@ -87,6 +99,19 @@ export function FeaturedCreatorForm({
   const onSubmit = (formData: FormData) => {
     setError(null);
     startTransition(async () => {
+      // Upload local avatar file (if picked) before saving the form
+      if (avatarFile) {
+        setAvatarUploading(true);
+        const fd = new FormData();
+        fd.append("file", avatarFile);
+        const result = await uploadFeaturedCreatorAvatar(fd);
+        setAvatarUploading(false);
+        if (result.error) { setError(result.error); return; }
+        if (result.url) {
+          formData.set("avatar_url", result.url);
+          setState((prev) => ({ ...prev, avatar_url: result.url! }));
+        }
+      }
       const res = await action(formData);
       if (res?.error) setError(res.error);
     });
@@ -118,18 +143,50 @@ export function FeaturedCreatorForm({
         <Field label="Display name" name="display_name" value={state.display_name} onChange={(v) => setState({ ...state, display_name: v })} placeholder="Cristiano Ronaldo" />
       </div>
 
-      <Field label="Avatar URL" name="avatar_url" value={state.avatar_url} onChange={(v) => setState({ ...state, avatar_url: v })} placeholder="https://…/photo.jpg" />
-      {state.avatar_url && (
-        <div className="flex items-center gap-3">
-          <img
-            src={state.avatar_url}
-            alt="avatar preview"
-            className="w-16 h-16 rounded-2xl object-cover border border-gray-200"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      {/* Hidden input so the form still submits the avatar_url field (filled by the picker / set after upload). */}
+      <input type="hidden" name="avatar_url" value={state.avatar_url} />
+
+      <div>
+        <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Avatar</span>
+        <div className="mt-2 flex items-center gap-4">
+          <div
+            onClick={() => avatarInputRef.current?.click()}
+            className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-500 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-gray-50 dark:bg-gray-800 shrink-0"
+          >
+            {state.avatar_url ? (
+              <img
+                src={state.avatar_url}
+                alt="avatar"
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            )}
+          </div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleAvatarSelect(e.target.files)}
           />
-          <span className="text-[11px] text-gray-400">preview</span>
+          <div>
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              {state.avatar_url ? "Change avatar" : "Upload avatar"}
+            </button>
+            <p className="text-[10px] text-gray-400 mt-1">JPG, PNG, WebP. Max 5MB.</p>
+            {avatarFile && <p className="text-[11px] text-emerald-600 mt-1">New avatar selected — will upload on save</p>}
+            {avatarUploading && <p className="text-[11px] text-indigo-600 mt-1">Uploading…</p>}
+          </div>
         </div>
-      )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field label="Followers label" name="followers_label" value={state.followers_label} onChange={(v) => setState({ ...state, followers_label: v })} placeholder="1.4M" />

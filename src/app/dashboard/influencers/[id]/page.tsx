@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { EditInfluencerButton } from "./edit-influencer";
+import { ChangePlanButton } from "./change-plan";
 import { Avatar } from "@/components/avatar";
 
 export default async function InfluencerDetailPage({
@@ -60,6 +61,7 @@ export default async function InfluencerDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ChangePlanButton influencerId={inf.influencer_id} currentPlan={inf.subscription_plan} />
           <EditInfluencerButton influencer={inf} />
           <RefreshButton />
         </div>
@@ -112,6 +114,7 @@ export default async function InfluencerDetailPage({
             ["Instagram", inf.instagram_handle ? `@${inf.instagram_handle}` : "—"],
             ["Status", inf.status || "—"],
             ["Verification", inf.verification_status || "—"],
+            ["Plan", inf.subscription_plan ? inf.subscription_plan.charAt(0).toUpperCase() + inf.subscription_plan.slice(1) : "Free"],
             ["Source", inf.source || "—"],
           ]} />
           <SidebarTable title="Instagram Stats" rows={[

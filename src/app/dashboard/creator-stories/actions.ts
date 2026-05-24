@@ -132,19 +132,84 @@ export async function moveCreatorStory(id: string, direction: "up" | "down") {
   return { ok: true };
 }
 
-// Lighter version of the featured-creators picker — same data, no rating.
+// Lighter version of the featured-creators picker — searches both
+// registered influencers AND pending invitations so admin can pick
+// pre-onboarded creators too.
 export async function searchInfluencersForStory(query: string) {
   const admin = createAdminClient();
   const q = query.trim();
   if (!q) return [];
   const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
-  const { data } = await admin
-    .from("influencer_profiles")
-    .select(
-      "influencer_id, full_name, username, instagram_handle, profile_photo_url, custom_profile_photo_url, followers_count"
-    )
-    .or(`instagram_handle.ilike.${like},username.ilike.${like},full_name.ilike.${like}`)
-    .eq("status", "active")
-    .limit(20);
-  return data || [];
+
+  const [registeredRes, invitedRes] = await Promise.all([
+    admin
+      .from("influencer_profiles")
+      .select(
+        "influencer_id, full_name, username, instagram_handle, profile_photo_url, custom_profile_photo_url, followers_count"
+      )
+      .or(`instagram_handle.ilike.${like},username.ilike.${like},full_name.ilike.${like}`)
+      .limit(15),
+    admin
+      .from("influencer_invitations")
+      .select("id, full_name, instagram_username, profile_photo_url, notes")
+      .eq("status", "pending")
+      .or(`instagram_username.ilike.${like},full_name.ilike.${like}`)
+      .limit(15),
+  ]);
+
+  const parseFollowers = (s: string | undefined | null): number => {
+    if (!s) return 0;
+    const m = String(s).match(/([\d.]+)\s*([kKmM]?)/);
+    if (!m) return 0;
+    const num = parseFloat(m[1]);
+    const unit = (m[2] || "").toLowerCase();
+    if (unit === "m") return Math.round(num * 1_000_000);
+    if (unit === "k") return Math.round(num * 1_000);
+    return Math.round(num);
+  };
+
+  const registered = (registeredRes.data || []).map((r) => ({
+    influencer_id: r.influencer_id as string | null,
+    full_name: r.full_name,
+    username: r.username,
+    instagram_handle: r.instagram_handle,
+    profile_photo_url: r.profile_photo_url,
+    custom_profile_photo_url: r.custom_profile_photo_url,
+    followers_count: r.followers_count,
+    source: "registered" as const,
+  }));
+
+  const invited = (invitedRes.data || []).map((r) => {
+    let followers = 0;
+    if (r.notes) {
+      try {
+        const sep = r.notes.indexOf("\n---\n");
+        const jsonStr = sep > -1 ? r.notes.slice(sep + 5) : (r.notes.startsWith("{") ? r.notes : "");
+        if (jsonStr) {
+          const meta = JSON.parse(jsonStr);
+          if (meta.followers) followers = parseFollowers(meta.followers);
+        }
+      } catch { /* ignore */ }
+    }
+    return {
+      influencer_id: null as string | null,
+      full_name: r.full_name,
+      username: r.instagram_username,
+      instagram_handle: r.instagram_username,
+      profile_photo_url: r.profile_photo_url,
+      custom_profile_photo_url: null,
+      followers_count: followers,
+      source: "invited" as const,
+    };
+  });
+
+  const seen = new Set<string>();
+  const combined: Array<(typeof registered)[number] | (typeof invited)[number]> = [];
+  for (const r of [...registered, ...invited]) {
+    const handle = (r.instagram_handle || "").toLowerCase();
+    if (handle && seen.has(handle)) continue;
+    if (handle) seen.add(handle);
+    combined.push(r);
+  }
+  return combined.slice(0, 20);
 }
