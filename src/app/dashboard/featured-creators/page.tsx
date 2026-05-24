@@ -1,20 +1,12 @@
 import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
-import {
-  deleteFeaturedCreator,
-  moveFeaturedCreator,
-  toggleFeaturedCreatorActive,
-} from "./actions";
+import { deleteFeaturedCreator, moveFeaturedCreator, toggleFeaturedCreatorActive } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedCreatorsPage() {
   const admin = createAdminClient();
-  const { data: creators, error } = await admin
-    .from("featured_creators")
-    .select("*")
-    .order("position", { ascending: true })
-    .order("created_at", { ascending: false });
+  const { data: creators, error } = await admin.from("featured_creators").select("*").order("position", { ascending: true }).order("created_at", { ascending: false });
 
   const activeCount = (creators || []).filter((c) => c.is_active).length;
 
@@ -23,9 +15,7 @@ export default async function FeaturedCreatorsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Featured Creators</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Hand-curated Top Creators carousel on the brand home page. Lower position = appears first.
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Hand-curated Top Creators carousel on the brand home page. Lower position = appears first.</p>
         </div>
         <Link
           href="/dashboard/featured-creators/create"
@@ -44,11 +34,7 @@ export default async function FeaturedCreatorsPage() {
         <StatPill label="Hidden" value={(creators || []).length - activeCount} accent="text-gray-400" />
       </div>
 
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
-          {error.message}
-        </div>
-      )}
+      {error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">{error.message}</div>}
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
         {(creators || []).length === 0 ? (
@@ -64,15 +50,7 @@ export default async function FeaturedCreatorsPage() {
   );
 }
 
-function StatPill({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: string;
-}) {
+function StatPill({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
       <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
@@ -84,40 +62,27 @@ function StatPill({
 function CreatorRow({ creator }: { creator: any }) {
   return (
     <div className="flex items-center gap-4 p-4">
-      <span className="shrink-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 w-6 text-center">
+      {/* <span className="shrink-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 w-6 text-center">
         {creator.position}
-      </span>
+      </span> */}
 
       {creator.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={creator.avatar_url} alt={creator.username} className="w-12 h-12 rounded-full object-cover" />
       ) : (
-        <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">
-          {(creator.username || "?").charAt(0).toUpperCase()}
-        </div>
+        <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">{(creator.username || "?").charAt(0).toUpperCase()}</div>
       )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-            {creator.display_name || `@${creator.username}`}
-          </p>
-          {creator.verified && (
-            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
-              Verified
-            </span>
-          )}
+          <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{creator.display_name || `@${creator.username}`}</p>
+          {creator.verified && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Verified</span>}
         </div>
         <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate">
           @{creator.username} · {creator.followers_label || "?"} followers
           {creator.rating ? ` · ★ ${creator.rating}` : ""}
         </p>
-        <a
-          href={creator.instagram_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[11px] text-indigo-500 hover:underline truncate inline-block"
-        >
+        <a href={creator.instagram_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-indigo-500 hover:underline truncate inline-block">
           {creator.instagram_url}
         </a>
       </div>
@@ -151,11 +116,7 @@ function CreatorRow({ creator }: { creator: any }) {
         </button>
       </form>
 
-      <span
-        className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${
-          creator.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
-        }`}
-      >
+      <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${creator.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
         {creator.is_active ? "Active" : "Hidden"}
       </span>
 
