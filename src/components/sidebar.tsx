@@ -17,6 +17,7 @@ const mainNav: NavSpec[] = [
   { label: "Leads", href: "/dashboard/leads", icon: "phone" },
   { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
   { label: "Creator Stories", href: "/dashboard/creator-stories", icon: "video" },
+  { label: "Featured Campaigns", href: "/dashboard/featured-campaigns", icon: "flame" },
 ];
 
 const adminNav: NavSpec[] = [
@@ -72,6 +73,11 @@ const icons: Record<string, React.ReactNode> = {
   video: (
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+    </svg>
+  ),
+  flame: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.24 17 7.317c1.07 2.043.282 4.622-1.5 6.183a7 7 0 002.157 5.157z" />
     </svg>
   ),
 };
