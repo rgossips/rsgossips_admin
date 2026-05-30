@@ -38,13 +38,16 @@ export const updateSession = async (request: NextRequest) => {
     error,
   } = await supabase.auth.getUser();
 
+  // Public routes that don't require an authenticated session:
+  // - /login              the login page itself
+  // - /auth/...           Supabase invite + password-reset callback handler
+  const isPublicRoute =
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/auth/");
+
   // Only redirect on "definitely not logged in" (no user AND no auth error).
   // Auth errors usually mean the cookie is being refreshed mid-flight.
-  if (
-    !user &&
-    !error &&
-    !request.nextUrl.pathname.startsWith("/login")
-  ) {
+  if (!user && !error && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

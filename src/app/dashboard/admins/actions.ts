@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { getSiteUrl } from "@/lib/site-url";
 
 async function requireSuperAdmin() {
   const supabase = await createClient();
@@ -42,10 +43,15 @@ export async function inviteAdmin(formData: FormData) {
 
   const adminClient = createAdminClient();
 
-  // Invite user via Supabase Auth (sends invite email)
+  // Invite user via Supabase Auth (sends invite email). Pass an explicit
+  // redirectTo so the email link lands on OUR admin app — without this,
+  // Supabase falls back to the project's Site URL config (typically
+  // localhost:3000 in dev) and the invite link is unusable in production.
+  const redirectTo = `${getSiteUrl()}/auth/callback`;
   const { data: authData, error: authError } =
     await adminClient.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName },
+      redirectTo,
     });
 
   if (authError) {
