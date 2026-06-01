@@ -6,9 +6,21 @@ import { revalidatePath } from "next/cache";
 
 // Admin-only override of an influencer's subscription plan. Bypasses
 // Stripe entirely — useful for comping accounts, granting trials, or
-// fixing data after a refund. Logs nothing extra; the column already
-// has updated_at tracking.
+// fixing data after a refund. Mirrors the Stripe-webhook reset behaviour:
+// if the user's saved media-kit template is above the new plan's tier
+// (e.g. they're on Glass Blue and admin moves them to Starter) we flip
+// media_kit_template back to "classic" in the same write, so the picker
+// is never stuck in an unsave-able state.
 const VALID_PLANS = new Set(["trial", "starter", "pro", "elite"]);
+const TEMPLATE_MIN_PLAN: Record<string, string> = {
+  classic: "starter",
+  glass_blue: "pro",
+  editorial_noir: "pro",
+  bento_sunset: "pro",
+  neo_brutalist: "pro",
+};
+const PLAN_RANK: Record<string, number> = { trial: 2, starter: 1, pro: 2, elite: 3 };
+
 export async function updateInfluencerPlan(influencerId: string, plan: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -17,12 +29,46 @@ export async function updateInfluencerPlan(influencerId: string, plan: string) {
   if (!VALID_PLANS.has(plan)) return { error: "Invalid plan" };
 
   const adminClient = createAdminClient();
+
+  const { data: prior } = await adminClient
+    .from("influencer_profiles")
+    .select("media_kit_template")
+    .eq("influencer_id", influencerId)
+    .maybeSingle();
+  const previousTemplate = prior?.media_kit_template || "classic";
+  const requiredRank = PLAN_RANK[TEMPLATE_MIN_PLAN[previousTemplate] || "starter"] || 0;
+  const nextPlanRank = PLAN_RANK[plan] || 0;
+  const templateNoLongerAllowed = requiredRank > nextPlanRank;
+
+  const update: Record<string, unknown> = {
+    subscription_plan: plan,
+    updated_at: new Date().toISOString(),
+  };
+  if (templateNoLongerAllowed) update.media_kit_template = "classic";
+
   const { error } = await adminClient
     .from("influencer_profiles")
-    .update({ subscription_plan: plan, updated_at: new Date().toISOString() })
+    .update(update)
     .eq("influencer_id", influencerId);
 
   if (error) return { error: error.message };
+
+  if (templateNoLongerAllowed) {
+    // Best-effort heads-up so the creator knows their kit reverted; failures
+    // are non-fatal because the plan change itself already succeeded.
+    try {
+      await adminClient.from("notifications").insert({
+        user_id: influencerId,
+        type: "media_kit_template_reset",
+        title: "Media kit reset to Classic",
+        body: JSON.stringify({
+          text: `Your ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan only includes the Classic media-kit template, so your kit was switched back. Pick another any time from your media-kit page.`,
+          link: "/influencer/media-kit",
+        }),
+        is_read: false,
+      });
+    } catch {}
+  }
 
   revalidatePath(`/dashboard/influencers/${influencerId}`);
   revalidatePath("/dashboard/influencers");
