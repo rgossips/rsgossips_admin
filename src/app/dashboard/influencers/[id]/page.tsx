@@ -4,7 +4,9 @@ import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { EditInfluencerButton } from "./edit-influencer";
 import { ChangePlanButton } from "./change-plan";
+import { DeleteInfluencerButton } from "./delete-influencer";
 import { Avatar } from "@/components/avatar";
+import { isSuperAdmin } from "@/lib/require-super-admin";
 
 export default async function InfluencerDetailPage({
   params,
@@ -21,6 +23,8 @@ export default async function InfluencerDetailPage({
     .single();
 
   if (error || !inf) notFound();
+
+  const superAdmin = await isSuperAdmin();
 
   const formatDate = (d: string | null) => {
     if (!d) return "—";
@@ -63,6 +67,13 @@ export default async function InfluencerDetailPage({
         <div className="flex items-center gap-2">
           <ChangePlanButton influencerId={inf.influencer_id} currentPlan={inf.subscription_plan} />
           <EditInfluencerButton influencer={inf} />
+          {superAdmin && (
+            <DeleteInfluencerButton
+              influencerId={inf.influencer_id}
+              displayName={inf.full_name || inf.username || inf.instagram_handle || "Influencer"}
+              confirmText={inf.instagram_handle || inf.username || inf.full_name || "DELETE"}
+            />
+          )}
           <RefreshButton />
         </div>
       </div>

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { EditBrandButton } from "./edit-brand";
+import { DeleteBrandButton } from "./delete-brand";
+import { isSuperAdmin } from "@/lib/require-super-admin";
 
 export default async function BrandDetailPage({
   params,
@@ -31,6 +33,8 @@ export default async function BrandDetailPage({
   }
 
   if (!brand) return notFound();
+
+  const superAdmin = await isSuperAdmin();
 
   // Fetch campaigns for this brand (from brand_id or brand_invitation_id)
   let campQuery = supabase
@@ -124,6 +128,13 @@ export default async function BrandDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {!isInvited && <EditBrandButton brand={brand} />}
+          {!isInvited && superAdmin && (
+            <DeleteBrandButton
+              brandId={brand.brand_id}
+              displayName={brand.brand_name || brand.instagram_username || "Brand"}
+              confirmText={brand.instagram_username || brand.brand_name || "DELETE"}
+            />
+          )}
           <RefreshButton />
         </div>
       </div>

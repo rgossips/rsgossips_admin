@@ -2,20 +2,33 @@
 
 import { useState } from "react";
 import { inviteAdmin } from "./actions";
-import { ButtonSpinner } from "@/components/spinner";
+import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 
 export function InviteForm() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
 
   const handleSubmit = async (formData: FormData) => {
     setError("");
     setSuccess("");
     setLoading(true);
 
+    // Best-effort progress copy — the server action runs all steps in
+    // one call so we step the message client-side to indicate progress.
+    setLoadingMsg("Preparing invitation…");
+    const ticks = setInterval(() => {
+      setLoadingMsg((prev) => {
+        if (prev === "Preparing invitation…") return "Generating secure link…";
+        if (prev === "Generating secure link…") return "Sending email…";
+        return prev;
+      });
+    }, 900);
+
     const result = await inviteAdmin(formData);
+    clearInterval(ticks);
 
     if (result.error) {
       setError(result.error);
@@ -24,10 +37,12 @@ export function InviteForm() {
       setOpen(false);
     }
     setLoading(false);
+    setLoadingMsg("");
   };
 
   return (
     <div className="mb-6">
+      {loading && <FullPageLoader message={loadingMsg || "Sending invitation…"} />}
       {success && (
         <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-sm mb-4">
           {success}
