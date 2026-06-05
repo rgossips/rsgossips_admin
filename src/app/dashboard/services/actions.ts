@@ -1,9 +1,9 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { adminGate } from "@/lib/require-super-admin";
 
 // ── upload helper ────────────────────────────────────────────────────────
 // Uploads service-related images (featured + gallery) to the existing
@@ -11,11 +11,8 @@ import { redirect } from "next/navigation";
 // dedicated server action and inline by the form component.
 
 export async function uploadServiceImage(formData: FormData): Promise<{ url?: string; error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided" };
@@ -135,11 +132,8 @@ function readForm(formData: FormData) {
 // ── actions ──────────────────────────────────────────────────────────────
 
 export async function createService(formData: FormData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   let row;
   try {
@@ -159,11 +153,8 @@ export async function createService(formData: FormData): Promise<{ error?: strin
 }
 
 export async function updateService(id: string, formData: FormData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   let row;
   try {
@@ -185,12 +176,9 @@ export async function updateService(id: string, formData: FormData): Promise<{ e
   redirect("/dashboard/services");
 }
 
-export async function toggleServiceActive(id: string, nextValue: boolean) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function toggleServiceActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -203,12 +191,9 @@ export async function toggleServiceActive(id: string, nextValue: boolean) {
   return { ok: true };
 }
 
-export async function deleteService(id: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deleteService(id: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   // Soft delete: just set is_active=false. Hard delete would orphan any

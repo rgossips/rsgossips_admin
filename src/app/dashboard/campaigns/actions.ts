@@ -1,15 +1,12 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { adminGate } from "@/lib/require-super-admin";
 
-export async function uploadCampaignImage(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function uploadCampaignImage(formData: FormData): Promise<{ error?: string; url?: string }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const file = formData.get("file") as File | null;
   const folder = (formData.get("folder") as string) || "misc";
@@ -37,13 +34,9 @@ export async function uploadCampaignImage(formData: FormData) {
   return { url: data.publicUrl };
 }
 
-export async function createCampaign(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Not authenticated" };
+export async function createCampaign(formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
@@ -203,10 +196,9 @@ export async function updateApplicationStatus(
   _approvalNote?: string,
   revisionNote?: string,
   revisionLinks?: string[],
-) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const adminClient = createAdminClient();
   const updates: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
@@ -223,10 +215,9 @@ export async function updateApplicationStatus(
   return { success: true };
 }
 
-export async function updateCampaignStatus(campaignId: string, status: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateCampaignStatus(campaignId: string, status: string): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const adminClient = createAdminClient();
   const { error } = await adminClient.from("campaigns").update({ status }).eq("campaign_id", campaignId);
@@ -236,10 +227,9 @@ export async function updateCampaignStatus(campaignId: string, status: string) {
   return { success: true };
 }
 
-export async function updateCampaign(campaignId: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateCampaign(campaignId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;

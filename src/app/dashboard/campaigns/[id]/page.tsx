@@ -5,6 +5,7 @@ import { CampaignDetailActions } from "./detail-actions";
 import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export default async function CampaignDetailPage({
   params,
@@ -13,6 +14,7 @@ export default async function CampaignDetailPage({
 }) {
   const { id } = await params;
   const supabase = createAdminClient();
+  const canWrite = await isAdminOrAbove();
 
   const { data: campaign, error } = await supabase
     .from("campaigns")
@@ -159,8 +161,8 @@ export default async function CampaignDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <EditCampaignButton campaign={campaign} description={description} bannerUrl={bannerUrl} galleryUrls={galleryUrls} engagementRate={engagementRate} deliverables={deliverables} />
-          <CampaignDetailActions campaignId={campaign.campaign_id} status={campaign.status} />
+          {canWrite && <EditCampaignButton campaign={campaign} description={description} bannerUrl={bannerUrl} galleryUrls={galleryUrls} engagementRate={engagementRate} deliverables={deliverables} />}
+          {canWrite && <CampaignDetailActions campaignId={campaign.campaign_id} status={campaign.status} />}
           <RefreshButton />
         </div>
       </div>

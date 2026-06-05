@@ -6,7 +6,7 @@ import { EditInfluencerButton } from "./edit-influencer";
 import { ChangePlanButton } from "./change-plan";
 import { DeleteInfluencerButton } from "./delete-influencer";
 import { Avatar } from "@/components/avatar";
-import { isSuperAdmin } from "@/lib/require-super-admin";
+import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
 
 export default async function InfluencerDetailPage({
   params,
@@ -24,7 +24,7 @@ export default async function InfluencerDetailPage({
 
   if (error || !inf) notFound();
 
-  const superAdmin = await isSuperAdmin();
+  const [superAdmin, canWrite] = await Promise.all([isSuperAdmin(), isAdminOrAbove()]);
 
   const formatDate = (d: string | null) => {
     if (!d) return "—";
@@ -65,8 +65,8 @@ export default async function InfluencerDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <ChangePlanButton influencerId={inf.influencer_id} currentPlan={inf.subscription_plan} />
-          <EditInfluencerButton influencer={inf} />
+          {canWrite && <ChangePlanButton influencerId={inf.influencer_id} currentPlan={inf.subscription_plan} />}
+          {canWrite && <EditInfluencerButton influencer={inf} />}
           {superAdmin && (
             <DeleteInfluencerButton
               influencerId={inf.influencer_id}

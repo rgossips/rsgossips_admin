@@ -5,6 +5,27 @@ import { useRouter } from "next/navigation";
 import { updateCampaignStatus } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 
+const STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "completed", label: "Completed" },
+] as const;
+
+// Styling for each status — keep in sync with the badge colors used on
+// the list/detail pages so the dropdown reads as the same affordance.
+const statusStyle: Record<string, string> = {
+  draft: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700",
+  active: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+  paused: "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
+  completed: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+};
+
+// Free-form status changer. Replaces the older one-shot buttons so the
+// admin can move to any state (e.g. revert a completed campaign back to
+// active if it was marked done by mistake). We optimistically update the
+// local select value and roll back if the server action rejects, so the
+// UI stays responsive without a full router refresh just to flip a badge.
 export function CampaignDetailActions({
   campaignId,
   status,
@@ -13,80 +34,58 @@ export function CampaignDetailActions({
   status: string;
 }) {
   const router = useRouter();
+  const [current, setCurrent] = useState(status);
   const [loading, setLoading] = useState(false);
 
-  const handleStatusChange = async (newStatus: string) => {
-    setLoading(true);
-    const result = await updateCampaignStatus(campaignId, newStatus);
-    if (result.error) {
-      alert(result.error);
-    } else {
-      router.refresh();
+  const handleChange = async (next: string) => {
+    if (next === current) return;
+
+    // Soft confirm only for terminal transitions where it matters.
+    const isCompleting = next === "completed";
+    if (isCompleting && !confirm("Mark this campaign as completed? Applications won't change but the campaign will no longer accept new ones.")) {
+      return;
     }
+
+    const prev = current;
+    setCurrent(next);
+    setLoading(true);
+    const result = await updateCampaignStatus(campaignId, next);
     setLoading(false);
+    if (result.error) {
+      setCurrent(prev);
+      alert(result.error);
+      return;
+    }
+    router.refresh();
   };
 
-  const btnBase =
-    "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border";
-
   return (
-    <div className="flex items-center gap-2 shrink-0">
-      {status === "draft" && (
-        <button
-          onClick={() => handleStatusChange("active")}
+    <div className="inline-flex items-center gap-2 shrink-0">
+      <label className="sr-only" htmlFor="campaign-status-select">Campaign status</label>
+      <div className={`relative inline-flex items-center rounded-xl border ${statusStyle[current] || statusStyle.draft}`}>
+        <select
+          id="campaign-status-select"
+          value={current}
+          onChange={(e) => handleChange(e.target.value)}
           disabled={loading}
-          className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40`}
+          className="appearance-none bg-transparent text-sm font-semibold pl-4 pr-9 py-2.5 cursor-pointer focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? <ButtonSpinner /> : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          {STATUSES.map((s) => (
+            <option key={s.value} value={s.value} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-3">
+          {loading ? (
+            <ButtonSpinner />
+          ) : (
+            <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           )}
-          Activate
-        </button>
-      )}
-      {status === "active" && (
-        <>
-          <button
-            onClick={() => handleStatusChange("paused")}
-            disabled={loading}
-            className={`${btnBase} bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/40`}
-          >
-            {loading ? <ButtonSpinner /> : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            )}
-            Pause
-          </button>
-          <button
-            onClick={() => handleStatusChange("completed")}
-            disabled={loading}
-            className={`${btnBase} bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40`}
-          >
-            {loading ? <ButtonSpinner /> : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            )}
-            Complete
-          </button>
-        </>
-      )}
-      {status === "paused" && (
-        <button
-          onClick={() => handleStatusChange("active")}
-          disabled={loading}
-          className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40`}
-        >
-          {loading ? <ButtonSpinner /> : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-            </svg>
-          )}
-          Resume
-        </button>
-      )}
+        </span>
+      </div>
     </div>
   );
 }

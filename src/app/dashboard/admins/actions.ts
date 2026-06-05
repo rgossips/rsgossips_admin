@@ -219,6 +219,29 @@ export async function resendAdminInvite(adminId: string) {
   return { success: true };
 }
 
+export async function updateAdminRole(adminId: string, newRole: string) {
+  const currentUser = await requireSuperAdmin();
+
+  if (!["super_admin", "admin", "viewer"].includes(newRole)) {
+    return { error: "Invalid role" };
+  }
+  // Block self-demotion — otherwise a super_admin could lock themselves
+  // out and there'd be no path back without DB access.
+  if (adminId === currentUser.id) {
+    return { error: "You can't change your own role" };
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("admin_profiles")
+    .update({ role: newRole })
+    .eq("id", adminId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/admins");
+  return { success: true };
+}
+
 export async function removeAdmin(adminId: string) {
   const currentUser = await requireSuperAdmin();
 

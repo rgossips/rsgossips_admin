@@ -1,6 +1,8 @@
 // Step metadata for the delete-brand flow. Lives outside the "use server"
 // actions file — see the comment in influencers/delete-steps.ts.
 export const BRAND_DELETE_STEPS = [
+  // Must run before brand_profile so we can still read their contact email.
+  { key: "notify_user", label: "Notify brand by email" },
   { key: "campaign_applications", label: "Campaign applications" },
   { key: "campaigns", label: "Campaigns" },
   { key: "service_orders", label: "Service orders & timeline events" },

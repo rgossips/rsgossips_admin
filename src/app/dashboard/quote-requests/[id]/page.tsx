@@ -6,6 +6,7 @@ import { DeliverDraftForm } from "../_components/deliver-draft-form";
 import { DeliverFinalForm } from "../_components/deliver-final-form";
 import { acceptCounterOffer } from "../actions";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function QuoteRequestDetailPage({
 }) {
   const { id } = await params;
   const admin = createAdminClient();
+  const canWrite = await isAdminOrAbove();
   const { data: order } = await admin
     .from("service_orders")
     .select("*")
@@ -168,7 +170,7 @@ export default async function QuoteRequestDetailPage({
           {/* Status-dependent action card. pending_quote → send quote /
               decline; counter_offered → accept counter, send new quote, or
               decline; everything else → read-only summary card. */}
-          {order.status === "pending_quote" && (
+          {canWrite && order.status === "pending_quote" && (
             <QuoteResponseForm
               orderId={order.id}
               serviceTitle={order.service_title || ""}
@@ -177,7 +179,7 @@ export default async function QuoteRequestDetailPage({
             />
           )}
 
-          {order.status === "counter_offered" && (
+          {canWrite && order.status === "counter_offered" && (
             <div className="space-y-3">
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
                 <p className="text-[11px] font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wider">
@@ -215,7 +217,7 @@ export default async function QuoteRequestDetailPage({
             </div>
           )}
 
-          {["paid_advance", "in_progress", "revision_requested"].includes(order.status) && (
+          {canWrite && ["paid_advance", "in_progress", "revision_requested"].includes(order.status) && (
             <DeliverDraftForm
               orderId={order.id}
               status={order.status}
@@ -225,7 +227,7 @@ export default async function QuoteRequestDetailPage({
             />
           )}
 
-          {order.status === "paid_final" && <DeliverFinalForm orderId={order.id} />}
+          {canWrite && order.status === "paid_final" && <DeliverFinalForm orderId={order.id} />}
 
           {order.status === "completed" && Array.isArray(order.final_files) && order.final_files.length > 0 && (
             <Card title="Delivered files">

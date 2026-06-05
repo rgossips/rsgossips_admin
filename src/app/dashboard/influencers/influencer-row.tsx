@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { toggleInfluencerStatus } from "./actions";
 import { Avatar } from "@/components/avatar";
+import { useRole } from "@/components/role-context";
 
 interface Influencer {
   influencer_id: string;
@@ -18,6 +19,7 @@ interface Influencer {
 export function InfluencerRow({ inf }: { inf: Influencer }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(inf.status);
+  const { isAdmin } = useRole();
 
   const handleToggle = async () => {
     const action = status === "active" ? "suspend" : "reactivate";
@@ -85,6 +87,7 @@ export function InfluencerRow({ inf }: { inf: Influencer }) {
         </span>
       </td>
       <td className="px-6 py-4">
+        {isAdmin ? (
         <button
           onClick={handleToggle}
           disabled={loading}
@@ -114,6 +117,9 @@ export function InfluencerRow({ inf }: { inf: Influencer }) {
             ? "Suspend"
             : "Reactivate"}
         </button>
+        ) : (
+          <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+        )}
       </td>
     </tr>
   );

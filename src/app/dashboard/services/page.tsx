@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { toggleServiceActive } from "./actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function ServicesPage({
   const status = sp.status || "all"; // 'all' | 'active' | 'inactive'
 
   const admin = createAdminClient();
+  const canWrite = await isAdminOrAbove();
   let q = admin
     .from("services")
     .select("*")
@@ -40,15 +42,17 @@ export default async function ServicesPage({
             Catalogue shown to influencers. Edits go live immediately.
           </p>
         </div>
-        <Link
-          href="/dashboard/services/create"
-          className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Service
-        </Link>
+        {canWrite && (
+          <Link
+            href="/dashboard/services/create"
+            className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Service
+          </Link>
+        )}
       </div>
 
       {/* Stats */}
@@ -99,7 +103,7 @@ export default async function ServicesPage({
           </div>
         ) : (
           (services || []).map((s) => (
-            <ServiceRow key={s.id} service={s} />
+            <ServiceRow key={s.id} service={s} canWrite={canWrite} />
           ))
         )}
       </div>
@@ -128,7 +132,7 @@ function StatPill({
   );
 }
 
-function ServiceRow({ service }: { service: any }) {
+function ServiceRow({ service, canWrite }: { service: any; canWrite: boolean }) {
   const price = `₹${Number(service.price_starting || 0).toLocaleString("en-IN")}${
     service.price_suffix || ""
   }`;
@@ -165,25 +169,29 @@ function ServiceRow({ service }: { service: any }) {
       >
         {service.is_active ? "Active" : "Inactive"}
       </span>
-      <Link
-        href={`/dashboard/services/${service.id}/edit`}
-        className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-      >
-        Edit
-      </Link>
-      <form
-        action={async () => {
-          "use server";
-          await toggleServiceActive(service.id, !service.is_active);
-        }}
-      >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          {service.is_active ? "Deactivate" : "Activate"}
-        </button>
-      </form>
+      {canWrite && (
+        <>
+          <Link
+            href={`/dashboard/services/${service.id}/edit`}
+            className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Edit
+          </Link>
+          <form
+            action={async () => {
+              "use server";
+              await toggleServiceActive(service.id, !service.is_active);
+            }}
+          >
+            <button
+              type="submit"
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              {service.is_active ? "Deactivate" : "Activate"}
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }

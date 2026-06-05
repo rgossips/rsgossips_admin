@@ -3,6 +3,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { requireAdmin, adminGate } from "@/lib/require-super-admin";
+import { sendMail } from "@/lib/mailer";
+import { renderUserStatusEmail } from "@/lib/email-templates";
 
 // Admin-only override of an influencer's subscription plan. Bypasses
 // Stripe entirely — useful for comping accounts, granting trials, or
@@ -21,10 +24,9 @@ const TEMPLATE_MIN_PLAN: Record<string, string> = {
 };
 const PLAN_RANK: Record<string, number> = { trial: 2, starter: 1, pro: 2, elite: 3 };
 
-export async function updateInfluencerPlan(influencerId: string, plan: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateInfluencerPlan(influencerId: string, plan: string): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   if (!VALID_PLANS.has(plan)) return { error: "Invalid plan" };
 
@@ -75,24 +77,49 @@ export async function updateInfluencerPlan(influencerId: string, plan: string) {
   return { success: true };
 }
 
-export async function toggleInfluencerStatus(influencerId: string, currentStatus: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function toggleInfluencerStatus(influencerId: string, currentStatus: string): Promise<{ error?: string; success?: boolean; newStatus?: string; emailSent?: boolean; emailError?: string }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const newStatus = currentStatus === "active" ? "suspended" : "active";
   const adminClient = createAdminClient();
   const { error } = await adminClient.from("influencer_profiles").update({ status: newStatus }).eq("influencer_id", influencerId);
   if (error) return { error: error.message };
 
+  // Notify the creator. Non-fatal — the status change itself already
+  // succeeded, so a mail failure shouldn't roll it back.
+  let emailSent = false;
+  let emailError: string | undefined;
+  try {
+    const { data: profile } = await adminClient
+      .from("influencer_profiles")
+      .select("full_name, username, email")
+      .eq("influencer_id", influencerId)
+      .maybeSingle();
+    if (profile?.email) {
+      const { html, text, subjectFragment } = renderUserStatusEmail({
+        fullName: profile.full_name || profile.username || "there",
+        action: newStatus === "suspended" ? "suspended" : "reactivated",
+      });
+      await sendMail({
+        to: profile.email,
+        subject: `Your RecentGossips account has been ${subjectFragment}`,
+        html,
+        text,
+      });
+      emailSent = true;
+    }
+  } catch (e) {
+    emailError = e instanceof Error ? e.message : "Failed to send notification email";
+  }
+
   revalidatePath("/dashboard/influencers");
-  return { success: true, newStatus };
+  return { success: true, newStatus, emailSent, emailError };
 }
 
-export async function updateInfluencer(influencerId: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateInfluencer(influencerId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const updates: Record<string, unknown> = {};
   const fields = ["full_name", "username", "instagram_handle", "email", "bio", "city_id", "location", "status", "verification_status", "tier", "gender", "date_of_birth", "profile_photo_url"];
@@ -114,10 +141,9 @@ export async function updateInfluencer(influencerId: string, formData: FormData)
   return { success: true };
 }
 
-export async function uploadInfluencerPhoto(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function uploadInfluencerPhoto(formData: FormData): Promise<{ error?: string; url?: string }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file" };
@@ -134,10 +160,10 @@ export async function uploadInfluencerPhoto(formData: FormData) {
   return { url: data.publicUrl };
 }
 
-export async function inviteInfluencer(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function inviteInfluencer(formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const fullName = formData.get("full_name") as string;
   const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();
@@ -181,7 +207,7 @@ export async function inviteInfluencer(formData: FormData) {
     instagram_username: instagramUsername,
     profile_photo_url: profilePhotoUrl,
     notes,
-    created_by: user.id,
+    created_by: actingUserId,
     status: "pending",
   });
 
@@ -190,10 +216,9 @@ export async function inviteInfluencer(formData: FormData) {
   return { success: true };
 }
 
-export async function deleteInfluencerInvitation(invitationId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deleteInfluencerInvitation(invitationId: string): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const adminClient = createAdminClient();
   const { error } = await adminClient.from("influencer_invitations").delete().eq("id", invitationId).eq("status", "pending");
@@ -203,10 +228,9 @@ export async function deleteInfluencerInvitation(invitationId: string) {
   return { success: true };
 }
 
-export async function updateInfluencerInvitation(invitationId: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateInfluencerInvitation(invitationId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const fullName = formData.get("full_name") as string;
   const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();
@@ -256,9 +280,11 @@ interface BulkInfluencerRow {
 }
 
 export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated", success: 0, failed: [] };
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) {
+    return { error: e instanceof Error ? e.message : "Forbidden", success: 0, failed: [] };
+  }
 
   const adminClient = createAdminClient();
   const results: { success: number; failed: Array<{ row: number; reason: string; data: BulkInfluencerRow }> } = { success: 0, failed: [] };
@@ -304,7 +330,7 @@ export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
       instagram_username: ig,
       profile_photo_url: "",
       notes,
-      created_by: user.id,
+      created_by: actingUserId,
       status: "pending",
     });
 

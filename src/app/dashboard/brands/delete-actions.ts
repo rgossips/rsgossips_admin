@@ -4,6 +4,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { requireSuperAdmin } from "@/lib/require-super-admin";
 import { revalidatePath } from "next/cache";
 import type { BrandDeleteStepKey } from "./delete-steps";
+import { sendMail } from "@/lib/mailer";
+import { renderUserDeletedEmail } from "@/lib/email-templates";
 
 export async function deleteBrandStep(
   brandId: string,
@@ -19,6 +21,33 @@ export async function deleteBrandStep(
 
   try {
     switch (step) {
+      case "notify_user": {
+        // Best-effort notification — never blocks the destructive flow.
+        try {
+          const { data: profile } = await admin
+            .from("brand_profiles")
+            .select("brand_name, contact_email")
+            .eq("brand_id", brandId)
+            .maybeSingle();
+          let email = profile?.contact_email || null;
+          const fullName = profile?.brand_name || "there";
+          if (!email) {
+            const { data: authUser } = await admin.auth.admin.getUserById(brandId);
+            email = authUser?.user?.email || null;
+          }
+          if (!email) return { ok: true, detail: "No email on file — skipped" };
+          const { html, text } = renderUserDeletedEmail({ fullName, kind: "brand" });
+          await sendMail({
+            to: email,
+            subject: "Your RecentGossips account has been removed",
+            html,
+            text,
+          });
+          return { ok: true, detail: `Notified ${email}` };
+        } catch (e) {
+          return { ok: true, detail: `Skipped (${e instanceof Error ? e.message : "send failed"})` };
+        }
+      }
       case "campaign_applications": {
         // Delete all applications for campaigns owned by this brand
         const { data: camps } = await admin

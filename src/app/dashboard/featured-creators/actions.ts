@@ -1,9 +1,9 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { adminGate } from "@/lib/require-super-admin";
 
 // Stays in lockstep with public.featured_creators (see migration 017).
 function readForm(formData: FormData) {
@@ -37,9 +37,8 @@ function readForm(formData: FormData) {
 }
 
 export async function createFeaturedCreator(formData: FormData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const row = readForm(formData);
   if (!row.username) return { error: "Username is required" };
@@ -54,9 +53,8 @@ export async function createFeaturedCreator(formData: FormData): Promise<{ error
 }
 
 export async function updateFeaturedCreator(id: string, formData: FormData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const row = readForm(formData);
   if (!row.username) return { error: "Username is required" };
@@ -70,10 +68,9 @@ export async function updateFeaturedCreator(id: string, formData: FormData): Pro
   redirect("/dashboard/featured-creators");
 }
 
-export async function toggleFeaturedCreatorActive(id: string, nextValue: boolean) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function toggleFeaturedCreatorActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -86,10 +83,9 @@ export async function toggleFeaturedCreatorActive(id: string, nextValue: boolean
   return { ok: true };
 }
 
-export async function deleteFeaturedCreator(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deleteFeaturedCreator(id: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin.from("featured_creators").delete().eq("id", id);
@@ -102,10 +98,9 @@ export async function deleteFeaturedCreator(id: string) {
 // Bumps the row's position by ±1 within the active list. We don't need a
 // global rebalance because position is a plain integer and the brand-side
 // query sorts ascending — small gaps are fine.
-export async function moveFeaturedCreator(id: string, direction: "up" | "down") {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function moveFeaturedCreator(id: string, direction: "up" | "down"): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { data: row } = await admin
@@ -129,10 +124,9 @@ export async function moveFeaturedCreator(id: string, direction: "up" | "down") 
 // Upload a featured creator avatar to Supabase Storage. Called from the
 // form before saving so the avatar_url field gets a stored URL (not a
 // short-lived Instagram CDN link that would expire).
-export async function uploadFeaturedCreatorAvatar(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function uploadFeaturedCreatorAvatar(formData: FormData): Promise<{ error?: string; url?: string }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided" };

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { EditBrandButton } from "./edit-brand";
 import { DeleteBrandButton } from "./delete-brand";
-import { isSuperAdmin } from "@/lib/require-super-admin";
+import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
 
 export default async function BrandDetailPage({
   params,
@@ -34,7 +34,7 @@ export default async function BrandDetailPage({
 
   if (!brand) return notFound();
 
-  const superAdmin = await isSuperAdmin();
+  const [superAdmin, canWrite] = await Promise.all([isSuperAdmin(), isAdminOrAbove()]);
 
   // Fetch campaigns for this brand (from brand_id or brand_invitation_id)
   let campQuery = supabase
@@ -127,7 +127,7 @@ export default async function BrandDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!isInvited && <EditBrandButton brand={brand} />}
+          {!isInvited && canWrite && <EditBrandButton brand={brand} />}
           {!isInvited && superAdmin && (
             <DeleteBrandButton
               brandId={brand.brand_id}

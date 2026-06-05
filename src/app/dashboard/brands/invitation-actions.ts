@@ -1,16 +1,12 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { adminGate } from "@/lib/require-super-admin";
 
-export async function deleteInvitation(invitationId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Not authenticated" };
+export async function deleteInvitation(invitationId: string): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const adminClient = createAdminClient();
   const { error } = await adminClient
@@ -25,10 +21,9 @@ export async function deleteInvitation(invitationId: string) {
   return { success: true };
 }
 
-export async function updateBrandInvitation(invitationId: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateBrandInvitation(invitationId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const brandName = formData.get("brand_name") as string;
   const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();

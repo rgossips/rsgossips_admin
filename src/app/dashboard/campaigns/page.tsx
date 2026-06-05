@@ -3,6 +3,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { CampaignRow } from "./campaign-row";
 import { CampaignFilters } from "./campaign-filters";
 import { RefreshButton } from "@/components/refresh-button";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export default async function CampaignsPage({
   searchParams,
@@ -11,6 +12,7 @@ export default async function CampaignsPage({
 }) {
   const { search, status, category } = await searchParams;
   const supabase = createAdminClient();
+  const canWrite = await isAdminOrAbove();
 
   let query = supabase
     .from("campaigns")
@@ -46,15 +48,17 @@ export default async function CampaignsPage({
         </div>
         <div className="flex items-center gap-2">
           <RefreshButton />
-          <Link
-            href="/dashboard/campaigns/create"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-200/50 dark:shadow-indigo-900/30"
-          >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-            New Campaign
-          </Link>
+          {canWrite && (
+            <Link
+              href="/dashboard/campaigns/create"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-200/50 dark:shadow-indigo-900/30"
+            >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+              New Campaign
+            </Link>
+          )}
         </div>
       </div>
 

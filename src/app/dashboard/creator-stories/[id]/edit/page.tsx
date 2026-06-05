@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CreatorStoryForm } from "../../_form/creator-story-form";
 import { updateCreatorStory } from "../../actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function EditCreatorStoryPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/creator-stories");
   const { id } = await params;
   const admin = createAdminClient();
   const { data: story } = await admin

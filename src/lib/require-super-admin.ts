@@ -29,6 +29,14 @@ export async function isSuperAdmin(): Promise<boolean> {
   return role === "super_admin";
 }
 
+// True for both "admin" and "super_admin" — anyone who is allowed to
+// perform day-to-day write actions (everything except managing other
+// admins and deleting users). Viewers are read-only and return false.
+export async function isAdminOrAbove(): Promise<boolean> {
+  const { role } = await getCurrentAdminRole();
+  return role === "admin" || role === "super_admin";
+}
+
 // Throws if the caller isn't a super admin. Use from server actions
 // before performing privileged operations like user deletion.
 export async function requireSuperAdmin(): Promise<string> {
@@ -36,4 +44,38 @@ export async function requireSuperAdmin(): Promise<string> {
   if (!userId) throw new Error("Not authenticated — please sign in again");
   if (role !== "super_admin") throw new Error("Only super admins can perform this action");
   return userId;
+}
+
+// Throws if the caller isn't an admin or super admin. Use from server
+// actions that perform writes (create, update, delete) but aren't
+// destructive enough to require super admin (e.g. editing a profile vs
+// deleting a user entirely).
+export async function requireAdmin(): Promise<string> {
+  const { userId, role } = await getCurrentAdminRole();
+  if (!userId) throw new Error("Not authenticated — please sign in again");
+  if (role !== "admin" && role !== "super_admin") {
+    throw new Error("This action requires admin access. Viewers have read-only access.");
+  }
+  return userId;
+}
+
+// Returns an `{ error }` instead of throwing — convenient for server
+// actions that have a `{ error?: string }` return contract and want to
+// reject viewer-only callers cleanly. Returns `null` on success.
+export async function adminGate(): Promise<{ error: string } | null> {
+  try {
+    await requireAdmin();
+    return null;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Forbidden" };
+  }
+}
+
+export async function superAdminGate(): Promise<{ error: string } | null> {
+  try {
+    await requireSuperAdmin();
+    return null;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Forbidden" };
+  }
 }

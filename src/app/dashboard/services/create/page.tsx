@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ServiceForm } from "../_form/service-form";
 import { createService } from "../actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
-export default function CreateServicePage() {
+export default async function CreateServicePage() {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/services");
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">

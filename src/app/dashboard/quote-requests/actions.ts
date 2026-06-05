@@ -1,8 +1,8 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 
 // Pulls the platform-fee % from config; falls back to 15% if missing.
 async function loadPlatformFeePct(admin: ReturnType<typeof createAdminClient>) {
@@ -37,12 +37,10 @@ function notifyUser(
 // We compute platform_fee_amount + total_amount server-side from the
 // platform-fee % config so the math is consistent.
 
-export async function sendQuote(orderId: string, formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function sendQuote(orderId: string, formData: FormData): Promise<{ error?: string; ok?: boolean }> {
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const quotedAmount = parseInt((formData.get("quoted_amount") as string) || "0", 10);
   if (!Number.isFinite(quotedAmount) || quotedAmount <= 0) {
@@ -102,7 +100,7 @@ export async function sendQuote(orderId: string, formData: FormData) {
   if (quoteMessage) {
     await admin.from("service_order_messages").insert({
       order_id: orderId,
-      sender_id: user.id,
+      sender_id: actingUserId,
       sender_role: "admin",
       body: quoteMessage,
     });
@@ -123,12 +121,9 @@ export async function sendQuote(orderId: string, formData: FormData) {
 // Converts counter_amount into the new quoted_amount, recomputes fee + total,
 // flips status back to 'quoted' so the user can accept-and-pay.
 
-export async function acceptCounterOffer(orderId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function acceptCounterOffer(orderId: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { data: order, error: oErr } = await admin
@@ -185,12 +180,10 @@ export async function acceptCounterOffer(orderId: string) {
 
 const URL_RE = /^https?:\/\/\S+\.\S+/i;
 
-export async function deliverDraft(orderId: string, formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deliverDraft(orderId: string, formData: FormData): Promise<{ error?: string; ok?: boolean }> {
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const url = ((formData.get("draft_url") as string) || "").trim();
   const note = ((formData.get("draft_note") as string) || "").trim();
@@ -232,7 +225,7 @@ export async function deliverDraft(orderId: string, formData: FormData) {
   if (note) {
     await admin.from("service_order_messages").insert({
       order_id: orderId,
-      sender_id: user.id,
+      sender_id: actingUserId,
       sender_role: "admin",
       body: note,
     });
@@ -253,12 +246,9 @@ export async function deliverDraft(orderId: string, formData: FormData) {
 // least one entry with a valid URL. On success the order flips to
 // 'completed' and the user is notified.
 
-export async function deliverFinalFiles(orderId: string, formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deliverFinalFiles(orderId: string, formData: FormData): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const raw = ((formData.get("final_files_json") as string) || "[]").trim();
   let files: any;
@@ -322,12 +312,10 @@ export async function deliverFinalFiles(orderId: string, formData: FormData) {
 
 // ── Decline the request ──────────────────────────────────────────────────
 
-export async function declineOrder(orderId: string, formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function declineOrder(orderId: string, formData: FormData): Promise<{ error?: string; ok?: boolean }> {
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const reason = ((formData.get("decline_reason") as string) || "").trim();
 
@@ -359,7 +347,7 @@ export async function declineOrder(orderId: string, formData: FormData) {
   if (reason) {
     await admin.from("service_order_messages").insert({
       order_id: orderId,
-      sender_id: user.id,
+      sender_id: actingUserId,
       sender_role: "admin",
       body: reason,
     });

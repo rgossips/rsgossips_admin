@@ -1,15 +1,14 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { adminGate } from "@/lib/require-super-admin";
 
 // Stays in lockstep with public.featured_campaigns (migration 019).
 
-export async function addFeaturedCampaign(campaignId: string, position?: number) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function addFeaturedCampaign(campaignId: string, position?: number): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   // Default position = next slot at the end of the active list so a new
@@ -34,10 +33,9 @@ export async function addFeaturedCampaign(campaignId: string, position?: number)
   return { ok: true };
 }
 
-export async function toggleFeaturedCampaignActive(id: string, nextValue: boolean) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function toggleFeaturedCampaignActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -50,10 +48,9 @@ export async function toggleFeaturedCampaignActive(id: string, nextValue: boolea
   return { ok: true };
 }
 
-export async function deleteFeaturedCampaign(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deleteFeaturedCampaign(id: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin.from("featured_campaigns").delete().eq("id", id);
@@ -63,10 +60,9 @@ export async function deleteFeaturedCampaign(id: string) {
   return { ok: true };
 }
 
-export async function moveFeaturedCampaign(id: string, direction: "up" | "down") {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function moveFeaturedCampaign(id: string, direction: "up" | "down"): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { data: row } = await admin

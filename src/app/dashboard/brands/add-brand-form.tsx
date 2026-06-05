@@ -6,8 +6,10 @@ import { ButtonSpinner } from "@/components/spinner";
 import { FullPageLoader } from "@/components/spinner";
 import { CATEGORIES } from "@/lib/categories";
 import { BulkInviteBrands } from "./bulk-invite-brands";
+import { useRole } from "@/components/role-context";
 
 export function AddBrandForm() {
+  const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -66,6 +68,8 @@ export function AddBrandForm() {
     }
     setLoading(false);
   };
+
+  if (!isAdmin) return null;
 
   return (
     <div className="mb-6">

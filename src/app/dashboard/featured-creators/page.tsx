@@ -2,12 +2,14 @@ import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { deleteFeaturedCreator, moveFeaturedCreator, toggleFeaturedCreatorActive } from "./actions";
 import { ActionButton } from "./_components/action-button";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedCreatorsPage() {
   const admin = createAdminClient();
   const { data: creators, error } = await admin.from("featured_creators").select("*").order("position", { ascending: true }).order("created_at", { ascending: false });
+  const canWrite = await isAdminOrAbove();
 
   const activeCount = (creators || []).filter((c) => c.is_active).length;
 
@@ -18,15 +20,17 @@ export default async function FeaturedCreatorsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Featured Creators</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Hand-curated Top Creators carousel on the brand home page. Lower position = appears first.</p>
         </div>
-        <Link
-          href="/dashboard/featured-creators/create"
-          className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Feature a creator
-        </Link>
+        {canWrite && (
+          <Link
+            href="/dashboard/featured-creators/create"
+            className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Feature a creator
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -44,7 +48,7 @@ export default async function FeaturedCreatorsPage() {
             <p className="text-[11px] text-gray-300 mt-2">Until you publish at least one, the brand home page falls back to a built-in list.</p>
           </div>
         ) : (
-          (creators || []).map((c) => <CreatorRow key={c.id} creator={c} />)
+          (creators || []).map((c) => <CreatorRow key={c.id} creator={c} canWrite={canWrite} />)
         )}
       </div>
     </div>
@@ -60,7 +64,7 @@ function StatPill({ label, value, accent }: { label: string; value: number; acce
   );
 }
 
-function CreatorRow({ creator }: { creator: any }) {
+function CreatorRow({ creator, canWrite }: { creator: any; canWrite: boolean }) {
   return (
     <div className="flex items-center gap-4 p-4">
       {/* <span className="shrink-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 w-6 text-center">
@@ -88,59 +92,67 @@ function CreatorRow({ creator }: { creator: any }) {
         </a>
       </div>
 
-      <form
-        action={async () => {
-          "use server";
-          await moveFeaturedCreator(creator.id, "up");
-        }}
-      >
-        <ActionButton title="Move up" className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-          ↑
-        </ActionButton>
-      </form>
-      <form
-        action={async () => {
-          "use server";
-          await moveFeaturedCreator(creator.id, "down");
-        }}
-      >
-        <ActionButton title="Move down" className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-          ↓
-        </ActionButton>
-      </form>
+      {canWrite && (
+        <>
+          <form
+            action={async () => {
+              "use server";
+              await moveFeaturedCreator(creator.id, "up");
+            }}
+          >
+            <ActionButton title="Move up" className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+              ↑
+            </ActionButton>
+          </form>
+          <form
+            action={async () => {
+              "use server";
+              await moveFeaturedCreator(creator.id, "down");
+            }}
+          >
+            <ActionButton title="Move down" className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+              ↓
+            </ActionButton>
+          </form>
+        </>
+      )}
 
       <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${creator.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
         {creator.is_active ? "Active" : "Hidden"}
       </span>
 
-      <Link
-        href={`/dashboard/featured-creators/${creator.id}/edit`}
-        className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-      >
-        Edit
-      </Link>
+      {canWrite && (
+        <>
+          <Link
+            href={`/dashboard/featured-creators/${creator.id}/edit`}
+            className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Edit
+          </Link>
 
-      <form
-        action={async () => {
-          "use server";
-          await toggleFeaturedCreatorActive(creator.id, !creator.is_active);
-        }}
-      >
-        <ActionButton className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-          {creator.is_active ? "Hide" : "Show"}
-        </ActionButton>
-      </form>
+          <form
+            action={async () => {
+              "use server";
+              await toggleFeaturedCreatorActive(creator.id, !creator.is_active);
+            }}
+          >
+            <ActionButton className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+              {creator.is_active ? "Hide" : "Show"}
+            </ActionButton>
+          </form>
 
-      <form
-        action={async () => {
-          "use server";
-          await deleteFeaturedCreator(creator.id);
-        }}
-      >
-        <ActionButton className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer">
-          Delete
-        </ActionButton>
-      </form>
+          <form
+            action={async () => {
+              "use server";
+              await deleteFeaturedCreator(creator.id);
+            }}
+          >
+            <ActionButton className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer">
+              Delete
+            </ActionButton>
+          </form>
+        </>
+      )}
     </div>
   );
 }

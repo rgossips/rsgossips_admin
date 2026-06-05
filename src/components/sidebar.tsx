@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { useRole } from "@/components/role-context";
 
 type NavSpec = { label: string; href: string; icon: string; badgeKey?: string };
 
@@ -134,6 +135,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { isSuperAdmin, role } = useRole();
 
   // Live counts used by nav badges. Currently just the inbox of pending
   // quote requests; refresh every 30 s so admins see new submissions
@@ -207,7 +209,9 @@ export function Sidebar({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-900 dark:text-white capitalize truncate">{userName}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">Administrator</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 capitalize">
+                {role === "super_admin" ? "Super Admin" : role === "admin" ? "Admin" : role === "viewer" ? "Viewer (read-only)" : "Administrator"}
+              </p>
             </div>
           </div>
         </div>
@@ -228,14 +232,18 @@ export function Sidebar({
             ))}
           </div>
 
-          <p className="px-3 mt-6 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
-            Admin Panel
-          </p>
-          <div className="space-y-0.5">
-            {adminNav.map((item) => (
-              <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
-            ))}
-          </div>
+          {isSuperAdmin && (
+            <>
+              <p className="px-3 mt-6 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
+                Admin Panel
+              </p>
+              <div className="space-y-0.5">
+                {adminNav.map((item) => (
+                  <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
+                ))}
+              </div>
+            </>
+          )}
         </nav>
 
         {/* Logout */}

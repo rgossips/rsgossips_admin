@@ -6,6 +6,7 @@ import Link from "next/link";
 import { updateApplicationStatus } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { Avatar } from "@/components/avatar";
+import { useRole } from "@/components/role-context";
 
 interface Application {
   id: string;
@@ -87,10 +88,13 @@ export function ApplicationsList({ applications, budgetPerInfluencer }: { applic
 
 function ApplicationRow({ application, budgetPerInfluencer }: { application: Application; budgetPerInfluencer: number }) {
   const router = useRouter();
+  const { isAdmin } = useRole();
   const [loading, setLoading] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showReject, setShowReject] = useState(false);
   const [showRevision, setShowRevision] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideSaving, setOverrideSaving] = useState(false);
   const [reason, setReason] = useState("");
   const [revisionNote, setRevisionNote] = useState("");
   const [revisionIndexes, setRevisionIndexes] = useState<number[]>([]);
@@ -98,6 +102,26 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
   const [payNote, setPayNote] = useState("");
   const inf = application.influencer_profiles;
   const st = statusConfig[application.status] || statusConfig.pending;
+
+  // Free-form status change for admins. Bypasses the rich Approve/Reject/
+  // Revision flows — use those when you need to attach a rate, reason, or
+  // revision note. This is for corrections / out-of-band transitions.
+  const handleOverride = async (next: string) => {
+    if (next === application.status) {
+      setOverrideOpen(false);
+      return;
+    }
+    if (!confirm(`Change status from "${statusConfig[application.status]?.label || application.status}" to "${statusConfig[next]?.label || next}"?`)) return;
+    setOverrideSaving(true);
+    const result = await updateApplicationStatus(application.id, next);
+    setOverrideSaving(false);
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
+    setOverrideOpen(false);
+    router.refresh();
+  };
 
   const handleAction = async (newStatus: string) => {
     setLoading(true);
@@ -168,9 +192,38 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
           {application.final_agreed_rate != null && (
             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mr-1">₹{application.final_agreed_rate.toLocaleString()}</span>
           )}
-          <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${st.bg}`}>{st.label}</span>
+          {isAdmin ? (
+            overrideOpen ? (
+              <select
+                autoFocus
+                value={application.status}
+                disabled={overrideSaving}
+                onBlur={() => setOverrideOpen(false)}
+                onChange={(e) => handleOverride(e.target.value)}
+                className={`inline-flex text-[10px] font-semibold rounded-full px-2.5 py-0.5 border-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 ${st.bg}`}
+              >
+                {Object.entries(statusConfig).map(([k, v]) => (
+                  <option key={k} value={k} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">{v.label}</option>
+                ))}
+              </select>
+            ) : (
+              <button
+                type="button"
+                title="Click to override status"
+                onClick={() => setOverrideOpen(true)}
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-shadow ${st.bg}`}
+              >
+                {st.label}
+                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )
+          ) : (
+            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${st.bg}`}>{st.label}</span>
+          )}
 
-          {application.status === "pending" && (
+          {isAdmin && application.status === "pending" && (
             <div className="flex items-center gap-1.5 ml-2">
               <button onClick={() => { setShowReview(!showReview); setShowReject(false); }} disabled={loading}
                 className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100`}>
@@ -185,7 +238,7 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
             </div>
           )}
 
-          {application.status === "approved" && (
+          {isAdmin && application.status === "approved" && (
             <button onClick={() => { setShowReject(!showReject); }} disabled={loading}
               className={`${btnBase} ml-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -193,7 +246,7 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
             </button>
           )}
 
-          {application.status === "revision_needed" && (
+          {isAdmin && application.status === "revision_needed" && (
             <button onClick={() => { setShowReject(!showReject); }} disabled={loading}
               className={`${btnBase} ml-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -355,7 +408,7 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
           </div>
 
           {/* Submitted: Accept / Need Revision / Reject */}
-          {application.status === "submitted" && !showRevision && (
+          {isAdmin && application.status === "submitted" && !showRevision && (
             <div className="px-4 pb-4 flex flex-wrap gap-2">
               <button onClick={() => handleAction("accepted")} disabled={loading}
                 className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100`}>
@@ -376,7 +429,7 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
           )}
 
           {/* Live Links Submitted: Release Payment / Need Revision / Reject */}
-          {application.status === "live_submitted" && !showRevision && (
+          {isAdmin && application.status === "live_submitted" && !showRevision && (
             <div className="px-4 pb-4 flex flex-wrap gap-2">
               <button onClick={() => handleAction("payment")} disabled={loading}
                 className={`${btnBase} bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100`}>

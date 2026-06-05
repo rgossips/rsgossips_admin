@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CreateCampaignForm } from "./create-campaign-form";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export default async function CreateCampaignPage() {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/campaigns");
   const supabase = createAdminClient();
 
   // Fetch registered brands

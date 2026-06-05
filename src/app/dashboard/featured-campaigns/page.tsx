@@ -5,11 +5,13 @@ import {
   toggleFeaturedCampaignActive,
 } from "./actions";
 import { AddFeaturedCampaignButton } from "./_components/add-featured-campaign";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedCampaignsPage() {
   const admin = createAdminClient();
+  const canWrite = await isAdminOrAbove();
 
   // Join through featured_campaigns → campaigns and pick up brand info
   // from whichever side has it (registered brand or invitation).
@@ -68,7 +70,7 @@ export default async function FeaturedCampaignsPage() {
             position = appears first.
           </p>
         </div>
-        <AddFeaturedCampaignButton />
+        {canWrite && <AddFeaturedCampaignButton />}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -92,7 +94,7 @@ export default async function FeaturedCampaignsPage() {
         ) : (
           (featured || []).map((f) => {
             const c = campaignsById[f.campaign_id];
-            return <FeaturedRow key={f.id} row={f} campaign={c} />;
+            return <FeaturedRow key={f.id} row={f} campaign={c} canWrite={canWrite} />;
           })
         )}
       </div>
@@ -117,7 +119,7 @@ function StatPill({
   );
 }
 
-function FeaturedRow({ row, campaign }: { row: any; campaign: any }) {
+function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; canWrite: boolean }) {
   const brandName = campaign?.brand?.name || "Unknown brand";
   const brandLogo = campaign?.brand?.logo || "";
   const title = campaign?.title || "(missing — campaign deleted)";
@@ -146,34 +148,38 @@ function FeaturedRow({ row, campaign }: { row: any; campaign: any }) {
         </p>
       </div>
 
-      <form
-        action={async () => {
-          "use server";
-          await moveFeaturedCampaign(row.id, "up");
-        }}
-      >
-        <button
-          type="submit"
-          title="Move up"
-          className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          ↑
-        </button>
-      </form>
-      <form
-        action={async () => {
-          "use server";
-          await moveFeaturedCampaign(row.id, "down");
-        }}
-      >
-        <button
-          type="submit"
-          title="Move down"
-          className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          ↓
-        </button>
-      </form>
+      {canWrite && (
+        <>
+          <form
+            action={async () => {
+              "use server";
+              await moveFeaturedCampaign(row.id, "up");
+            }}
+          >
+            <button
+              type="submit"
+              title="Move up"
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              ↑
+            </button>
+          </form>
+          <form
+            action={async () => {
+              "use server";
+              await moveFeaturedCampaign(row.id, "down");
+            }}
+          >
+            <button
+              type="submit"
+              title="Move down"
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              ↓
+            </button>
+          </form>
+        </>
+      )}
 
       <span
         className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${
@@ -183,33 +189,37 @@ function FeaturedRow({ row, campaign }: { row: any; campaign: any }) {
         {row.is_active ? "Active" : "Hidden"}
       </span>
 
-      <form
-        action={async () => {
-          "use server";
-          await toggleFeaturedCampaignActive(row.id, !row.is_active);
-        }}
-      >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          {row.is_active ? "Hide" : "Show"}
-        </button>
-      </form>
+      {canWrite && (
+        <>
+          <form
+            action={async () => {
+              "use server";
+              await toggleFeaturedCampaignActive(row.id, !row.is_active);
+            }}
+          >
+            <button
+              type="submit"
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              {row.is_active ? "Hide" : "Show"}
+            </button>
+          </form>
 
-      <form
-        action={async () => {
-          "use server";
-          await deleteFeaturedCampaign(row.id);
-        }}
-      >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
-        >
-          Delete
-        </button>
-      </form>
+          <form
+            action={async () => {
+              "use server";
+              await deleteFeaturedCampaign(row.id);
+            }}
+          >
+            <button
+              type="submit"
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+            >
+              Delete
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }

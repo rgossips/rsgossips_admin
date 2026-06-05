@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FeaturedCreatorForm } from "../_form/featured-creator-form";
 import { createFeaturedCreator } from "../actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
-export default function CreateFeaturedCreatorPage() {
+export default async function CreateFeaturedCreatorPage() {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/featured-creators");
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { ServiceForm } from "../../_form/service-form";
 import { updateService } from "../../actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function EditServicePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/services");
   const { id } = await params;
   const admin = createAdminClient();
   const { data: service } = await admin.from("services").select("*").eq("id", id).maybeSingle();

@@ -4,6 +4,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { requireSuperAdmin } from "@/lib/require-super-admin";
 import { revalidatePath } from "next/cache";
 import type { InfluencerDeleteStepKey } from "./delete-steps";
+import { sendMail } from "@/lib/mailer";
+import { renderUserDeletedEmail } from "@/lib/email-templates";
 
 export async function deleteInfluencerStep(
   influencerId: string,
@@ -19,6 +21,38 @@ export async function deleteInfluencerStep(
 
   try {
     switch (step) {
+      case "notify_user": {
+        // Pull email from the profile (or auth.users as a fallback) BEFORE
+        // any of the deletion steps wipe the row. Notification is
+        // best-effort: a failure here is intentionally swallowed so the
+        // rest of the destructive flow still runs — we don't want a
+        // misconfigured SMTP to block a deletion the admin already
+        // confirmed.
+        try {
+          const { data: profile } = await admin
+            .from("influencer_profiles")
+            .select("full_name, username, email")
+            .eq("influencer_id", influencerId)
+            .maybeSingle();
+          let email = profile?.email || null;
+          const fullName = profile?.full_name || profile?.username || "there";
+          if (!email) {
+            const { data: authUser } = await admin.auth.admin.getUserById(influencerId);
+            email = authUser?.user?.email || null;
+          }
+          if (!email) return { ok: true, detail: "No email on file — skipped" };
+          const { html, text } = renderUserDeletedEmail({ fullName, kind: "influencer" });
+          await sendMail({
+            to: email,
+            subject: "Your RecentGossips account has been removed",
+            html,
+            text,
+          });
+          return { ok: true, detail: `Notified ${email}` };
+        } catch (e) {
+          return { ok: true, detail: `Skipped (${e instanceof Error ? e.message : "send failed"})` };
+        }
+      }
       case "creator_stories": {
         // creator_stories references the influencer by username (matches IG handle)
         const { data: inf } = await admin

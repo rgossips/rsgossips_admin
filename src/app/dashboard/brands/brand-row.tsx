@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { updateBrandVerification } from "./actions";
 import { ButtonSpinner } from "@/components/spinner";
+import { useRole } from "@/components/role-context";
 
 interface Brand {
   brand_id: string;
@@ -17,6 +18,7 @@ interface Brand {
 
 export function BrandRow({ brand }: { brand: Brand }) {
   const router = useRouter();
+  const { isAdmin } = useRole();
   const [loading, setLoading] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState(brand.verification_status);
 
@@ -72,7 +74,9 @@ export function BrandRow({ brand }: { brand: Brand }) {
         {brand.gstin || "—"}
       </td>
       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-        {verificationStatus === "pending" ? (
+        {!isAdmin ? (
+          <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+        ) : verificationStatus === "pending" ? (
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleVerification("verified")}

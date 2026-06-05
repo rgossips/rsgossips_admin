@@ -1,16 +1,15 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { adminGate } from "@/lib/require-super-admin";
 
 // Uploads a video file to the campaign-images bucket under a creator-stories/
 // prefix and returns the public URL. Mirrors the service image upload helper.
 export async function uploadStoryVideo(formData: FormData): Promise<{ url?: string; error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided" };
@@ -46,9 +45,8 @@ function readForm(formData: FormData) {
 }
 
 export async function createCreatorStory(formData: FormData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const row = readForm(formData);
   if (!row.username) return { error: "Username is required" };
@@ -63,9 +61,8 @@ export async function createCreatorStory(formData: FormData): Promise<{ error?: 
 }
 
 export async function updateCreatorStory(id: string, formData: FormData): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const row = readForm(formData);
   if (!row.username) return { error: "Username is required" };
@@ -79,10 +76,9 @@ export async function updateCreatorStory(id: string, formData: FormData): Promis
   redirect("/dashboard/creator-stories");
 }
 
-export async function toggleCreatorStoryActive(id: string, nextValue: boolean) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function toggleCreatorStoryActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -95,10 +91,9 @@ export async function toggleCreatorStoryActive(id: string, nextValue: boolean) {
   return { ok: true };
 }
 
-export async function deleteCreatorStory(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deleteCreatorStory(id: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin.from("creator_stories").delete().eq("id", id);
@@ -108,10 +103,9 @@ export async function deleteCreatorStory(id: string) {
   return { ok: true };
 }
 
-export async function moveCreatorStory(id: string, direction: "up" | "down") {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function moveCreatorStory(id: string, direction: "up" | "down"): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { data: row } = await admin

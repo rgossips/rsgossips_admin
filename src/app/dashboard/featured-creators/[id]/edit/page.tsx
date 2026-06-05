@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { FeaturedCreatorForm } from "../../_form/featured-creator-form";
 import { updateFeaturedCreator } from "../../actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function EditFeaturedCreatorPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/featured-creators");
   const { id } = await params;
   const admin = createAdminClient();
   const { data: creator } = await admin

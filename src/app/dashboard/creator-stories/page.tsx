@@ -5,6 +5,7 @@ import {
   moveCreatorStory,
   toggleCreatorStoryActive,
 } from "./actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function CreatorStoriesPage() {
     .select("*")
     .order("position", { ascending: true })
     .order("created_at", { ascending: false });
+  const canWrite = await isAdminOrAbove();
 
   const activeCount = (stories || []).filter((s) => s.is_active).length;
 
@@ -27,15 +29,17 @@ export default async function CreatorStoriesPage() {
             Vertical reels shown in the Top Creator Stories carousel on the brand home page.
           </p>
         </div>
-        <Link
-          href="/dashboard/creator-stories/create"
-          className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New story
-        </Link>
+        {canWrite && (
+          <Link
+            href="/dashboard/creator-stories/create"
+            className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer inline-flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New story
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -57,7 +61,7 @@ export default async function CreatorStoriesPage() {
             <p className="text-[11px] text-gray-300 mt-2">Until you publish at least one, the brand home page falls back to a built-in list.</p>
           </div>
         ) : (
-          (stories || []).map((s) => <StoryRow key={s.id} story={s} />)
+          (stories || []).map((s) => <StoryRow key={s.id} story={s} canWrite={canWrite} />)
         )}
       </div>
     </div>
@@ -81,7 +85,7 @@ function StatPill({
   );
 }
 
-function StoryRow({ story }: { story: any }) {
+function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
   return (
     <div className="flex items-center gap-4 p-4">
       <span className="shrink-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 w-6 text-center">
@@ -111,34 +115,38 @@ function StoryRow({ story }: { story: any }) {
         </a>
       </div>
 
-      <form
-        action={async () => {
-          "use server";
-          await moveCreatorStory(story.id, "up");
-        }}
-      >
-        <button
-          type="submit"
-          title="Move up"
-          className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          ↑
-        </button>
-      </form>
-      <form
-        action={async () => {
-          "use server";
-          await moveCreatorStory(story.id, "down");
-        }}
-      >
-        <button
-          type="submit"
-          title="Move down"
-          className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          ↓
-        </button>
-      </form>
+      {canWrite && (
+        <>
+          <form
+            action={async () => {
+              "use server";
+              await moveCreatorStory(story.id, "up");
+            }}
+          >
+            <button
+              type="submit"
+              title="Move up"
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              ↑
+            </button>
+          </form>
+          <form
+            action={async () => {
+              "use server";
+              await moveCreatorStory(story.id, "down");
+            }}
+          >
+            <button
+              type="submit"
+              title="Move down"
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              ↓
+            </button>
+          </form>
+        </>
+      )}
 
       <span
         className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${
@@ -148,40 +156,44 @@ function StoryRow({ story }: { story: any }) {
         {story.is_active ? "Active" : "Hidden"}
       </span>
 
-      <Link
-        href={`/dashboard/creator-stories/${story.id}/edit`}
-        className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-      >
-        Edit
-      </Link>
+      {canWrite && (
+        <>
+          <Link
+            href={`/dashboard/creator-stories/${story.id}/edit`}
+            className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Edit
+          </Link>
 
-      <form
-        action={async () => {
-          "use server";
-          await toggleCreatorStoryActive(story.id, !story.is_active);
-        }}
-      >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-        >
-          {story.is_active ? "Hide" : "Show"}
-        </button>
-      </form>
+          <form
+            action={async () => {
+              "use server";
+              await toggleCreatorStoryActive(story.id, !story.is_active);
+            }}
+          >
+            <button
+              type="submit"
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              {story.is_active ? "Hide" : "Show"}
+            </button>
+          </form>
 
-      <form
-        action={async () => {
-          "use server";
-          await deleteCreatorStory(story.id);
-        }}
-      >
-        <button
-          type="submit"
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
-        >
-          Delete
-        </button>
-      </form>
+          <form
+            action={async () => {
+              "use server";
+              await deleteCreatorStory(story.id);
+            }}
+          >
+            <button
+              type="submit"
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+            >
+              Delete
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }

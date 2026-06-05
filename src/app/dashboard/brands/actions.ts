@@ -1,16 +1,12 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 
-export async function updateBrandVerification(brandId: string, action: "verified" | "rejected" | "pending") {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Not authenticated" };
+export async function updateBrandVerification(brandId: string, action: "verified" | "rejected" | "pending"): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const adminClient = createAdminClient();
   const { error } = await adminClient
@@ -27,12 +23,9 @@ export async function updateBrandVerification(brandId: string, action: "verified
   return { success: true };
 }
 
-export async function uploadBrandIcon(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function uploadBrandIcon(formData: FormData): Promise<{ error?: string; url?: string }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided" };
@@ -66,13 +59,10 @@ export async function uploadBrandIcon(formData: FormData) {
   return { url: data.publicUrl };
 }
 
-export async function inviteBrand(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Not authenticated" };
+export async function inviteBrand(formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const brandName = formData.get("brand_name") as string;
   const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();
@@ -123,7 +113,7 @@ export async function inviteBrand(formData: FormData) {
     instagram_username: instagramUsername,
     logo_url: logoUrl,
     notes,
-    created_by: user.id,
+    created_by: actingUserId,
     status: "pending",
   });
 
@@ -133,10 +123,9 @@ export async function inviteBrand(formData: FormData) {
   return { success: true };
 }
 
-export async function updateBrand(brandId: string, formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function updateBrand(brandId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const updates: Record<string, unknown> = {};
   const fields = ["brand_name", "contact_name", "contact_role", "contact_email", "contact_phone", "instagram_username", "website_url", "short_description", "full_description", "gstin", "status", "verification_status", "listing_type", "tier", "monthly_budget_range", "preferred_influencer_tier", "logo_url"];
@@ -158,13 +147,9 @@ export async function updateBrand(brandId: string, formData: FormData) {
 }
 
 // Keep the old addBrand for backward compat (direct brand_profiles insert)
-export async function addBrand(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return { error: "Not authenticated" };
+export async function addBrand(formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const brandName = formData.get("brand_name") as string;
   const contactName = formData.get("contact_name") as string;
@@ -200,9 +185,11 @@ interface BulkBrandRow {
 }
 
 export async function bulkInviteBrands(rows: BulkBrandRow[]) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated", success: 0, failed: [] };
+  let actingUserId: string;
+  try { actingUserId = await requireAdmin(); }
+  catch (e) {
+    return { error: e instanceof Error ? e.message : "Forbidden", success: 0, failed: [] };
+  }
 
   const adminClient = createAdminClient();
   const results: { success: number; failed: Array<{ row: number; reason: string; data: BulkBrandRow }> } = { success: 0, failed: [] };
@@ -243,7 +230,7 @@ export async function bulkInviteBrands(rows: BulkBrandRow[]) {
       instagram_username: ig,
       logo_url: "",
       notes,
-      created_by: user.id,
+      created_by: actingUserId,
       status: "pending",
     });
 

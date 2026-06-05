@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { removeAdmin, resendAdminInvite } from "./actions";
+import { removeAdmin, resendAdminInvite, updateAdminRole } from "./actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { ConfirmDialog, useConfirmDialog } from "@/components/confirm-dialog";
 
@@ -28,6 +28,8 @@ export function AdminRow({
 }) {
   const [removing, setRemoving] = useState(false);
   const [resending, setResending] = useState(false);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [role, setRole] = useState(admin.role);
   const confirmRevoke = useConfirmDialog();
 
   const roleColors: Record<string, string> = {
@@ -91,6 +93,20 @@ export function AdminRow({
     setResending(false);
   };
 
+  const handleRoleChange = async (next: string) => {
+    if (next === role) return;
+    const prev = role;
+    setRole(next);
+    setRoleSaving(true);
+    const result = await updateAdminRole(admin.id, next);
+    setRoleSaving(false);
+    if (result.error) {
+      // Roll back the select if the action rejected the change.
+      setRole(prev);
+      alert(result.error);
+    }
+  };
+
   return (
     <>
       <ConfirmDialog {...confirmRevoke.dialogProps} />
@@ -103,13 +119,31 @@ export function AdminRow({
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{admin.email}</td>
       <td className="px-6 py-4">
-        <span
-          className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            roleColors[admin.role] || roleColors.viewer
-          }`}
-        >
-          {roleLabels[admin.role] || admin.role}
-        </span>
+        {isSuperAdmin && !isCurrentUser ? (
+          <div className="inline-flex items-center gap-2">
+            <select
+              value={role}
+              onChange={(e) => handleRoleChange(e.target.value)}
+              disabled={roleSaving || removing || resending}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-60 ${
+                roleColors[role] || roleColors.viewer
+              }`}
+            >
+              <option value="super_admin">Super Admin</option>
+              <option value="admin">Admin</option>
+              <option value="viewer">Viewer</option>
+            </select>
+            {roleSaving && <ButtonSpinner />}
+          </div>
+        ) : (
+          <span
+            className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              roleColors[role] || roleColors.viewer
+            }`}
+          >
+            {roleLabels[role] || role}
+          </span>
+        )}
       </td>
       <td className="px-6 py-4">
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge}`}>

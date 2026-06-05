@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { inviteInfluencer, uploadInfluencerPhoto } from "./actions";
 import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 import { BulkInviteInfluencers } from "./bulk-invite-influencers";
+import { useRole } from "@/components/role-context";
 
 import { CATEGORIES } from "@/lib/categories";
 import { INDIAN_CITIES } from "@/lib/cities";
@@ -83,6 +84,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
 }
 
 export function InviteInfluencerForm() {
+  const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -131,6 +133,8 @@ export function InviteInfluencerForm() {
   };
 
   const reset = () => { setOpen(false); setError(""); setPhotoFile(null); setPhotoPreview(null); setSelectedCategories([]); setSelectedLanguages([]); setTags([]); };
+
+  if (!isAdmin) return null;
 
   return (
     <div className="mb-6">

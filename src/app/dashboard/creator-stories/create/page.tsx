@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CreatorStoryForm } from "../_form/creator-story-form";
 import { createCreatorStory } from "../actions";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
 
-export default function CreateCreatorStoryPage() {
+export default async function CreateCreatorStoryPage() {
+  if (!(await isAdminOrAbove())) redirect("/dashboard/creator-stories");
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">

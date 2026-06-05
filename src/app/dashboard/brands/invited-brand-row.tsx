@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ButtonSpinner } from "@/components/spinner";
 import { deleteInvitation, updateBrandInvitation } from "./invitation-actions";
+import { sendBrandInvitationEmail } from "./invitation-email-actions";
 import { CATEGORIES } from "@/lib/categories";
+import { useRole } from "@/components/role-context";
+import { SendInviteEmailModal } from "@/components/send-invite-email-modal";
 
 interface Invitation {
   id: string;
@@ -27,9 +30,11 @@ function parseMeta(notes: string | null) {
 }
 
 export function InvitedBrandRow({ invitation }: { invitation: Invitation }) {
+  const { isAdmin } = useRole();
   const [loading, setLoading] = useState(false);
   const [removed, setRemoved] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [emailing, setEmailing] = useState(false);
 
   const handleDelete = async () => {
     if (!confirm(`Remove invitation for @${invitation.instagram_username}?`)) return;
@@ -84,20 +89,32 @@ export function InvitedBrandRow({ invitation }: { invitation: Invitation }) {
 
         <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
           <span className="text-[11px] text-gray-400 dark:text-gray-500">Created {new Date(invitation.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-500 hover:text-indigo-600 cursor-pointer">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Edit
-            </button>
-            <button onClick={handleDelete} disabled={loading} className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer disabled:opacity-50">
-              {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
-              Remove
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-3">
+              <button onClick={() => setEmailing(true)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                Send invite
+              </button>
+              <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-500 hover:text-indigo-600 cursor-pointer">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Edit
+              </button>
+              <button onClick={handleDelete} disabled={loading} className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer disabled:opacity-50">
+                {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
+                Remove
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {editing && <EditBrandInviteModal invitation={invitation} text={text} meta={meta} onClose={() => setEditing(false)} />}
+      <SendInviteEmailModal
+        open={emailing}
+        onClose={() => setEmailing(false)}
+        recipientLabel={`${invitation.brand_name} (@${invitation.instagram_username})`}
+        send={(email, customMessage) => sendBrandInvitationEmail(invitation.id, email, customMessage)}
+      />
     </>
   );
 }

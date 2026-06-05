@@ -36,10 +36,14 @@ export default async function DashboardLayout({
   const tableExists = !profileError;
   const tableHasRows = tableExists && (count ?? 0) > 0;
 
+  // Read the role and decide what to render. We still allow users in
+  // even if the lookup fails (network blip) — see comment in the gate
+  // below — but we want the role for downstream UI gating.
+  let role: "super_admin" | "admin" | "viewer" | null = null;
   if (tableHasRows) {
     const { data: adminProfile, error: lookupErr } = await adminClient
       .from("admin_profiles")
-      .select("id")
+      .select("id, role")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -49,9 +53,10 @@ export default async function DashboardLayout({
       await supabase.auth.signOut();
       redirect("/login");
     }
+    role = (adminProfile?.role as typeof role) || null;
   }
 
   return (
-    <DashboardShell userEmail={user.email || ""}>{children}</DashboardShell>
+    <DashboardShell userEmail={user.email || ""} role={role}>{children}</DashboardShell>
   );
 }

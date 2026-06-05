@@ -1,8 +1,8 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { adminGate } from "@/lib/require-super-admin";
 
 // Stays in lockstep with public.featured_brands (migration 020). Display
 // fields are denormalised at add-time so the influencer carousel renders
@@ -14,10 +14,9 @@ export async function addFeaturedBrand(payload: {
   name: string;
   logo_url?: string;
   instagram_url?: string;
-}) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+}): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
   if (!payload.name) return { error: "Brand name is required" };
 
   const admin = createAdminClient();
@@ -44,10 +43,9 @@ export async function addFeaturedBrand(payload: {
   return { ok: true };
 }
 
-export async function toggleFeaturedBrandActive(id: string, nextValue: boolean) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function toggleFeaturedBrandActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -60,10 +58,9 @@ export async function toggleFeaturedBrandActive(id: string, nextValue: boolean) 
   return { ok: true };
 }
 
-export async function deleteFeaturedBrand(id: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function deleteFeaturedBrand(id: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { error } = await admin.from("featured_brands").delete().eq("id", id);
@@ -73,10 +70,9 @@ export async function deleteFeaturedBrand(id: string) {
   return { ok: true };
 }
 
-export async function moveFeaturedBrand(id: string, direction: "up" | "down") {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+export async function moveFeaturedBrand(id: string, direction: "up" | "down"): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
 
   const admin = createAdminClient();
   const { data: row } = await admin
