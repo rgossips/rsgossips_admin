@@ -13,6 +13,7 @@ const mainNav: NavSpec[] = [
   { label: "Influencers", href: "/dashboard/influencers", icon: "users" },
   { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
   { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
+  { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
   { label: "Services", href: "/dashboard/services", icon: "sparkles" },
   { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
   { label: "Leads", href: "/dashboard/leads", icon: "phone" },
@@ -87,6 +88,11 @@ const icons: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
     </svg>
   ),
+  scale: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+    </svg>
+  ),
 };
 
 function NavItem({
@@ -146,11 +152,23 @@ export function Sidebar({
     const fetchBadges = async () => {
       try {
         const supabase = createClient();
-        const { count } = await supabase
-          .from("service_orders")
-          .select("*", { count: "exact", head: true })
-          .in("status", ["pending_quote", "counter_offered"]);
-        if (!cancelled) setBadges((prev) => ({ ...prev, pendingQuotes: count ?? 0 }));
+        const [quoteRes, disputeRes] = await Promise.all([
+          supabase
+            .from("service_orders")
+            .select("*", { count: "exact", head: true })
+            .in("status", ["pending_quote", "counter_offered"]),
+          supabase
+            .from("escrow_disputes_v")
+            .select("*", { count: "exact", head: true })
+            .eq("escrow_status", "disputed"),
+        ]);
+        if (!cancelled) {
+          setBadges((prev) => ({
+            ...prev,
+            pendingQuotes: quoteRes.count ?? 0,
+            openDisputes: disputeRes.count ?? 0,
+          }));
+        }
       } catch {
         // Non-fatal — leave previous count in place.
       }

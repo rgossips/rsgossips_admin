@@ -14,6 +14,7 @@ async function getStats() {
     influencersByMonth,
     brandsByMonth,
     campaignsByStatus,
+    openDisputes,
   ] = await Promise.all([
     supabase.from("influencer_profiles").select("*", { count: "exact", head: true }),
     supabase.from("brand_profiles").select("*", { count: "exact", head: true }),
@@ -39,6 +40,14 @@ async function getStats() {
       .select("created_at")
       .gte("created_at", new Date(new Date().getFullYear(), 0, 1).toISOString()),
     supabase.from("campaigns").select("status, created_at"),
+    // High-priority disputes — surfaced at the top of the home page so
+    // admins see them on every visit. Limit to 5 most recent.
+    supabase
+      .from("escrow_disputes_v")
+      .select("application_id, campaign_title, brand_name, influencer_name, escrow_amount, dispute_opened_at, dispute_reason")
+      .eq("escrow_status", "disputed")
+      .order("dispute_opened_at", { ascending: false })
+      .limit(5),
   ]);
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -86,6 +95,7 @@ async function getStats() {
     monthlySignups,
     campaignMonthly,
     weeklyCampaigns,
+    openDisputes: openDisputes.data || [],
   };
 }
 
@@ -197,6 +207,55 @@ export default async function DashboardPage() {
         <div className="absolute right-16 -bottom-12 w-32 h-32 rounded-full bg-white/5" />
         <div className="absolute right-48 top-4 w-20 h-20 rounded-full bg-white/10" />
       </div>
+
+      {/* High-priority disputes — surfaced front and centre because brand
+          escrow funds are held while these are open. */}
+      {stats.openDisputes.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 bg-red-100/60 dark:bg-red-900/30">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
+              </svg>
+              <h3 className="text-sm font-bold text-red-900 dark:text-red-200">
+                {stats.openDisputes.length} open escrow {stats.openDisputes.length === 1 ? "dispute" : "disputes"} — needs review
+              </h3>
+            </div>
+            <a href="/dashboard/disputes" className="text-xs font-bold text-red-700 dark:text-red-300 hover:underline">
+              View all →
+            </a>
+          </div>
+          <ul className="divide-y divide-red-100 dark:divide-red-900/40">
+            {stats.openDisputes.map((d: any) => (
+              <li key={d.application_id}>
+                <a
+                  href={`/dashboard/disputes/${d.application_id}`}
+                  className="flex items-center gap-4 px-5 py-3 hover:bg-red-100/40 dark:hover:bg-red-900/40 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {d.campaign_title || "Campaign"}
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate">
+                      {d.brand_name || "Brand"} ↔ {d.influencer_name || "Creator"}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-red-700 dark:text-red-300">
+                      ₹{Math.round((d.escrow_amount || 0) / 100).toLocaleString("en-IN")}
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      {d.dispute_opened_at
+                        ? new Date(d.dispute_opened_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                        : ""}
+                    </p>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">

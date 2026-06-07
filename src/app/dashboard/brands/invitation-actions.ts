@@ -30,6 +30,12 @@ export async function updateBrandInvitation(invitationId: string, formData: Form
   const notesText = (formData.get("notes") as string) || "";
   const category = (formData.get("category") as string) || "";
   const instagramVerified = (formData.get("instagram_verified") as string) === "yes";
+  // logo_url is optional — only present in the form when the admin
+  // uploaded (or cleared) the logo. We treat an empty string as
+  // "remove the current logo" rather than skipping the field.
+  const logoUrlRaw = formData.get("logo_url");
+  const logoTouched = logoUrlRaw !== null;
+  const logoUrl = (logoUrlRaw as string | null)?.trim() || null;
 
   if (!brandName) return { error: "Brand name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
@@ -43,11 +49,17 @@ export async function updateBrandInvitation(invitationId: string, formData: Form
   }
 
   const adminClient = createAdminClient();
-  const { error } = await adminClient.from("brand_invitations").update({
+  const updates: Record<string, unknown> = {
     brand_name: brandName,
     instagram_username: instagramUsername,
     notes,
-  }).eq("id", invitationId).eq("status", "pending");
+  };
+  if (logoTouched) updates.logo_url = logoUrl;
+  const { error } = await adminClient
+    .from("brand_invitations")
+    .update(updates)
+    .eq("id", invitationId)
+    .eq("status", "pending");
 
   if (error) return { error: error.message };
   revalidatePath("/dashboard/brands");

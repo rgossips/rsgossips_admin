@@ -4,16 +4,9 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 
-// Pulls the platform-fee % from config; falls back to 15% if missing.
-async function loadPlatformFeePct(admin: ReturnType<typeof createAdminClient>) {
-  const { data } = await admin
-    .from("platform_config")
-    .select("value")
-    .eq("key", "service_platform_fee_pct")
-    .maybeSingle();
-  const n = Number((data as any)?.value);
-  return Number.isFinite(n) && n >= 0 ? n : 15;
-}
+// Platform fees were removed — the user pays exactly the quoted amount.
+// We still write `platform_fee_amount: 0` on the service_orders row so
+// callers that read the column don't break.
 
 function notifyUser(
   admin: ReturnType<typeof createAdminClient>,
@@ -34,8 +27,7 @@ function notifyUser(
 // ── Send a quote ─────────────────────────────────────────────────────────
 //
 // Admin fills in the quoted amount + delivery date + validity period etc.
-// We compute platform_fee_amount + total_amount server-side from the
-// platform-fee % config so the math is consistent.
+// The user pays exactly the quoted amount — no platform fee added on top.
 
 export async function sendQuote(orderId: string, formData: FormData): Promise<{ error?: string; ok?: boolean }> {
   let actingUserId: string;
@@ -58,9 +50,8 @@ export async function sendQuote(orderId: string, formData: FormData): Promise<{ 
   const validUntil = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
 
   const admin = createAdminClient();
-  const feePct = await loadPlatformFeePct(admin);
-  const platformFee = Math.round(quotedAmount * (feePct / 100));
-  const total = quotedAmount + platformFee;
+  // No platform fee: the user pays exactly the quoted amount.
+  const total = quotedAmount;
 
   const { data: order, error: oErr } = await admin
     .from("service_orders")
@@ -76,7 +67,7 @@ export async function sendQuote(orderId: string, formData: FormData): Promise<{ 
   const updates = {
     status: "quoted",
     quoted_amount: quotedAmount,
-    platform_fee_amount: platformFee,
+    platform_fee_amount: 0,
     total_amount: total,
     quoted_delivery_date: quotedDelivery,
     quoted_turnaround_days: turnaroundDays,
@@ -94,7 +85,7 @@ export async function sendQuote(orderId: string, formData: FormData): Promise<{ 
     order_id: orderId,
     type: "quote_received",
     label: `Quote sent: ₹${total.toLocaleString("en-IN")} (${advancePct}% advance)`,
-    meta: { quoted_amount: quotedAmount, platform_fee: platformFee, total, valid_until: validUntil },
+    meta: { quoted_amount: quotedAmount, total, valid_until: validUntil },
   });
 
   if (quoteMessage) {
@@ -118,8 +109,8 @@ export async function sendQuote(orderId: string, formData: FormData): Promise<{ 
 }
 
 // ── Accept the user's counter offer ──────────────────────────────────────
-// Converts counter_amount into the new quoted_amount, recomputes fee + total,
-// flips status back to 'quoted' so the user can accept-and-pay.
+// Converts counter_amount into the new quoted_amount and flips status back
+// to 'quoted' so the user can accept-and-pay. No platform fee is added.
 
 export async function acceptCounterOffer(orderId: string): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
@@ -136,9 +127,7 @@ export async function acceptCounterOffer(orderId: string): Promise<{ error?: str
   if (order.status !== "counter_offered") return { error: "No counter to accept" };
   if (!order.counter_amount || order.counter_amount <= 0) return { error: "Counter amount missing" };
 
-  const feePct = await loadPlatformFeePct(admin);
-  const platformFee = Math.round(order.counter_amount * (feePct / 100));
-  const total = order.counter_amount + platformFee;
+  const total = order.counter_amount;
 
   // Extend validity by 7 days from acceptance.
   const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -148,7 +137,7 @@ export async function acceptCounterOffer(orderId: string): Promise<{ error?: str
     .update({
       status: "quoted",
       quoted_amount: order.counter_amount,
-      platform_fee_amount: platformFee,
+      platform_fee_amount: 0,
       total_amount: total,
       quote_valid_until: validUntil,
       updated_at: new Date().toISOString(),

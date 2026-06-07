@@ -43,14 +43,6 @@ export default async function QuoteRequestDetailPage({
     .eq("order_id", id)
     .order("occurred_at", { ascending: true });
 
-  // Platform fee % for live preview in the response form
-  const { data: feeRow } = await admin
-    .from("platform_config")
-    .select("value")
-    .eq("key", "service_platform_fee_pct")
-    .maybeSingle();
-  const platformFeePct = Number((feeRow as any)?.value) || 15;
-
   return (
     <div className="space-y-6">
       <AutoRefresh intervalMs={15000} />
@@ -175,7 +167,6 @@ export default async function QuoteRequestDetailPage({
               orderId={order.id}
               serviceTitle={order.service_title || ""}
               desiredDeliveryDate={order.desired_delivery_date}
-              platformFeePct={platformFeePct}
             />
           )}
 
@@ -212,7 +203,6 @@ export default async function QuoteRequestDetailPage({
                 orderId={order.id}
                 serviceTitle={order.service_title || ""}
                 desiredDeliveryDate={order.desired_delivery_date}
-                platformFeePct={platformFeePct}
               />
             </div>
           )}
@@ -255,7 +245,6 @@ export default async function QuoteRequestDetailPage({
               {order.quoted_amount ? (
                 <>
                   <Field label="Quoted" value={`₹${Number(order.quoted_amount).toLocaleString("en-IN")}`} />
-                  <Field label="Platform fee" value={`₹${Number(order.platform_fee_amount || 0).toLocaleString("en-IN")}`} />
                   <Field label="Total" value={`₹${Number(order.total_amount || 0).toLocaleString("en-IN")}`} />
                   <Field label="Advance" value={`${order.advance_pct}%`} />
                   <Field

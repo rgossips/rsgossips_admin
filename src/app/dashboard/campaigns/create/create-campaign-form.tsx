@@ -2,10 +2,55 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createCampaign, uploadCampaignImage } from "../actions";
+import { createCampaign, updateCampaign, uploadCampaignImage } from "../actions";
 import { FullPageLoader } from "@/components/spinner";
 
 import { CATEGORIES } from "@/lib/categories";
+
+// Shape passed in when the form is in edit mode. Optional fields mirror
+// the columns we read off `campaigns` + the metadata we pack into the
+// description (see actions.ts).
+export interface CampaignInitial {
+  campaign_id: string;
+  title: string;
+  description: string; // cleaned (metadata trailer stripped by the caller)
+  brand_id: string | null;
+  brand_invitation_id: string | null;
+  status: string;
+  campaign_type: "barter" | "paid" | "hybrid";
+  max_influencers: number | null;
+  budget_total: number | null;
+  target_follower_min: number | null;
+  target_follower_max: number | null;
+  target_influencer_tier: string | null;
+  target_categories: string[] | null;
+  target_cities: string[] | null;
+  campaign_start_date: string | null;
+  campaign_end_date: string | null;
+  application_deadline: string | null;
+  deliverables: Record<string, number>;
+  banner_image: string | null;
+  gallery_images: string[];
+  min_engagement_rate: number | null;
+  platforms: string[];
+  target_gender: string[];
+  target_languages: string[];
+  offering_type: "product" | "service" | null;
+  product_name: string;
+  product_value: number | null;
+  shipping_required: string;
+  shipping_timeline_days: number | null;
+  service_location: string;
+  barter_compensation: string;
+  content_dos: string;
+  content_donts: string;
+  required_hashtags: string;
+  brand_handles_to_tag: string;
+  usage_rights: string;
+  keepup_duration: string;
+  exclusivity_days: string;
+  payment_timeline: string;
+}
 
 const PLATFORMS = ["Instagram"];
 const CITIES = [
@@ -52,37 +97,102 @@ interface ImagePreview {
 const DESCRIPTION_TEMPLATE =
   "What is this campaign about?\n\nWhat do you want the influencer to highlight?\n\nAny specific messaging or hashtags?";
 
-export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
+// Defined outside CreateCampaignForm so React doesn't see a new component
+// identity on every render. When these lived inside the form, any state
+// change (typing in a deliverable count) remounted every input under
+// the card, kicking focus out and looking like the form was "resetting".
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
+    </div>
+  );
+}
+
+function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
+        on
+          ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300"
+          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300"
+      }`}
+    >
+      {on ? "✓ " : ""}{label}
+    </button>
+  );
+}
+
+export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initial?: CampaignInitial }) {
   const router = useRouter();
+  const isEdit = !!initial;
+  // The "brand_id" select expects format "registered:uuid" or "invited:uuid".
+  // Build that prefilled value when we're editing an existing row.
+  const initialBrandValue = initial?.brand_id
+    ? `registered:${initial.brand_id}`
+    : initial?.brand_invitation_id
+      ? `invited:${initial.brand_invitation_id}`
+      : "";
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("Creating campaign...");
+  const [loadingMsg, setLoadingMsg] = useState(isEdit ? "Saving campaign..." : "Creating campaign...");
 
-  const [campaignType, setCampaignType] = useState<"barter" | "paid" | "hybrid">("barter");
-  const [budgetTotal, setBudgetTotal] = useState("");
-  const [maxInfluencers, setMaxInfluencers] = useState("");
-  const [tier, setTier] = useState("all");
-  const [followerMin, setFollowerMin] = useState("");
-  const [followerMax, setFollowerMax] = useState("");
+  const [campaignType, setCampaignType] = useState<"barter" | "paid" | "hybrid">(initial?.campaign_type || "barter");
+  const [status, setStatus] = useState<string>(initial?.status || "draft");
+  const [brandSelect, setBrandSelect] = useState<string>(initialBrandValue);
+  const [title, setTitle] = useState(initial?.title || "");
+  const [description, setDescription] = useState(initial?.description || "");
+  const [budgetTotal, setBudgetTotal] = useState(initial?.budget_total ? String(initial.budget_total) : "");
+  const [maxInfluencers, setMaxInfluencers] = useState(initial?.max_influencers ? String(initial.max_influencers) : "");
+  const [tier, setTier] = useState(initial?.target_influencer_tier || "all");
+  const [followerMin, setFollowerMin] = useState(initial?.target_follower_min ? String(initial.target_follower_min) : "");
+  const [followerMax, setFollowerMax] = useState(initial?.target_follower_max ? String(initial.target_follower_max) : "");
+  const [startDate, setStartDate] = useState(initial?.campaign_start_date?.split("T")[0] || "");
+  const [endDate, setEndDate] = useState(initial?.campaign_end_date?.split("T")[0] || "");
+  const [applicationDeadline, setApplicationDeadline] = useState(initial?.application_deadline?.split("T")[0] || "");
+  const [minEngagement, setMinEngagement] = useState(initial?.min_engagement_rate ? String(initial.min_engagement_rate) : "");
 
-  const [numReels, setNumReels] = useState("");
-  const [numPosts, setNumPosts] = useState("");
-  const [numStories, setNumStories] = useState("");
-  const [numVideos, setNumVideos] = useState("");
-  const [numBlogs, setNumBlogs] = useState("");
+  const [numReels, setNumReels] = useState(initial?.deliverables?.reels ? String(initial.deliverables.reels) : "");
+  const [numPosts, setNumPosts] = useState(initial?.deliverables?.posts ? String(initial.deliverables.posts) : "");
+  const [numStories, setNumStories] = useState(initial?.deliverables?.stories ? String(initial.deliverables.stories) : "");
+  const [numVideos, setNumVideos] = useState(initial?.deliverables?.videos ? String(initial.deliverables.videos) : "");
+  const [numBlogs, setNumBlogs] = useState(initial?.deliverables?.blogs ? String(initial.deliverables.blogs) : "");
 
-  const [shippingRequired, setShippingRequired] = useState<"no" | "yes" | "pickup">("no");
-  const [offeringType, setOfferingType] = useState<"product" | "service">("product");
+  const [shippingRequired, setShippingRequired] = useState<"no" | "yes" | "pickup">((initial?.shipping_required as "no" | "yes" | "pickup") || "no");
+  const [shippingTimelineDays, setShippingTimelineDays] = useState(initial?.shipping_timeline_days ? String(initial.shipping_timeline_days) : "");
+  const [serviceLocation, setServiceLocation] = useState(initial?.service_location || "");
+  const [offeringType, setOfferingType] = useState<"product" | "service">(initial?.offering_type || "product");
+  const [productName, setProductName] = useState(initial?.product_name || "");
+  const [productValue, setProductValue] = useState(initial?.product_value ? String(initial.product_value) : "");
+  const [barterCompensation, setBarterCompensation] = useState(initial?.barter_compensation || "");
+  const [contentDos, setContentDos] = useState(initial?.content_dos || "");
+  const [contentDonts, setContentDonts] = useState(initial?.content_donts || "");
+  const [requiredHashtags, setRequiredHashtags] = useState(initial?.required_hashtags || "");
+  const [brandHandlesToTag, setBrandHandlesToTag] = useState(initial?.brand_handles_to_tag || "");
+  const [usageRights, setUsageRights] = useState(initial?.usage_rights || "");
+  const [keepupDuration, setKeepupDuration] = useState(initial?.keepup_duration || "");
+  const [exclusivityDays, setExclusivityDays] = useState(initial?.exclusivity_days || "");
+  const [paymentTimeline, setPaymentTimeline] = useState(initial?.payment_timeline || "");
 
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["Instagram"]);
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [allIndia, setAllIndia] = useState(false);
-  const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(initial?.target_categories || []);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(initial?.platforms?.length ? initial.platforms : ["Instagram"]);
+  const initialCities = initial?.target_cities || [];
+  const [allIndia, setAllIndia] = useState(initialCities.includes("All India"));
+  const [selectedCities, setSelectedCities] = useState<string[]>(initialCities.filter((c) => c !== "All India"));
+  const [selectedGenders, setSelectedGenders] = useState<string[]>(initial?.target_gender || []);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(initial?.target_languages || []);
 
   const [bannerImage, setBannerImage] = useState<ImagePreview | null>(null);
+  // When editing, the existing banner URL is preserved unless the admin
+  // picks a new file or clears it explicitly.
+  const [existingBannerUrl, setExistingBannerUrl] = useState<string>(initial?.banner_image || "");
   const [galleryImages, setGalleryImages] = useState<ImagePreview[]>([]);
+  const [existingGalleryUrls, setExistingGalleryUrls] = useState<string[]>(initial?.gallery_images || []);
   const [bannerDragOver, setBannerDragOver] = useState(false);
   const [galleryDragOver, setGalleryDragOver] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -195,12 +305,20 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
       formData.append("languages_json", JSON.stringify(selectedLanguages));
       formData.append("offering_type", offeringType);
 
+      // Banner: new file overrides existing; otherwise reuse the existing URL.
       if (bannerImage) {
         setLoadingMsg("Uploading banner image...");
         const bannerUrl = await uploadImage(bannerImage.file, "banners");
         if (bannerUrl) formData.append("banner_image_url", bannerUrl);
+      } else if (existingBannerUrl) {
+        formData.append("banner_image_url", existingBannerUrl);
       }
 
+      // Gallery: keep the existing URLs the admin hasn't removed, then
+      // append uploads from newly-picked files.
+      for (const url of existingGalleryUrls) {
+        formData.append("gallery_image_urls", url);
+      }
       if (galleryImages.length > 0) {
         for (let i = 0; i < galleryImages.length; i++) {
           setLoadingMsg(`Uploading gallery image ${i + 1} of ${galleryImages.length}...`);
@@ -209,13 +327,19 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
         }
       }
 
-      setLoadingMsg("Saving campaign...");
-      const result = await createCampaign(formData);
+      // Status is only set explicitly in edit mode — create defaults to "draft" server-side.
+      if (isEdit) formData.append("status", status);
+
+      setLoadingMsg(isEdit ? "Saving campaign..." : "Creating campaign...");
+      const result = isEdit
+        ? await updateCampaign(initial!.campaign_id, formData)
+        : await createCampaign(formData);
       if (result.error) {
         setError(result.error);
         setLoading(false);
       } else {
-        router.push("/dashboard/campaigns");
+        router.push(isEdit ? `/dashboard/campaigns/${initial!.campaign_id}` : "/dashboard/campaigns");
+        router.refresh();
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -226,29 +350,6 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
   const inputClass =
     "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all";
   const labelClass = "block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
-
-  const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
-      </div>
-      <div className="p-5 space-y-4">{children}</div>
-    </div>
-  );
-
-  const Chip = ({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${
-        on
-          ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300"
-          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300"
-      }`}
-    >
-      {on ? "✓ " : ""}{label}
-    </button>
-  );
 
   return (
     <form action={handleSubmit} className="space-y-6">
@@ -264,17 +365,38 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
           <Card title="Basic information">
             <div>
               <label className={labelClass}>Campaign Title <span className="text-red-400">*</span></label>
-              <input name="title" type="text" required placeholder="e.g. Summer Fashion 2026" className={inputClass} />
+              <input
+                name="title"
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Summer Fashion 2026"
+                className={inputClass}
+              />
             </div>
             <div>
               <label className={labelClass}>Description</label>
-              <textarea name="description" rows={5} placeholder={DESCRIPTION_TEMPLATE} className={`${inputClass} resize-none`} />
+              <textarea
+                name="description"
+                rows={5}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={DESCRIPTION_TEMPLATE}
+                className={`${inputClass} resize-none`}
+              />
               <p className="text-[11px] text-gray-400 mt-1">A guided template helps creators understand what you need.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Brand <span className="text-red-400">*</span></label>
-                <select name="brand_id" required className={inputClass}>
+                <select
+                  name="brand_id"
+                  required
+                  value={brandSelect}
+                  onChange={(e) => setBrandSelect(e.target.value)}
+                  className={inputClass}
+                >
                   <option value="">Select a brand</option>
                   {brands.map((b) => (
                     <option key={b.id} value={`${b.type}:${b.id}`}>
@@ -298,6 +420,17 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                 </select>
               </div>
             </div>
+            {isEdit && (
+              <div>
+                <label className={labelClass}>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>Total Slots</label>
@@ -346,6 +479,8 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                     name="product_value"
                     type="number"
                     min="0"
+                    value={productValue}
+                    onChange={(e) => setProductValue(e.target.value)}
                     placeholder="3500"
                     className={inputClass}
                   />
@@ -384,6 +519,8 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               <input
                 name="product_name"
                 type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
                 placeholder={offeringType === "product"
                   ? 'e.g. "Moisturizing cream — 50ml tube"'
                   : 'e.g. "Weekend stay at our Mussoorie resort"'}
@@ -413,6 +550,8 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                       name="shipping_timeline_days"
                       type="number"
                       min="1"
+                      value={shippingTimelineDays}
+                      onChange={(e) => setShippingTimelineDays(e.target.value)}
                       placeholder="3"
                       className={inputClass}
                     />
@@ -427,6 +566,8 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                 <input
                   name="service_location"
                   type="text"
+                  value={serviceLocation}
+                  onChange={(e) => setServiceLocation(e.target.value)}
                   placeholder='e.g. "Mussoorie, India" or "Online / virtual"'
                   className={inputClass}
                 />
@@ -440,6 +581,8 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                 <textarea
                   name="barter_compensation"
                   rows={2}
+                  value={barterCompensation}
+                  onChange={(e) => setBarterCompensation(e.target.value)}
                   placeholder={offeringType === "product"
                     ? 'e.g. "Full skincare kit worth ₹3,500"'
                     : 'e.g. "Free 2-night stay + meals + spa session"'}
@@ -457,6 +600,26 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
                   <button
                     type="button"
                     onClick={removeBanner}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-red-600 font-medium text-sm cursor-pointer shadow-lg"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : existingBannerUrl ? (
+              <div className="relative group rounded-xl overflow-hidden">
+                <img src={existingBannerUrl} alt="Existing banner" className="w-full h-48 object-cover" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-gray-700 font-medium text-sm cursor-pointer shadow-lg"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExistingBannerUrl("")}
                     className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-red-600 font-medium text-sm cursor-pointer shadow-lg"
                   >
                     Remove
@@ -489,11 +652,24 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
           </Card>
 
           <Card title="Gallery">
-            {galleryImages.length > 0 && (
+            {(existingGalleryUrls.length > 0 || galleryImages.length > 0) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {existingGalleryUrls.map((url, i) => (
+                  <div key={`existing-${i}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setExistingGalleryUrls((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-white/90 text-red-600 cursor-pointer shadow"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
                 {galleryImages.map((img, i) => (
-                  <div key={i} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <div key={`new-${i}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
                     <img src={img.url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                    <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded bg-indigo-600 text-white font-bold">NEW</span>
                     <button
                       type="button"
                       onClick={() => removeGalleryImage(i)}
@@ -517,7 +693,7 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               }`}
             >
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {galleryImages.length > 0 ? "Add more images" : "Click or drag to upload images"}
+                {(galleryImages.length > 0 || existingGalleryUrls.length > 0) ? "Add more images" : "Click or drag to upload images"}
               </p>
             </div>
             <input
@@ -602,7 +778,16 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
             </div>
             <div>
               <label className={labelClass}>Min. Engagement Rate (%)</label>
-              <input name="min_engagement_rate" type="number" min="0" step="0.1" placeholder="2.5" className={inputClass} />
+              <input
+                name="min_engagement_rate"
+                type="number"
+                min="0"
+                step="0.1"
+                value={minEngagement}
+                onChange={(e) => setMinEngagement(e.target.value)}
+                placeholder="2.5"
+                className={inputClass}
+              />
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -646,20 +831,48 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
           <Card title="Content guidelines">
             <div>
               <label className={labelClass}>Must include (Do&apos;s)</label>
-              <textarea name="content_dos" rows={2} placeholder='"Show product packaging, mention discount code SAVE20"' className={`${inputClass} resize-none`} />
+              <textarea
+                name="content_dos"
+                rows={2}
+                value={contentDos}
+                onChange={(e) => setContentDos(e.target.value)}
+                placeholder='"Show product packaging, mention discount code SAVE20"'
+                className={`${inputClass} resize-none`}
+              />
             </div>
             <div>
               <label className={labelClass}>Must avoid (Don&apos;ts)</label>
-              <textarea name="content_donts" rows={2} placeholder='"No competitor products, no copyrighted music"' className={`${inputClass} resize-none`} />
+              <textarea
+                name="content_donts"
+                rows={2}
+                value={contentDonts}
+                onChange={(e) => setContentDonts(e.target.value)}
+                placeholder='"No competitor products, no copyrighted music"'
+                className={`${inputClass} resize-none`}
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Required hashtags</label>
-                <input name="required_hashtags" type="text" placeholder="#RGossips #Ad #Paidpartnership" className={inputClass} />
+                <input
+                  name="required_hashtags"
+                  type="text"
+                  value={requiredHashtags}
+                  onChange={(e) => setRequiredHashtags(e.target.value)}
+                  placeholder="#RGossips #Ad #Paidpartnership"
+                  className={inputClass}
+                />
               </div>
               <div>
                 <label className={labelClass}>Brand handle(s) to tag</label>
-                <input name="brand_handles_to_tag" type="text" placeholder="@yourbrand" className={inputClass} />
+                <input
+                  name="brand_handles_to_tag"
+                  type="text"
+                  value={brandHandlesToTag}
+                  onChange={(e) => setBrandHandlesToTag(e.target.value)}
+                  placeholder="@yourbrand"
+                  className={inputClass}
+                />
               </div>
             </div>
           </Card>
@@ -668,7 +881,12 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Content usage rights</label>
-                <select name="usage_rights" defaultValue="creator_only" className={inputClass}>
+                <select
+                  name="usage_rights"
+                  value={usageRights || "creator_only"}
+                  onChange={(e) => setUsageRights(e.target.value)}
+                  className={inputClass}
+                >
                   <option value="creator_only">Influencer&apos;s page only</option>
                   <option value="brand_repost">Brand can repost</option>
                   <option value="paid_ads">Brand can use in paid ads</option>
@@ -677,7 +895,12 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               </div>
               <div>
                 <label className={labelClass}>Content keep-up duration</label>
-                <select name="keepup_duration" defaultValue="permanent" className={inputClass}>
+                <select
+                  name="keepup_duration"
+                  value={keepupDuration || "permanent"}
+                  onChange={(e) => setKeepupDuration(e.target.value)}
+                  className={inputClass}
+                >
                   <option value="24h">24 hours (stories)</option>
                   <option value="7d">7 days</option>
                   <option value="30d">30 days</option>
@@ -686,7 +909,12 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               </div>
               <div>
                 <label className={labelClass}>Exclusivity (no competing brands)</label>
-                <select name="exclusivity_days" defaultValue="0" className={inputClass}>
+                <select
+                  name="exclusivity_days"
+                  value={exclusivityDays || "0"}
+                  onChange={(e) => setExclusivityDays(e.target.value)}
+                  className={inputClass}
+                >
                   <option value="0">No exclusivity</option>
                   <option value="7">7 days</option>
                   <option value="15">15 days</option>
@@ -698,7 +926,12 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
               {!isBarter && (
                 <div>
                   <label className={labelClass}>Payment timeline</label>
-                  <select name="payment_timeline" defaultValue="on_approval" className={inputClass}>
+                  <select
+                    name="payment_timeline"
+                    value={paymentTimeline || "on_approval"}
+                    onChange={(e) => setPaymentTimeline(e.target.value)}
+                    className={inputClass}
+                  >
                     <option value="advance">Advance</option>
                     <option value="on_approval">On content approval</option>
                     <option value="7_days">Within 7 days of posting</option>
@@ -737,36 +970,59 @@ export function CreateCampaignForm({ brands }: { brands: Brand[] }) {
           <Card title="Schedule">
             <div>
               <label className={labelClass}>Start Date <span className="text-red-400">*</span></label>
-              <input name="campaign_start_date" type="date" required className={inputClass} />
+              <input
+                name="campaign_start_date"
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={inputClass}
+              />
             </div>
             <div>
               <label className={labelClass}>Application Deadline <span className="text-red-400">*</span></label>
-              <input name="application_deadline" type="date" required className={inputClass} />
+              <input
+                name="application_deadline"
+                type="date"
+                required
+                value={applicationDeadline}
+                onChange={(e) => setApplicationDeadline(e.target.value)}
+                className={inputClass}
+              />
               <p className="text-[11px] text-gray-400 mt-1">Last day for influencers to apply.</p>
             </div>
             <div>
               <label className={labelClass}>Campaign End Date <span className="text-red-400">*</span></label>
-              <input name="campaign_end_date" type="date" required className={inputClass} />
+              <input
+                name="campaign_end_date"
+                type="date"
+                required
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={inputClass}
+              />
               <p className="text-[11px] text-gray-400 mt-1">All content must be delivered by this date.</p>
             </div>
           </Card>
 
-          <Card title="Submit">
+          <Card title={isEdit ? "Save changes" : "Submit"}>
             <button
               type="submit"
               disabled={loading}
               className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-sm font-semibold cursor-pointer shadow-lg"
             >
-              {loading ? "Creating..." : "Create Campaign"}
+              {loading
+                ? (isEdit ? "Saving..." : "Creating...")
+                : (isEdit ? "Save Changes" : "Create Campaign")}
             </button>
             <button
               type="button"
-              onClick={() => router.push("/dashboard/campaigns")}
+              onClick={() => router.push(isEdit ? `/dashboard/campaigns/${initial!.campaign_id}` : "/dashboard/campaigns")}
               className="w-full px-6 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 text-sm font-medium cursor-pointer"
             >
               Cancel
             </button>
-            <p className="text-[11px] text-gray-400 text-center">Campaign will be created as a draft</p>
+            {!isEdit && <p className="text-[11px] text-gray-400 text-center">Campaign will be created as a draft</p>}
           </Card>
         </div>
       </div>

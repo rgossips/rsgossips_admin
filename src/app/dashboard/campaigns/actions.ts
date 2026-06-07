@@ -227,59 +227,122 @@ export async function updateCampaignStatus(campaignId: string, status: string): 
   return { success: true };
 }
 
+// Mirrors createCampaign field-by-field so the same client form can drive
+// both. The only differences from create: we accept a brand change but
+// don't require it (`brand_id` is optional here), we honour an explicit
+// `status` field, and we update by campaign_id instead of inserting.
 export async function updateCampaign(campaignId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
-  const campaignType = formData.get("campaign_type") as string;
+  const brandId = formData.get("brand_id") as string | null;
+  const category = formData.getAll("category") as string[];
   const maxInfluencers = formData.get("max_influencers") as string;
   const startDate = formData.get("campaign_start_date") as string;
   const endDate = formData.get("campaign_end_date") as string;
   const deadline = formData.get("application_deadline") as string;
+  const campaignType = formData.get("campaign_type") as string;
   const budgetTotal = formData.get("budget_total") as string;
   const budgetPerInfluencer = formData.get("budget_per_influencer") as string;
-  const minFollowers = formData.get("target_follower_min") as string;
   const followerMax = formData.get("target_follower_max") as string;
   const influencerTier = formData.get("target_influencer_tier") as string;
-  const targetCities = formData.get("target_cities") as string;
   const status = formData.get("status") as string;
-  const categories = formData.getAll("category") as string[];
+
   const reels = formData.get("num_reels") as string;
   const posts = formData.get("num_posts") as string;
   const stories = formData.get("num_stories") as string;
   const videos = formData.get("num_videos") as string;
-  const bannerUrl = formData.get("banner_image_url") as string | null;
-  const galleryUrlsNew = formData.getAll("gallery_image_urls") as string[];
-  const existingGallery = formData.get("existing_gallery") as string;
+  const blogs = formData.get("num_blogs") as string;
+
+  const minFollowers = formData.get("target_follower_min") as string;
   const minEngagement = formData.get("min_engagement_rate") as string;
+  const targetCities = formData.get("target_cities") as string;
+
+  const bannerUrl = formData.get("banner_image_url") as string | null;
+  const galleryUrls = formData.getAll("gallery_image_urls") as string[];
+
+  const offeringType = formData.get("offering_type") as string;
+  const productName = formData.get("product_name") as string;
+  const productValue = formData.get("product_value") as string;
+  const shippingRequired = formData.get("shipping_required") as string;
+  const shippingTimelineDays = formData.get("shipping_timeline_days") as string;
+  const serviceLocation = formData.get("service_location") as string;
+  const barterCompensation = formData.get("barter_compensation") as string;
+  const contentDos = formData.get("content_dos") as string;
+  const contentDonts = formData.get("content_donts") as string;
+  const requiredHashtags = formData.get("required_hashtags") as string;
+  const brandHandlesToTag = formData.get("brand_handles_to_tag") as string;
+  const usageRights = formData.get("usage_rights") as string;
+  const keepupDuration = formData.get("keepup_duration") as string;
+  const exclusivityDays = formData.get("exclusivity_days") as string;
+  const paymentTimeline = formData.get("payment_timeline") as string;
+  const platformsJson = formData.get("platforms_json") as string;
+  const gendersJson = formData.get("genders_json") as string;
+  const languagesJson = formData.get("languages_json") as string;
+
+  const safeJsonArr = (raw: string) => {
+    try { const v = JSON.parse(raw || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+  };
+  const platforms = safeJsonArr(platformsJson);
+  const genders = safeJsonArr(gendersJson);
+  const languages = safeJsonArr(languagesJson);
 
   if (!title) return { error: "Title is required" };
+  if (deadline && endDate && new Date(deadline) > new Date(endDate)) {
+    return { error: "Application deadline must be on or before the campaign end date" };
+  }
 
   const contentTypes: string[] = [];
   if (reels && parseInt(reels) > 0) contentTypes.push(`reels:${reels}`);
   if (posts && parseInt(posts) > 0) contentTypes.push(`posts:${posts}`);
   if (stories && parseInt(stories) > 0) contentTypes.push(`stories:${stories}`);
   if (videos && parseInt(videos) > 0) contentTypes.push(`videos:${videos}`);
+  if (blogs && parseInt(blogs) > 0) contentTypes.push(`blogs:${blogs}`);
 
   let fullDescription = description || "";
   const metadata: Record<string, unknown> = {};
   if (bannerUrl) metadata.banner_image = bannerUrl;
-  const allGallery = [
-    ...(existingGallery ? existingGallery.split(",").filter(Boolean) : []),
-    ...galleryUrlsNew.filter(Boolean),
-  ];
-  if (allGallery.length > 0) metadata.gallery_images = allGallery;
+  const validGalleryUrls = galleryUrls.filter(Boolean);
+  if (validGalleryUrls.length > 0) metadata.gallery_images = validGalleryUrls;
   if (minEngagement) metadata.min_engagement_rate = parseFloat(minEngagement);
+  if (platforms.length > 0) metadata.platforms = platforms;
+  if (genders.length > 0) metadata.target_gender = genders;
+  if (languages.length > 0) metadata.target_languages = languages;
+  if (offeringType) metadata.offering_type = offeringType;
+  if (productName) metadata.product_name = productName;
+  if (productValue) metadata.product_value = parseInt(productValue);
+  if (offeringType === "product") {
+    if (shippingRequired) metadata.shipping_required = shippingRequired;
+    if (shippingTimelineDays) metadata.shipping_timeline_days = parseInt(shippingTimelineDays);
+  } else if (offeringType === "service") {
+    if (serviceLocation) metadata.service_location = serviceLocation;
+  }
+  if (barterCompensation) metadata.barter_compensation = barterCompensation;
+  if (contentDos) metadata.content_dos = contentDos;
+  if (contentDonts) metadata.content_donts = contentDonts;
+  if (requiredHashtags) metadata.required_hashtags = requiredHashtags;
+  if (brandHandlesToTag) metadata.brand_handles_to_tag = brandHandlesToTag;
+  if (usageRights) metadata.usage_rights = usageRights;
+  if (keepupDuration) metadata.keepup_duration = keepupDuration;
+  if (exclusivityDays && exclusivityDays !== "0") metadata.exclusivity_days = exclusivityDays;
+  if (paymentTimeline) metadata.payment_timeline = paymentTimeline;
+
   if (Object.keys(metadata).length > 0) {
-    fullDescription = fullDescription ? `${fullDescription}\n\n---\n${JSON.stringify(metadata)}` : JSON.stringify(metadata);
+    fullDescription = fullDescription
+      ? `${fullDescription}\n\n---\n${JSON.stringify(metadata)}`
+      : JSON.stringify(metadata);
   }
 
-  const cities = targetCities ? targetCities.split(",").map((c) => c.trim()).filter(Boolean) : ["All India"];
-  const adminClient = createAdminClient();
+  const cities = targetCities
+    ? targetCities.split(",").map((c) => c.trim()).filter(Boolean)
+    : ["All India"];
+
   const updates: Record<string, unknown> = {
-    title, description: fullDescription || title, campaign_type: campaignType || "barter",
+    title,
+    description: fullDescription || title,
+    campaign_type: campaignType || "barter",
     max_influencers: maxInfluencers ? parseInt(maxInfluencers) : 10,
     content_types_required: contentTypes.length > 0 ? contentTypes : ["reels"],
     budget_total: budgetTotal ? parseInt(budgetTotal) : 0,
@@ -287,7 +350,8 @@ export async function updateCampaign(campaignId: string, formData: FormData): Pr
     target_follower_min: minFollowers ? parseInt(minFollowers) : 0,
     target_follower_max: followerMax ? parseInt(followerMax) : 1000000,
     target_influencer_tier: influencerTier || "all",
-    target_cities: cities, target_categories: categories.length > 0 ? categories : ["General"],
+    target_cities: cities,
+    target_categories: category.length > 0 ? category : ["General"],
     updated_at: new Date().toISOString(),
   };
   if (startDate) updates.campaign_start_date = startDate;
@@ -295,6 +359,20 @@ export async function updateCampaign(campaignId: string, formData: FormData): Pr
   if (deadline) updates.application_deadline = deadline;
   if (status) updates.status = status;
 
+  // Optional brand reassignment. We allow it because the inline edit
+  // route lets admins fix a mis-attributed campaign.
+  if (brandId) {
+    const [brandType, brandUuid] = brandId.includes(":") ? brandId.split(":", 2) : ["registered", brandId];
+    if (brandType === "registered") {
+      updates.brand_id = brandUuid;
+      updates.brand_invitation_id = null;
+    } else if (brandType === "invited") {
+      updates.brand_id = null;
+      updates.brand_invitation_id = brandUuid;
+    }
+  }
+
+  const adminClient = createAdminClient();
   const { error } = await adminClient.from("campaigns").update(updates).eq("campaign_id", campaignId);
   if (error) return { error: error.message };
 

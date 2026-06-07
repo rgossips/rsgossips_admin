@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ButtonSpinner } from "@/components/spinner";
 import { deleteInvitation, updateBrandInvitation } from "./invitation-actions";
+import { uploadBrandIcon } from "./actions";
 import { sendBrandInvitationEmail } from "./invitation-email-actions";
 import { CATEGORIES } from "@/lib/categories";
 import { useRole } from "@/components/role-context";
@@ -126,11 +127,61 @@ function EditBrandInviteModal({ invitation, text, meta, onClose }: { invitation:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Tracks edits to the logo independently. `logoChanged` distinguishes
+  // "untouched, leave the DB value alone" from "explicitly cleared",
+  // and matches the contract in [[updateBrandInvitation]] (an empty
+  // string clears, a missing field is ignored).
+  const [logoPreview, setLogoPreview] = useState<string>(invitation.logo_url || "");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoChanged, setLogoChanged] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith("image/")) return;
+    if (logoPreview && logoFile) URL.revokeObjectURL(logoPreview);
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setLogoChanged(true);
+  };
+
+  const removeLogo = () => {
+    if (logoPreview && logoFile) URL.revokeObjectURL(logoPreview);
+    setLogoFile(null);
+    setLogoPreview("");
+    setLogoChanged(true);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
   const handleSubmit = async (formData: FormData) => {
     setError(""); setLoading(true);
-    const result = await updateBrandInvitation(invitation.id, formData);
-    if (result.error) { setError(result.error); setLoading(false); }
-    else { router.refresh(); onClose(); }
+    try {
+      if (logoChanged) {
+        let url = "";
+        if (logoFile) {
+          const fd = new FormData();
+          fd.append("file", logoFile);
+          fd.append("folder", "brand-icons");
+          const upload = await uploadBrandIcon(fd);
+          if (upload.error) {
+            setError(upload.error);
+            setLoading(false);
+            return;
+          }
+          url = upload.url || "";
+        }
+        // Pass empty string when the admin cleared the logo so the
+        // server knows to null it out vs. leaving the field untouched.
+        formData.set("logo_url", url);
+      }
+      const result = await updateBrandInvitation(invitation.id, formData);
+      if (result.error) { setError(result.error); setLoading(false); }
+      else { router.refresh(); onClose(); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      setLoading(false);
+    }
   };
 
   return (
@@ -145,6 +196,41 @@ function EditBrandInviteModal({ invitation, text, meta, onClose }: { invitation:
         </div>
         <form action={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           {error && <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/30 text-red-600 text-sm">{error}</div>}
+
+          <div>
+            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Brand Logo</label>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 flex items-center justify-center cursor-pointer overflow-hidden bg-gray-50 dark:bg-gray-800 shrink-0"
+              >
+                {logoPreview ? (
+                  <img src={logoPreview} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                )}
+              </button>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleLogoSelect(e.target.files)}
+              />
+              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                <p>Click the square to {logoPreview ? "change" : "upload"} the logo.</p>
+                {logoPreview && (
+                  <button type="button" onClick={removeLogo} className="text-red-500 hover:text-red-600 cursor-pointer">
+                    Remove logo
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Brand Name *</label>

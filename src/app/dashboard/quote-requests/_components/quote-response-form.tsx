@@ -7,7 +7,6 @@ type Props = {
   orderId: string;
   serviceTitle: string;
   desiredDeliveryDate?: string | null;
-  platformFeePct: number;
 };
 
 // Default a delivery date a week out so the admin has a sensible starting
@@ -19,15 +18,14 @@ function defaultDeliveryISO(desired?: string | null) {
   return d.toISOString().slice(0, 10);
 }
 
-export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate, platformFeePct }: Props) {
+export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"none" | "quote" | "decline">("none");
 
-  // Live total preview as the admin types — same math the server uses.
+  // No platform fee — the user pays exactly what we quote.
   const [amount, setAmount] = useState("");
-  const fee = amount ? Math.round(Number(amount) * (platformFeePct / 100)) : 0;
-  const total = amount ? Number(amount) + fee : 0;
+  const total = amount ? Number(amount) : 0;
 
   const onSend = (formData: FormData) => {
     setError("");
@@ -113,7 +111,7 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate, 
       <div>
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Send quote — {serviceTitle}</h3>
         <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
-          Platform fee is currently <span className="font-bold">{platformFeePct}%</span>; the user-facing total includes it automatically.
+          The user pays exactly the amount you quote — no platform fee added on top.
         </p>
       </div>
 
@@ -183,8 +181,6 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate, 
 
       {/* Live total preview */}
       <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-lg p-3 text-[12px]">
-        <Row label="Subtotal" value={amount ? `₹${Number(amount).toLocaleString("en-IN")}` : "—"} />
-        <Row label={`Platform fee (${platformFeePct}%)`} value={amount ? `₹${fee.toLocaleString("en-IN")}` : "—"} />
         <Row
           label="Total user pays"
           value={amount ? `₹${total.toLocaleString("en-IN")}` : "—"}
