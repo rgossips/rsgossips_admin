@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { adminGate } from "@/lib/require-super-admin";
+import { adminGate, superAdminGate } from "@/lib/require-super-admin";
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ error?: string; url?: string }> {
   const gate = await adminGate();
@@ -379,4 +379,40 @@ export async function updateCampaign(campaignId: string, formData: FormData): Pr
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   revalidatePath("/dashboard/campaigns");
   return { success: true };
+}
+
+// Bulk-delete campaigns. Super admin only — destructive and cascades into
+// campaign_applications (otherwise the FK would block the delete). Also
+// nukes any featured_campaigns rows so the home carousel doesn't render
+// a deleted campaign.
+export async function deleteCampaigns(campaignIds: string[]): Promise<{ error?: string; deleted?: number }> {
+  const gate = await superAdminGate();
+  if (gate) return gate;
+
+  const ids = (campaignIds || []).filter((id) => typeof id === "string" && id.length > 0);
+  if (ids.length === 0) return { error: "No campaigns selected" };
+
+  const adminClient = createAdminClient();
+
+  // Applications reference campaigns by FK, so drop them first.
+  const { error: appsErr } = await adminClient
+    .from("campaign_applications")
+    .delete()
+    .in("campaign_id", ids);
+  if (appsErr) return { error: `Failed to remove applications: ${appsErr.message}` };
+
+  // Featured listings reference campaigns too — best-effort, swallow
+  // errors so a missing/empty table doesn't block the actual delete.
+  try {
+    await adminClient.from("featured_campaigns").delete().in("campaign_id", ids);
+  } catch { /* non-fatal */ }
+
+  const { error, count } = await adminClient
+    .from("campaigns")
+    .delete({ count: "exact" })
+    .in("campaign_id", ids);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/campaigns");
+  return { deleted: count ?? ids.length };
 }

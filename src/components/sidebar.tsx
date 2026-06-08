@@ -132,10 +132,14 @@ function NavItem({
 
 export function Sidebar({
   userEmail,
+  userName: userNameProp,
   collapsed,
   onClose,
 }: {
   userEmail: string;
+  // Display name from admin_profiles.full_name. Falls back to the
+  // email-derived label when the row doesn't have one yet (older invites).
+  userName?: string;
   collapsed?: boolean;
   onClose?: () => void;
 }) {
@@ -191,7 +195,7 @@ export function Sidebar({
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
 
-  const userName = userEmail.split("@")[0].replace(/[._-]/g, " ");
+  const userName = userNameProp?.trim() || userEmail.split("@")[0].replace(/[._-]/g, " ");
   const initials = userName
     .split(" ")
     .map((p) => p[0]?.toUpperCase())

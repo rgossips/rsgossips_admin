@@ -40,10 +40,11 @@ export default async function DashboardLayout({
   // even if the lookup fails (network blip) — see comment in the gate
   // below — but we want the role for downstream UI gating.
   let role: "super_admin" | "admin" | "viewer" | null = null;
+  let fullName = "";
   if (tableHasRows) {
     const { data: adminProfile, error: lookupErr } = await adminClient
       .from("admin_profiles")
-      .select("id, role")
+      .select("id, role, full_name")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -54,9 +55,10 @@ export default async function DashboardLayout({
       redirect("/login");
     }
     role = (adminProfile?.role as typeof role) || null;
+    fullName = adminProfile?.full_name || "";
   }
 
   return (
-    <DashboardShell userEmail={user.email || ""} role={role}>{children}</DashboardShell>
+    <DashboardShell userEmail={user.email || ""} userName={fullName} role={role}>{children}</DashboardShell>
   );
 }

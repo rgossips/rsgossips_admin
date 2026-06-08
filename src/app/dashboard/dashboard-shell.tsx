@@ -7,10 +7,12 @@ import { RoleProvider, type AdminRole } from "@/components/role-context";
 
 export function DashboardShell({
   userEmail,
+  userName,
   role,
   children,
 }: {
   userEmail: string;
+  userName?: string;
   role: AdminRole;
   children: React.ReactNode;
 }) {
@@ -21,6 +23,7 @@ export function DashboardShell({
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <Sidebar
           userEmail={userEmail}
+          userName={userName}
           collapsed={!sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
