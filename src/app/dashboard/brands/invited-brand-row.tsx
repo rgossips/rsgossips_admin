@@ -4,12 +4,14 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ButtonSpinner } from "@/components/spinner";
-import { deleteInvitation, updateBrandInvitation } from "./invitation-actions";
+import { deleteBrandInvitationStep, updateBrandInvitation } from "./invitation-actions";
+import { BRAND_INVITATION_DELETE_STEPS } from "./delete-invitation-steps";
 import { uploadBrandIcon } from "./actions";
 import { sendBrandInvitationEmail } from "./invitation-email-actions";
 import { CATEGORIES } from "@/lib/categories";
 import { useRole } from "@/components/role-context";
 import { SendInviteEmailModal } from "@/components/send-invite-email-modal";
+import { DeleteWithStepsModal } from "@/components/delete-with-steps-modal";
 
 interface Invitation {
   id: string;
@@ -31,20 +33,12 @@ function parseMeta(notes: string | null) {
 }
 
 export function InvitedBrandRow({ invitation }: { invitation: Invitation }) {
+  const router = useRouter();
   const { isAdmin } = useRole();
-  const [loading, setLoading] = useState(false);
   const [removed, setRemoved] = useState(false);
   const [editing, setEditing] = useState(false);
   const [emailing, setEmailing] = useState(false);
-
-  const handleDelete = async () => {
-    if (!confirm(`Remove invitation for @${invitation.instagram_username}?`)) return;
-    setLoading(true);
-    const result = await deleteInvitation(invitation.id);
-    if (result.error) alert(result.error);
-    else setRemoved(true);
-    setLoading(false);
-  };
+  const [removing, setRemoving] = useState(false);
 
   if (removed) return null;
 
@@ -100,8 +94,8 @@ export function InvitedBrandRow({ invitation }: { invitation: Invitation }) {
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Edit
               </button>
-              <button onClick={handleDelete} disabled={loading} className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer disabled:opacity-50">
-                {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
+              <button onClick={() => setRemoving(true)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-600 cursor-pointer">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 Remove
               </button>
             </div>
@@ -115,6 +109,25 @@ export function InvitedBrandRow({ invitation }: { invitation: Invitation }) {
         onClose={() => setEmailing(false)}
         recipientLabel={`${invitation.brand_name} (@${invitation.instagram_username})`}
         send={(email, customMessage) => sendBrandInvitationEmail(invitation.id, email, customMessage)}
+      />
+      <DeleteWithStepsModal
+        open={removing}
+        onClose={() => setRemoving(false)}
+        title={`Remove invitation for @${invitation.instagram_username}?`}
+        subtitle={invitation.brand_name}
+        confirmLabel="Remove invitation"
+        bullets={[
+          "All campaigns created for this invited brand",
+          "Every application on those campaigns",
+          "Any Featured Campaigns listings",
+          "The invitation itself",
+        ]}
+        steps={BRAND_INVITATION_DELETE_STEPS.map((s) => ({ key: s.key, label: s.label }))}
+        runStep={(key) => deleteBrandInvitationStep(invitation.id, key as never)}
+        onDone={() => {
+          setRemoved(true);
+          router.refresh();
+        }}
       />
     </>
   );
