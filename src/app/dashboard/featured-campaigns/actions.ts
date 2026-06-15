@@ -6,6 +6,38 @@ import { adminGate } from "@/lib/require-super-admin";
 
 // Stays in lockstep with public.featured_campaigns (migration 019).
 
+// homepage_settings key for the section title rendered above the
+// "Plan your stay with us" carousel on the influencer home (migration 029).
+const SECTION_TITLE_KEY = "featured_section_title";
+
+export async function getFeaturedSectionTitle(): Promise<string> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("homepage_settings")
+    .select("value")
+    .eq("key", SECTION_TITLE_KEY)
+    .maybeSingle();
+  return data?.value || "Plan your stay with us";
+}
+
+export async function setFeaturedSectionTitle(value: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
+
+  const trimmed = (value || "").trim();
+  if (!trimmed) return { error: "Title cannot be empty" };
+  if (trimmed.length > 80) return { error: "Title must be 80 characters or fewer" };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("homepage_settings")
+    .upsert({ key: SECTION_TITLE_KEY, value: trimmed, updated_at: new Date().toISOString() });
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/featured-campaigns");
+  return { ok: true };
+}
+
 export async function addFeaturedCampaign(campaignId: string, position?: number): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;

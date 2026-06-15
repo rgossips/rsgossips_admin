@@ -1,10 +1,12 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
   deleteFeaturedCampaign,
+  getFeaturedSectionTitle,
   moveFeaturedCampaign,
   toggleFeaturedCampaignActive,
 } from "./actions";
 import { AddFeaturedCampaignButton } from "./_components/add-featured-campaign";
+import { SectionTitleEditor } from "./_components/section-title-editor";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function FeaturedCampaignsPage() {
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
+  const sectionTitle = await getFeaturedSectionTitle();
 
   // Join through featured_campaigns → campaigns and pick up brand info
   // from whichever side has it (registered brand or invitation).
@@ -72,6 +75,8 @@ export default async function FeaturedCampaignsPage() {
         </div>
         {canWrite && <AddFeaturedCampaignButton />}
       </div>
+
+      <SectionTitleEditor initialTitle={sectionTitle} canWrite={canWrite} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatPill label="Total" value={(featured || []).length} />
