@@ -5,6 +5,38 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { adminGate } from "@/lib/require-super-admin";
 
+// homepage_settings key backing the editable section title above the
+// Top Creator Stories carousel on the marketing home (migration 030).
+const SECTION_TITLE_KEY = "creator_stories_section_title";
+
+export async function getCreatorStoriesSectionTitle(): Promise<string> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("homepage_settings")
+    .select("value")
+    .eq("key", SECTION_TITLE_KEY)
+    .maybeSingle();
+  return data?.value || "TOP CREATOR STORIES";
+}
+
+export async function setCreatorStoriesSectionTitle(value: string): Promise<{ error?: string; ok?: boolean }> {
+  const gate = await adminGate();
+  if (gate) return gate;
+
+  const trimmed = (value || "").trim();
+  if (!trimmed) return { error: "Title cannot be empty" };
+  if (trimmed.length > 80) return { error: "Title must be 80 characters or fewer" };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("homepage_settings")
+    .upsert({ key: SECTION_TITLE_KEY, value: trimmed, updated_at: new Date().toISOString() });
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/creator-stories");
+  return { ok: true };
+}
+
 // Uploads a video file to the campaign-images bucket under a creator-stories/
 // prefix and returns the public URL. Mirrors the service image upload helper.
 export async function uploadStoryVideo(formData: FormData): Promise<{ url?: string; error?: string }> {

@@ -4,6 +4,9 @@ import { BrandRow } from "./brand-row";
 import { AddBrandForm } from "./add-brand-form";
 import { InvitedBrandRow } from "./invited-brand-row";
 import { RefreshButton } from "@/components/refresh-button";
+import { Pagination } from "@/components/pagination";
+
+const INVITES_PER_PAGE = 12;
 
 const filterFields = [
   { name: "search", label: "Search", type: "text" as const, placeholder: "Search by brand name..." },
@@ -25,9 +28,11 @@ export default async function BrandsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
-  const { search, verification, tab } = await searchParams;
+  const params = await searchParams;
+  const { search, verification, tab, invite_page } = params;
   const supabase = createAdminClient();
   const activeTab = tab || "all";
+  const invitePage = Math.max(1, parseInt(invite_page || "1", 10) || 1);
 
   // Fetch registered brands
   let brandQuery = supabase
@@ -44,19 +49,24 @@ export default async function BrandsPage({
 
   const { data: brands, error: brandsError } = await brandQuery;
 
-  // Fetch only pending invitations
+  // Fetch only pending invitations — paginated. `count: exact` returns
+  // the matching total so the page count is correct after filtering.
+  const inviteFrom = (invitePage - 1) * INVITES_PER_PAGE;
+  const inviteTo = inviteFrom + INVITES_PER_PAGE - 1;
   let inviteQuery = supabase
     .from("brand_invitations")
-    .select("id, brand_name, instagram_username, logo_url, notes, status, created_at")
+    .select("id, brand_name, instagram_username, logo_url, notes, status, created_at", { count: "exact" })
     .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(inviteFrom, inviteTo);
 
   if (search) {
     inviteQuery = inviteQuery.or(`brand_name.ilike.%${search}%,instagram_username.ilike.%${search}%`);
   }
 
-  const { data: pendingInvites, error: invitesError } = await inviteQuery;
-  const allCount = (brands?.length || 0) + (pendingInvites?.length || 0);
+  const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
+  const invitesTotal = pendingInviteCount ?? 0;
+  const allCount = (brands?.length || 0) + invitesTotal;
 
   return (
     <div>
@@ -74,7 +84,7 @@ export default async function BrandsPage({
       <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-6 w-fit">
         <TabLink label="All" value="all" active={activeTab} count={allCount} />
         <TabLink label="Registered" value="registered" active={activeTab} count={brands?.length || 0} />
-        <TabLink label="Invited" value="invited" active={activeTab} count={pendingInvites?.length || 0} />
+        <TabLink label="Invited" value="invited" active={activeTab} count={invitesTotal} />
       </div>
 
       {/* Registered brands table — shown on "all" and "registered" tabs */}
@@ -131,11 +141,21 @@ export default async function BrandsPage({
           )}
 
           {pendingInvites && pendingInvites.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingInvites.map((invite) => (
-                <InvitedBrandRow key={invite.id} invitation={invite} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pendingInvites.map((invite) => (
+                  <InvitedBrandRow key={invite.id} invitation={invite} />
+                ))}
+              </div>
+              <Pagination
+                basePath="/dashboard/brands"
+                pageParam="invite_page"
+                currentParams={params}
+                page={invitePage}
+                perPage={INVITES_PER_PAGE}
+                total={invitesTotal}
+              />
+            </>
           ) : activeTab === "invited" ? (
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-16 text-center">
               <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">

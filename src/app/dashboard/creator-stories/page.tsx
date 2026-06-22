@@ -2,10 +2,12 @@ import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
   deleteCreatorStory,
+  getCreatorStoriesSectionTitle,
   moveCreatorStory,
   toggleCreatorStoryActive,
 } from "./actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { CreatorStoriesSectionTitleEditor } from "./_components/section-title-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ export default async function CreatorStoriesPage() {
     .order("position", { ascending: true })
     .order("created_at", { ascending: false });
   const canWrite = await isAdminOrAbove();
+  const sectionTitle = await getCreatorStoriesSectionTitle();
 
   const activeCount = (stories || []).filter((s) => s.is_active).length;
 
@@ -41,6 +44,8 @@ export default async function CreatorStoriesPage() {
           </Link>
         )}
       </div>
+
+      <CreatorStoriesSectionTitleEditor initialTitle={sectionTitle} canWrite={canWrite} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatPill label="Total" value={(stories || []).length} />
