@@ -14,6 +14,7 @@ const mainNav: NavSpec[] = [
   { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
   { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
   { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
+  { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
   { label: "Services", href: "/dashboard/services", icon: "sparkles" },
   { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
   { label: "Leads", href: "/dashboard/leads", icon: "phone" },
@@ -93,6 +94,11 @@ const icons: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
     </svg>
   ),
+  wallet: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2H3V8zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6zm14 3a1 1 0 100 2 1 1 0 000-2z" />
+    </svg>
+  ),
 };
 
 function NavItem({
@@ -156,7 +162,7 @@ export function Sidebar({
     const fetchBadges = async () => {
       try {
         const supabase = createClient();
-        const [quoteRes, disputeRes] = await Promise.all([
+        const [quoteRes, disputeRes, payoutRes] = await Promise.all([
           supabase
             .from("service_orders")
             .select("*", { count: "exact", head: true })
@@ -165,12 +171,17 @@ export function Sidebar({
             .from("escrow_disputes_v")
             .select("*", { count: "exact", head: true })
             .eq("escrow_status", "disputed"),
+          supabase
+            .from("campaign_applications")
+            .select("*", { count: "exact", head: true })
+            .in("payout_status", ["scheduled", "pending_creator_info"]),
         ]);
         if (!cancelled) {
           setBadges((prev) => ({
             ...prev,
             pendingQuotes: quoteRes.count ?? 0,
             openDisputes: disputeRes.count ?? 0,
+            pendingPayouts: payoutRes.count ?? 0,
           }));
         }
       } catch {
