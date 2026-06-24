@@ -4,22 +4,19 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { adminGate } from "@/lib/require-super-admin";
 
-// Stays in lockstep with public.featured_campaigns (migration 019)
-// + the section column added in migration 033. Featured Campaigns
-// (top StackedDeals strip) and Plan Your Stay (StayCarousel) share
-// this table but live in different `section` partitions:
-//   section='campaign' → /dashboard/featured-campaigns (this file)
-//   section='stay'     → /dashboard/featured-stay
-const SECTION = "campaign" as const;
+// Plan Your Stay carousel — admin-curated list backed by
+// public.featured_campaigns with section='stay' (migration 033).
+// Featured Campaigns (section='campaign') lives at
+// /dashboard/featured-campaigns; this page is its sibling.
+const SECTION = "stay" as const;
 
-// homepage_settings key for the section title. The campaign-strip
-// title is new (currently unused in the influencer UI but ready for
-// when StackedDeals gets a heading). Plan Your Stay keeps the
-// historical featured_section_title key.
-const SECTION_TITLE_KEY = "featured_campaigns_section_title";
-const DEFAULT_SECTION_TITLE = "FEATURED CAMPAIGNS";
+// homepage_settings key the StayCarousel component reads on the
+// influencer home — kept as the historical "featured_section_title"
+// so existing admin-set values don't reset.
+const SECTION_TITLE_KEY = "featured_section_title";
+const DEFAULT_SECTION_TITLE = "Plan your stay with us";
 
-export async function getFeaturedSectionTitle(): Promise<string> {
+export async function getStaySectionTitle(): Promise<string> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("homepage_settings")
@@ -29,7 +26,7 @@ export async function getFeaturedSectionTitle(): Promise<string> {
   return data?.value || DEFAULT_SECTION_TITLE;
 }
 
-export async function setFeaturedSectionTitle(value: string): Promise<{ error?: string; ok?: boolean }> {
+export async function setStaySectionTitle(value: string): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
@@ -43,11 +40,11 @@ export async function setFeaturedSectionTitle(value: string): Promise<{ error?: 
     .upsert({ key: SECTION_TITLE_KEY, value: trimmed, updated_at: new Date().toISOString() });
   if (error) return { error: error.message };
 
-  revalidatePath("/dashboard/featured-campaigns");
+  revalidatePath("/dashboard/featured-stay");
   return { ok: true };
 }
 
-export async function addFeaturedCampaign(campaignId: string, position?: number): Promise<{ error?: string; ok?: boolean }> {
+export async function addStayCampaign(campaignId: string, position?: number): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
@@ -69,11 +66,11 @@ export async function addFeaturedCampaign(campaignId: string, position?: number)
     .insert({ campaign_id: campaignId, position: pos, is_active: true, section: SECTION });
   if (error) return { error: error.message };
 
-  revalidatePath("/dashboard/featured-campaigns");
+  revalidatePath("/dashboard/featured-stay");
   return { ok: true };
 }
 
-export async function toggleFeaturedCampaignActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
+export async function toggleStayCampaignActive(id: string, nextValue: boolean): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
@@ -84,11 +81,11 @@ export async function toggleFeaturedCampaignActive(id: string, nextValue: boolea
     .eq("id", id);
   if (error) return { error: error.message };
 
-  revalidatePath("/dashboard/featured-campaigns");
+  revalidatePath("/dashboard/featured-stay");
   return { ok: true };
 }
 
-export async function deleteFeaturedCampaign(id: string): Promise<{ error?: string; ok?: boolean }> {
+export async function deleteStayCampaign(id: string): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
@@ -96,11 +93,11 @@ export async function deleteFeaturedCampaign(id: string): Promise<{ error?: stri
   const { error } = await admin.from("featured_campaigns").delete().eq("id", id);
   if (error) return { error: error.message };
 
-  revalidatePath("/dashboard/featured-campaigns");
+  revalidatePath("/dashboard/featured-stay");
   return { ok: true };
 }
 
-export async function moveFeaturedCampaign(id: string, direction: "up" | "down"): Promise<{ error?: string; ok?: boolean }> {
+export async function moveStayCampaign(id: string, direction: "up" | "down"): Promise<{ error?: string; ok?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
@@ -119,27 +116,23 @@ export async function moveFeaturedCampaign(id: string, direction: "up" | "down")
     .eq("id", id);
   if (error) return { error: error.message };
 
-  revalidatePath("/dashboard/featured-campaigns");
+  revalidatePath("/dashboard/featured-stay");
   return { ok: true };
 }
 
-// Picker — searches campaigns by title or brand name. Joins through to
-// brand_profiles / brand_invitations so admin can find a campaign by its
-// brand even if the campaign title is generic.
-export async function searchCampaignsForFeature(query: string) {
+// Picker — campaigns not already pinned to the 'stay' section.
+export async function searchCampaignsForStay(query: string) {
   const admin = createAdminClient();
   const q = query.trim();
   if (!q) return [];
   const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
 
-  // Direct title match first
   const { data: byTitle } = await admin
     .from("campaigns")
     .select("campaign_id, title, brand_id, brand_invitation_id, status, application_deadline")
     .ilike("title", like)
     .limit(15);
 
-  // Brand name match — look up matching brand rows then pull their campaigns
   const [{ data: bp }, { data: bi }] = await Promise.all([
     admin
       .from("brand_profiles")
@@ -212,8 +205,6 @@ export async function searchCampaignsForFeature(query: string) {
     });
   }
 
-  // Hide campaigns already featured in THIS section (admin can still
-  // feature the same campaign in the other section if they want).
   const { data: already } = await admin
     .from("featured_campaigns")
     .select("campaign_id")

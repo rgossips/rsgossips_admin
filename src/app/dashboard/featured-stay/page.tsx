@@ -1,29 +1,27 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
-  deleteFeaturedCampaign,
-  getFeaturedSectionTitle,
-  moveFeaturedCampaign,
-  toggleFeaturedCampaignActive,
+  deleteStayCampaign,
+  getStaySectionTitle,
+  moveStayCampaign,
+  toggleStayCampaignActive,
 } from "./actions";
 import { AddFeaturedCampaignButton } from "./_components/add-featured-campaign";
-import { SectionTitleEditor } from "./_components/section-title-editor";
+import { StaySectionTitleEditor } from "./_components/section-title-editor";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export const dynamic = "force-dynamic";
 
-export default async function FeaturedCampaignsPage() {
+export default async function FeaturedStayPage() {
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
-  const sectionTitle = await getFeaturedSectionTitle();
+  const sectionTitle = await getStaySectionTitle();
 
-  // Join through featured_campaigns → campaigns and pick up brand info
-  // from whichever side has it (registered brand or invitation).
-  // section='campaign' filters out Plan Your Stay picks (those live in
-  // /dashboard/featured-stay).
+  // section='stay' filters to the Plan Your Stay carousel only;
+  // Featured Campaigns picks live under /dashboard/featured-campaigns.
   const { data: featured, error } = await admin
     .from("featured_campaigns")
     .select("id, campaign_id, position, is_active")
-    .eq("section", "campaign")
+    .eq("section", "stay")
     .order("position", { ascending: true });
 
   let campaignsById: Record<string, any> = {};
@@ -69,13 +67,13 @@ export default async function FeaturedCampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Featured Campaigns</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Plan Your Stay</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Hand-picked list shown on the influencer home page at the top
-            (Deal Of The Day stacked carousel). Plan Your Stay With Us
-            is curated separately under{" "}
-            <a href="/dashboard/featured-stay" className="text-indigo-500 hover:underline">
-              Plan Your Stay
+            Hand-picked list shown in the &ldquo;Plan your stay with us&rdquo;
+            carousel on the influencer home page. Curated separately
+            from{" "}
+            <a href="/dashboard/featured-campaigns" className="text-indigo-500 hover:underline">
+              Featured Campaigns
             </a>
             . Lower position = appears first.
           </p>
@@ -83,7 +81,7 @@ export default async function FeaturedCampaignsPage() {
         {canWrite && <AddFeaturedCampaignButton />}
       </div>
 
-      <SectionTitleEditor initialTitle={sectionTitle} canWrite={canWrite} />
+      <StaySectionTitleEditor initialTitle={sectionTitle} canWrite={canWrite} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatPill label="Total" value={(featured || []).length} />
@@ -100,7 +98,7 @@ export default async function FeaturedCampaignsPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
         {(featured || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            No featured campaigns yet. Click <span className="font-semibold text-indigo-500">Feature a campaign</span> to add one.
+            No stay picks yet. Click <span className="font-semibold text-indigo-500">Feature a campaign</span> to add one.
             <p className="text-[11px] text-gray-300 mt-2">Until you publish at least one, the influencer home falls back to a built-in placeholder list.</p>
           </div>
         ) : (
@@ -165,7 +163,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
           <form
             action={async () => {
               "use server";
-              await moveFeaturedCampaign(row.id, "up");
+              await moveStayCampaign(row.id, "up");
             }}
           >
             <button
@@ -179,7 +177,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
           <form
             action={async () => {
               "use server";
-              await moveFeaturedCampaign(row.id, "down");
+              await moveStayCampaign(row.id, "down");
             }}
           >
             <button
@@ -206,7 +204,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
           <form
             action={async () => {
               "use server";
-              await toggleFeaturedCampaignActive(row.id, !row.is_active);
+              await toggleStayCampaignActive(row.id, !row.is_active);
             }}
           >
             <button
@@ -220,7 +218,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
           <form
             action={async () => {
               "use server";
-              await deleteFeaturedCampaign(row.id);
+              await deleteStayCampaign(row.id);
             }}
           >
             <button

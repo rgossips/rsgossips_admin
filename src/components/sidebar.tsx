@@ -21,6 +21,7 @@ const mainNav: NavSpec[] = [
   { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
   { label: "Creator Stories", href: "/dashboard/creator-stories", icon: "video" },
   { label: "Featured Campaigns", href: "/dashboard/featured-campaigns", icon: "flame" },
+  { label: "Plan Your Stay", href: "/dashboard/featured-stay", icon: "flame" },
   { label: "Featured Brands", href: "/dashboard/featured-brands", icon: "tag" },
 ];
 
