@@ -272,22 +272,30 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
   }, [bannerImage]);
 
   const handleSubmit = async (formData: FormData) => {
+    // Flip the spinner on immediately so the click feels acknowledged,
+    // even if validation rejects below — we'll flip it back off in that
+    // case. Otherwise the user sees nothing until uploads start, which
+    // reads as a dead button.
+    setLoading(true);
+    setLoadingMsg(isEdit ? "Saving campaign..." : "Creating campaign...");
     setError("");
 
     if (totalDeliverables < 1) {
       setError("Add at least 1 deliverable");
+      setLoading(false);
       return;
     }
     if (selectedCategories.length < 1) {
       setError("Select at least 1 category");
+      setLoading(false);
       return;
     }
     if (selectedPlatforms.length < 1) {
       setError("Select at least 1 platform");
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
     try {
       // Categories
       selectedCategories.forEach((cat) => formData.append("category", cat));
@@ -1009,10 +1017,17 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-sm font-semibold cursor-pointer shadow-lg"
+              aria-busy={loading}
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:from-indigo-700 active:to-purple-700 active:scale-[0.98] disabled:opacity-70 disabled:cursor-wait text-white text-sm font-semibold cursor-pointer shadow-lg transition-all"
             >
+              {loading && (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
               {loading
-                ? (isEdit ? "Saving..." : "Creating...")
+                ? (loadingMsg || (isEdit ? "Saving..." : "Creating..."))
                 : (isEdit ? "Save Changes" : "Create Campaign")}
             </button>
             <button
