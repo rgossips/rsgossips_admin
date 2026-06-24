@@ -88,9 +88,13 @@ export async function deleteBrandStep(
         return { ok: true, detail: `${orderIds.length} order(s) removed` };
       }
       case "brand_invitations": {
+        // Delete the invitation outright (was: reset to 'pending').
+        // The old reset caused freshly-deleted brands to reappear in
+        // the brand-invitation flow on the next sign-up attempt.
+        // Re-inviting via the admin tool is the deliberate path back.
         const { error } = await admin
           .from("brand_invitations")
-          .update({ status: "pending", claimed_by: null, claimed_at: null, brand_profile_id: null })
+          .delete()
           .eq("claimed_by", brandId);
         if (error) throw error;
         return { ok: true };

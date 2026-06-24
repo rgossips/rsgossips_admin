@@ -103,10 +103,16 @@ export async function deleteInfluencerStep(
         return { ok: true, detail: `${orderIds.length} order(s) removed` };
       }
       case "influencer_invitations": {
-        // Don't delete the invitation — null out the claim so the slot can be re-claimed if needed
+        // Delete the invitation outright. Previously we reset it to
+        // 'pending' so the slot could be re-claimed without admin
+        // action — but that caused freshly-deleted users to reappear
+        // in the influencer-invitation flow on the next sign-up
+        // attempt (lookup-invitation matched the dangling row). If
+        // admin wants the user back, they re-invite via the admin
+        // tool.
         const { error } = await admin
           .from("influencer_invitations")
-          .update({ status: "pending", claimed_by: null, claimed_at: null, influencer_profile_id: null })
+          .delete()
           .eq("claimed_by", influencerId);
         if (error) throw error;
         return { ok: true };

@@ -9,7 +9,7 @@ export const INFLUENCER_DELETE_STEPS = [
   { key: "featured_creators", label: "Featured creators listing" },
   { key: "campaign_applications", label: "Campaign applications" },
   { key: "service_orders", label: "Service orders & timeline events" },
-  { key: "influencer_invitations", label: "Unlink claimed invitations" },
+  { key: "influencer_invitations", label: "Delete claimed invitations" },
   { key: "influencer_profile", label: "Influencer profile" },
   { key: "auth_user", label: "Authentication (phone + Instagram tokens)" },
 ] as const;
