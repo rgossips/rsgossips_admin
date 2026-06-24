@@ -16,7 +16,7 @@ interface Influencer {
   status: string | null;
 }
 
-export function InfluencerRow({ inf }: { inf: Influencer }) {
+export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string | null }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(inf.status);
   const { isAdmin } = useRole();
@@ -50,6 +50,15 @@ export function InfluencerRow({ inf }: { inf: Influencer }) {
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {inf.username || "—"}
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-mono">
+        {phone ? (
+          <a href={`tel:${phone}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            {phone.startsWith("+") ? phone : `+${phone}`}
+          </a>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-600">—</span>
+        )}
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {inf.followers_count?.toLocaleString() ?? "—"}

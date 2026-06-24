@@ -24,6 +24,16 @@ export default async function InfluencerDetailPage({
 
   if (error || !inf) notFound();
 
+  // Phone lives on auth.users (creators sign in by phone), not the
+  // profile row. Fetch it separately — non-fatal if the call fails.
+  let phone: string | null = null;
+  try {
+    const { data: authUserRes } = await supabase.auth.admin.getUserById(id);
+    phone = authUserRes?.user?.phone || null;
+  } catch {
+    /* leave phone null — UI will show — */
+  }
+
   const [superAdmin, canWrite] = await Promise.all([isSuperAdmin(), isAdminOrAbove()]);
 
   const formatDate = (d: string | null) => {
@@ -106,7 +116,7 @@ export default async function InfluencerDetailPage({
           <Card icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" color="emerald" title="Contact & Location">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InfoItem label="Email" value={inf.email || "—"} />
-              <InfoItem label="Phone" value={inf.phone || "—"} />
+              <InfoItem label="Phone" value={phone ? (phone.startsWith("+") ? phone : `+${phone}`) : "—"} />
               <InfoItem label="City" value={inf.city || "—"} />
               <InfoItem label="State" value={inf.state || "—"} />
             </div>

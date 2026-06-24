@@ -40,6 +40,21 @@ export default async function InfluencersPage({
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
   const { data: influencers, error } = await query;
 
+  // Phone numbers live on auth.users, not influencer_profiles. Bulk-fetch
+  // and build an id→phone map so we can render the column without an
+  // N+1. Same pattern the admins page uses for auth status.
+  const phoneMap = new Map<string, string>();
+  if (influencers && influencers.length > 0) {
+    try {
+      const { data: list } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      for (const u of list?.users || []) {
+        if (u.phone) phoneMap.set(u.id, u.phone);
+      }
+    } catch {
+      // Non-fatal — column just shows "—" if we can't reach the auth API.
+    }
+  }
+
   // Fetch pending invitations — paginated. `count: exact` gives the
   // total so paging stays correct after filtering.
   const inviteFrom = (invitePage - 1) * INVITES_PER_PAGE;
@@ -85,6 +100,7 @@ export default async function InfluencersPage({
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Name</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Username</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Contact Number</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Followers</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Categories</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Status</th>
@@ -92,8 +108,8 @@ export default async function InfluencersPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {influencers && influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} />) : (
-                  <tr><td colSpan={6} className="px-6 py-16 text-center text-sm text-gray-400 dark:text-gray-500">No registered influencers found</td></tr>
+                {influencers && influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />) : (
+                  <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-400 dark:text-gray-500">No registered influencers found</td></tr>
                 )}
               </tbody>
             </table>
