@@ -15,6 +15,7 @@ const mainNav: NavSpec[] = [
   { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
   { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
   { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
+  { label: "Refer & Earn", href: "/dashboard/referrals", icon: "sparkles", badgeKey: "referralReviews" },
   { label: "Services", href: "/dashboard/services", icon: "sparkles" },
   { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
   { label: "Leads", href: "/dashboard/leads", icon: "phone" },
@@ -163,7 +164,7 @@ export function Sidebar({
     const fetchBadges = async () => {
       try {
         const supabase = createClient();
-        const [quoteRes, disputeRes, payoutRes] = await Promise.all([
+        const [quoteRes, disputeRes, payoutRes, reviewRes] = await Promise.all([
           supabase
             .from("service_orders")
             .select("*", { count: "exact", head: true })
@@ -176,6 +177,10 @@ export function Sidebar({
             .from("campaign_applications")
             .select("*", { count: "exact", head: true })
             .in("payout_status", ["scheduled", "pending_creator_info"]),
+          supabase
+            .from("referrals")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "MANUAL_REVIEW"),
         ]);
         if (!cancelled) {
           setBadges((prev) => ({
@@ -183,6 +188,7 @@ export function Sidebar({
             pendingQuotes: quoteRes.count ?? 0,
             openDisputes: disputeRes.count ?? 0,
             pendingPayouts: payoutRes.count ?? 0,
+            referralReviews: reviewRes.count ?? 0,
           }));
         }
       } catch {
