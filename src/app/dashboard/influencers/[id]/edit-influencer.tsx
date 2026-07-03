@@ -161,6 +161,14 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
                 <option value="mega">Mega</option>
               </select>
             </div>
+            <div>
+              <label className={labelClass}>Profile Type</label>
+              <select name="creator_type" defaultValue={influencer.creator_type || ""} className={inputClass}>
+                <option value="">Not classified</option>
+                <option value="meme_page">Meme page</option>
+                <option value="celebrity">Celebrity</option>
+              </select>
+            </div>
           </div>
 
           <div>

@@ -290,6 +290,20 @@ export function InviteInfluencerForm() {
               </div>
             </div>
 
+            {/* Row 2.5: Profile Type (optional) — segments the brand-side
+                 discover page into meme pages vs celebrities. Leave blank
+                 for regular creators. */}
+            <div>
+              <label className={labelClass}>
+                Profile Type <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <select name="creator_type" defaultValue="" className={`${inputClass} appearance-none`}>
+                <option value="">— Not classified —</option>
+                <option value="meme_page">Meme page</option>
+                <option value="celebrity">Celebrity</option>
+              </select>
+            </div>
+
             {/* Row 3: Categories + Languages */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <MultiSelectChips label="Categories" options={CATEGORIES} selected={selectedCategories} onChange={setSelectedCategories} />

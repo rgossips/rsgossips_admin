@@ -7,23 +7,49 @@ import { createClient } from "@/utils/supabase/client";
 import { useRole } from "@/components/role-context";
 
 type NavSpec = { label: string; href: string; icon: string; badgeKey?: string };
+type NavGroup = { title?: string; items: NavSpec[] };
 
-const mainNav: NavSpec[] = [
-  { label: "Dashboard", href: "/dashboard", icon: "grid" },
-  { label: "Influencers", href: "/dashboard/influencers", icon: "users" },
-  { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
-  { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
-  { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
-  { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
-  { label: "Refer & Earn", href: "/dashboard/referrals", icon: "sparkles", badgeKey: "referralReviews" },
-  { label: "Services", href: "/dashboard/services", icon: "sparkles" },
-  { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
-  { label: "Leads", href: "/dashboard/leads", icon: "phone" },
-  { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
-  { label: "Creator Stories", href: "/dashboard/creator-stories", icon: "video" },
-  { label: "Featured Campaigns", href: "/dashboard/featured-campaigns", icon: "flame" },
-  { label: "Plan Your Stay", href: "/dashboard/featured-stay", icon: "flame" },
-  { label: "Featured Brands", href: "/dashboard/featured-brands", icon: "tag" },
+// Sidebar navigation, grouped so influencer- and brand-related items
+// no longer sit side-by-side with each other and with operations.
+// Ordering per group is "primary entity → its featured/curated surfaces".
+const navGroups: NavGroup[] = [
+  {
+    // Top strip — everything cross-cutting sits under a "Overview" heading
+    // rather than crowding the influencer/brand groups below.
+    title: "Overview",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: "grid" },
+    ],
+  },
+  {
+    title: "Influencers",
+    items: [
+      { label: "Influencers", href: "/dashboard/influencers", icon: "users" },
+      { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
+      { label: "Creator Stories", href: "/dashboard/creator-stories", icon: "video" },
+      { label: "Refer & Earn", href: "/dashboard/referrals", icon: "sparkles", badgeKey: "referralReviews" },
+    ],
+  },
+  {
+    title: "Brands",
+    items: [
+      { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
+      { label: "Featured Brands", href: "/dashboard/featured-brands", icon: "tag" },
+      { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
+      { label: "Featured Campaigns", href: "/dashboard/featured-campaigns", icon: "flame" },
+      { label: "Plan Your Stay", href: "/dashboard/featured-stay", icon: "flame" },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
+      { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
+      { label: "Services", href: "/dashboard/services", icon: "sparkles" },
+      { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
+      { label: "Leads", href: "/dashboard/leads", icon: "phone" },
+    ],
+  },
 ];
 
 const adminNav: NavSpec[] = [

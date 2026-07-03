@@ -122,7 +122,7 @@ export async function updateInfluencer(influencerId: string, formData: FormData)
   if (gate) return gate;
 
   const updates: Record<string, unknown> = {};
-  const fields = ["full_name", "username", "instagram_handle", "email", "bio", "city_id", "location", "status", "verification_status", "tier", "gender", "date_of_birth", "profile_photo_url"];
+  const fields = ["full_name", "username", "instagram_handle", "email", "bio", "city_id", "location", "status", "verification_status", "tier", "gender", "date_of_birth", "profile_photo_url", "creator_type"];
   for (const f of fields) {
     const v = formData.get(f);
     if (v !== null) updates[f] = (v as string) || null;
@@ -174,6 +174,11 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
   const categories = formData.getAll("categories") as string[];
   const languages = formData.getAll("languages") as string[];
   const tags = formData.getAll("tags") as string[];
+  // Profile Type — optional; stored in the invitation notes metadata so it
+  // rides across to the influencer_profiles row on claim (create-profile
+  // reads notes.creator_type when converting an invitation to a profile).
+  const rawCreatorType = (formData.get("creator_type") as string) || "";
+  const creatorType = rawCreatorType === "meme_page" || rawCreatorType === "celebrity" ? rawCreatorType : "";
 
   if (!fullName) return { error: "Name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
@@ -187,6 +192,7 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
   if (categories.length > 0) metadata.categories = categories;
   if (languages.length > 0) metadata.languages = languages;
   if (tags.length > 0) metadata.tags = tags;
+  if (creatorType) metadata.creator_type = creatorType;
 
   let notes = notesText;
   if (Object.keys(metadata).length > 0) {
