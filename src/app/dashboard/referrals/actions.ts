@@ -104,10 +104,24 @@ export async function resolveManualReview(
   if (gate) return gate;
 
   const admin = createAdminClient();
+
+  // Resolve acting admin id for the review audit trail. Non-fatal if
+  // lookup fails — the row still transitions, just without a reviewer id.
+  let reviewerId: string | null = null;
+  try {
+    const { data: { user } } = await admin.auth.getUser();
+    reviewerId = user?.id ?? null;
+  } catch { /* leave null */ }
+
   if (decision === "reject") {
     const { error } = await admin
       .from("referrals")
-      .update({ status: "REVERSED", reversed_at: new Date().toISOString() })
+      .update({
+        status: "REVERSED",
+        reversed_at: new Date().toISOString(),
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: reviewerId,
+      })
       .eq("id", referralId)
       .eq("status", "MANUAL_REVIEW");
     if (error) return { error: error.message };
@@ -141,6 +155,8 @@ export async function resolveManualReview(
       status: "REWARDED",
       rewarded_at: new Date().toISOString(),
       referrer_reward_rc: rc,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: reviewerId,
     })
     .eq("id", referralId)
     .eq("status", "MANUAL_REVIEW");
@@ -155,6 +171,21 @@ export async function resolveManualReview(
     expires_at: expiresAt,
     note: "Manual review approved by admin",
   });
+
+  // Fire the "you earned RC" notification the webhook would have sent
+  // if this had qualified naturally. Best-effort — never block approval.
+  try {
+    await admin.from("notifications").insert({
+      user_id: row.referrer_id,
+      type: "referral_earned",
+      title: `You earned ${rc} RC!`,
+      body: JSON.stringify({
+        text: `Your referral just cleared review. ${rc} RC has landed in your wallet.`,
+        link: "/influencer/refer",
+      }),
+      is_read: false,
+    });
+  } catch { /* non-fatal */ }
 
   revalidatePath("/dashboard/referrals");
   return { ok: true };

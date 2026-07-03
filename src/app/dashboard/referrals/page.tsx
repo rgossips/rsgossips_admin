@@ -15,6 +15,14 @@ const STATUS_PILL: Record<string, { label: string; class: string }> = {
   MANUAL_REVIEW: { label: "Under review", class: "bg-orange-50 text-orange-700" },
 };
 
+// Human-readable strings for the anti-fraud flags attribute-referral
+// writes into review_reason. Unknown reasons render verbatim.
+const REVIEW_REASON_LABEL: Record<string, string> = {
+  duplicate_device_fp: "Same device as another signup under this referrer",
+  duplicate_signup_ip: "≥3 signups from this IP under this referrer",
+  daily_cap_hit: "Referrer hit the 5/day qualifying cap",
+};
+
 const FILTERS = [
   { id: "review", label: "Manual review" },
   { id: "rewarded", label: "Rewarded" },
@@ -45,7 +53,7 @@ export default async function ReferralsPage({
 
   let q = admin
     .from("referrals")
-    .select("id, referrer_id, referee_id, referral_code, status, referee_first_plan, referrer_reward_rc, created_at, qualified_at, rewarded_at")
+    .select("id, referrer_id, referee_id, referral_code, status, referee_first_plan, referrer_reward_rc, created_at, qualified_at, rewarded_at, review_reason, signup_ip, device_fingerprint, reviewed_at")
     .order("created_at", { ascending: false })
     .limit(100);
   if (filter === "review") q = q.eq("status", "MANUAL_REVIEW");
@@ -204,6 +212,21 @@ export default async function ReferralsPage({
                       </>
                     )}
                   </div>
+
+                  {r.status === "MANUAL_REVIEW" && (r.review_reason || r.signup_ip || r.device_fingerprint) && (
+                    <div className="col-span-12 mt-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/40 px-3 py-2 space-y-1">
+                      {r.review_reason && (
+                        <p className="text-[11px] text-orange-800 dark:text-orange-300">
+                          <span className="font-black uppercase tracking-wider">Flag:</span>{" "}
+                          {REVIEW_REASON_LABEL[r.review_reason] || r.review_reason}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-4 text-[11px] text-orange-700 dark:text-orange-400 font-mono">
+                        {r.signup_ip && <span>IP: {r.signup_ip}</span>}
+                        {r.device_fingerprint && <span>Device: {r.device_fingerprint}</span>}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
