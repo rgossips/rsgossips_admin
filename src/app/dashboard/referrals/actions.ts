@@ -187,6 +187,31 @@ export async function resolveManualReview(
     });
   } catch { /* non-fatal */ }
 
+  // Same event → also fire the branded email so the referrer hears the
+  // approval outcome on both channels. Silent if they have no email on
+  // file or if the send-email invoke errors.
+  try {
+    const { data: prof } = await admin
+      .from("influencer_profiles")
+      .select("email")
+      .eq("influencer_id", row.referrer_id)
+      .maybeSingle();
+    const to = prof?.email;
+    if (to) {
+      await admin.functions.invoke("send-email", {
+        body: {
+          to,
+          subject: `You earned ${rc} RC on RGossips`,
+          html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;padding:24px">
+            <h2 style="margin:0 0 10px">+${rc} RC just landed in your wallet</h2>
+            <p style="color:#475569;line-height:1.6">Your referral has cleared review and <strong>${rc} RC</strong> has been credited. Spend up to 50% of any plan price at your next renewal.</p>
+            <p style="margin-top:20px"><a href="https://rgossips.com/influencer/refer" style="background:linear-gradient(135deg,#9810FA,#E60076);color:#fff;padding:12px 22px;border-radius:12px;text-decoration:none;font-weight:700">Open your wallet</a></p>
+          </div>`,
+        },
+      });
+    }
+  } catch { /* non-fatal */ }
+
   revalidatePath("/dashboard/referrals");
   return { ok: true };
 }

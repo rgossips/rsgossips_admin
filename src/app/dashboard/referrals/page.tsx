@@ -92,6 +92,48 @@ export default async function ReferralsPage({
     review: statuses.filter((s) => s === "MANUAL_REVIEW").length,
   };
 
+  // Funnel + spend analytics — six numbers that tell you whether the
+  // program is working. Everything runs off the same referrals + ledger
+  // tables so it stays consistent with the queue below.
+  const signed = statuses.filter(
+    (s) => s === "SIGNED_UP" || s === "QUALIFIED" || s === "REWARDED" || s === "MANUAL_REVIEW",
+  ).length;
+  const rewardedCount = counts.rewarded;
+  const reversedCount = statuses.filter((s) => s === "REVERSED").length;
+  const conversionPct = signed > 0 ? Math.round((rewardedCount / signed) * 100) : 0;
+  const clawbackPct = rewardedCount + reversedCount > 0
+    ? Math.round((reversedCount / (rewardedCount + reversedCount)) * 100)
+    : 0;
+
+  // RC lifetime totals — earned, redeemed, expired, clawed back, admin-
+  // adjusted. Used together they show "how much program cost we've
+  // realised" vs "what's still sitting in wallets waiting to be spent".
+  const { data: ledgerRows } = await admin
+    .from("reward_credits_ledger")
+    .select("delta_rc, reason");
+  const ledgerSums = {
+    earned: 0,
+    welcome: 0,
+    redeemed: 0,
+    clawback: 0,
+    expired: 0,
+    admin: 0,
+  };
+  (ledgerRows || []).forEach((r: any) => {
+    const d = r.delta_rc || 0;
+    switch (r.reason) {
+      case "REFERRAL_EARN": ledgerSums.earned += d; break;
+      case "WELCOME_BONUS": ledgerSums.welcome += d; break;
+      case "REDEMPTION": ledgerSums.redeemed += -d; break;
+      case "CLAWBACK": ledgerSums.clawback += -d; break;
+      case "EXPIRY": ledgerSums.expired += -d; break;
+      case "ADMIN_ADJUSTMENT": ledgerSums.admin += d; break;
+    }
+  });
+  const rcOutstanding =
+    ledgerSums.earned + ledgerSums.welcome + ledgerSums.admin
+    - ledgerSums.redeemed - ledgerSums.clawback - ledgerSums.expired;
+
   return (
     <div className="space-y-6">
       <div>
@@ -106,6 +148,28 @@ export default async function ReferralsPage({
         <StatPill label="Rewarded" value={counts.rewarded} accent="text-emerald-600" />
         <StatPill label="In-flight" value={counts.signed_up} accent="text-blue-600" />
         <StatPill label="Under review" value={counts.review} accent="text-orange-600" />
+      </div>
+
+      {/* Funnel — signup → rewarded conversion and 7d clawback rate. If
+          conversion drops or clawback climbs, the program's health is
+          suffering and it's worth investigating. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatPill label="Signup → rewarded" value={`${conversionPct}%`} accent="text-indigo-600" />
+        <StatPill label="Clawback rate" value={`${clawbackPct}%`} accent={clawbackPct >= 10 ? "text-rose-600" : "text-slate-700"} />
+        <StatPill label="Reversed (all-time)" value={reversedCount} accent="text-rose-600" />
+        <StatPill label="Signups (all-time)" value={signed} />
+      </div>
+
+      {/* RC cost lens — what's been given, what's been spent, what's
+          still outstanding on wallets. Outstanding is what we'd owe if
+          every user redeemed today. */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <StatPill label="RC earned (referrals)" value={ledgerSums.earned} accent="text-emerald-600" />
+        <StatPill label="RC granted (welcome)" value={ledgerSums.welcome} accent="text-emerald-600" />
+        <StatPill label="RC granted (admin)" value={ledgerSums.admin} accent="text-emerald-600" />
+        <StatPill label="RC redeemed" value={ledgerSums.redeemed} accent="text-blue-600" />
+        <StatPill label="RC clawed back" value={ledgerSums.clawback} accent="text-rose-600" />
+        <StatPill label="RC outstanding" value={rcOutstanding} accent="text-slate-900 dark:text-white" />
       </div>
 
       <AdjustRcForm canWrite={canWrite} />
@@ -237,7 +301,7 @@ export default async function ReferralsPage({
   );
 }
 
-function StatPill({ label, value, accent }: { label: string; value: number; accent?: string }) {
+function StatPill({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
       <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
