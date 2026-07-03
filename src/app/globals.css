@@ -6,3 +6,49 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* ── Theme-aware scrollbars ─────────────────────────────────────────────
+ * Firefox uses the CSS `scrollbar-color` / `scrollbar-width` properties,
+ * WebKit / Blink use `::-webkit-scrollbar-*` pseudo-elements. Setting
+ * `color-scheme` on the root also lets native form controls (and native
+ * scrollbar chrome on Windows / macOS) pick up the right palette.
+ *
+ * Dark-mode overrides key off `.dark` on <html>, which the ThemeProvider
+ * toggles (see components/theme-provider.tsx).
+ */
+:root {
+  color-scheme: light;
+  scrollbar-color: rgb(203 213 225) transparent; /* thumb, track — slate-300 */
+  scrollbar-width: thin;
+}
+
+:root.dark {
+  color-scheme: dark;
+  scrollbar-color: rgb(55 65 81) transparent; /* thumb — gray-700 */
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225); /* slate-300 */
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184); /* slate-400 */
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(55 65 81); /* gray-700 */
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(75 85 99); /* gray-600 */
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

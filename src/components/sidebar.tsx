@@ -284,23 +284,29 @@ export function Sidebar({
 
         {/* Navigation */}
         <nav className="flex-1 px-4 pt-4 overflow-y-auto">
-          <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
-            Navigation
-          </p>
-          <div className="space-y-0.5">
-            {mainNav.map((item) => (
-              <NavItem
-                key={item.href}
-                item={item}
-                isActive={isActive(item.href)}
-                badge={item.badgeKey ? badges[item.badgeKey] : undefined}
-              />
-            ))}
-          </div>
+          {navGroups.map((group, gi) => (
+            <div key={group.title || `group-${gi}`} className={gi > 0 ? "mt-5" : ""}>
+              {group.title && (
+                <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
+                  {group.title}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    item={item}
+                    isActive={isActive(item.href)}
+                    badge={item.badgeKey ? badges[item.badgeKey] : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
 
           {isSuperAdmin && (
-            <>
-              <p className="px-3 mt-6 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
+            <div className="mt-5">
+              <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
                 Admin Panel
               </p>
               <div className="space-y-0.5">
@@ -308,7 +314,7 @@ export function Sidebar({
                   <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
                 ))}
               </div>
-            </>
+            </div>
           )}
         </nav>
 
