@@ -246,6 +246,9 @@ export async function updateInfluencerInvitation(invitationId: string, formData:
   const categoriesCsv = (formData.get("categories_csv") as string || "").split(",").map(c => c.trim()).filter(Boolean);
   const languagesCsv = (formData.get("languages_csv") as string || "").split(",").map(l => l.trim()).filter(Boolean);
   const tagsCsv = (formData.get("tags_csv") as string || "").split(",").map(t => t.trim()).filter(Boolean);
+  // Same allowlist as inviteInfluencer — empty string clears the classification.
+  const rawCreatorType = (formData.get("creator_type") as string) || "";
+  const creatorType = rawCreatorType === "meme_page" || rawCreatorType === "celebrity" ? rawCreatorType : "";
 
   if (!fullName) return { error: "Name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
@@ -256,6 +259,7 @@ export async function updateInfluencerInvitation(invitationId: string, formData:
   if (categoriesCsv.length > 0) metadata.categories = categoriesCsv;
   if (languagesCsv.length > 0) metadata.languages = languagesCsv;
   if (tagsCsv.length > 0) metadata.tags = tagsCsv;
+  if (creatorType) metadata.creator_type = creatorType;
 
   let notes = notesText;
   if (Object.keys(metadata).length > 0) {

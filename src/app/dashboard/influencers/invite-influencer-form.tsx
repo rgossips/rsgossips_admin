@@ -15,8 +15,9 @@ const inputClass =
   "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
 const labelClass = "block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
 
-function MultiSelectChips({ label, options, selected, onChange }: { label: string; options: string[]; selected: string[]; onChange: (v: string[]) => void }) {
+function MultiSelectChips({ label, options, selected, onChange, required }: { label: string; options: string[]; selected: string[]; onChange: (v: string[]) => void; required?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -26,10 +27,16 @@ function MultiSelectChips({ label, options, selected, onChange }: { label: strin
     return () => document.removeEventListener("mousedown", h);
   }, []);
   const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+  // Search box appears whenever options > 20 — meaning Categories +
+  // Locations get it, Languages doesn't (12 entries). Case-insensitive
+  // substring; kept simple so Location's 500+ list doesn't need a
+  // fuzzy matcher.
+  const q = search.trim().toLowerCase();
+  const filtered = q ? options.filter((o) => o.toLowerCase().includes(q)) : options;
 
   return (
     <div ref={ref} className="relative">
-      <label className={labelClass}>{label}</label>
+      <label className={labelClass}>{label}{required && <span className="text-red-400 ml-1">*</span>}</label>
       <button type="button" onClick={() => setOpen(!open)} className={`${inputClass} text-left flex items-center justify-between cursor-pointer`}>
         <span className={selected.length > 0 ? "text-gray-900 dark:text-white" : "text-gray-400"}>{selected.length > 0 ? `${selected.length} selected` : `Select ${label.toLowerCase()}`}</span>
         <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,13 +56,31 @@ function MultiSelectChips({ label, options, selected, onChange }: { label: strin
         </div>
       )}
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg py-1">
-          {options.map((opt) => (
-            <label key={opt} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
-              <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500" />
-              {opt}
-            </label>
-          ))}
+        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
+          {options.length > 20 && (
+            <div className="p-2 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`Search ${label.toLowerCase()}...`}
+                className="w-full px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-indigo-400"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+          <div className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <p className="text-center text-[12px] text-gray-400 py-6">No matches for &quot;{search}&quot;</p>
+            ) : (
+              filtered.map((opt) => (
+                <label key={opt} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500" />
+                  {opt}
+                </label>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -113,6 +138,10 @@ export function InviteInfluencerForm() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  // City is now a multiselect but persists as a comma-joined string on
+  // metadata.city so downstream fuzzy match ("Mumbai, Pune" → matches
+  // both Mumbai and Pune) doesn't need any schema change.
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -146,6 +175,9 @@ export function InviteInfluencerForm() {
       }
       selectedCategories.forEach((c) => formData.append("categories", c));
       selectedLanguages.forEach((l) => formData.append("languages", l));
+      // Cities join into one field for the server (single "city"
+      // metadata field, downstream fuzzy matcher unchanged).
+      if (selectedCities.length > 0) formData.set("city", selectedCities.join(", "));
       tags.forEach((t) => formData.append("tags", t));
 
       setLoadingMsg("Creating invitation...");
@@ -159,6 +191,7 @@ export function InviteInfluencerForm() {
         setPhotoPreview(null);
         setSelectedCategories([]);
         setSelectedLanguages([]);
+        setSelectedCities([]);
         setTags([]);
       }
     } catch (e) {
@@ -174,6 +207,7 @@ export function InviteInfluencerForm() {
     setPhotoPreview(null);
     setSelectedCategories([]);
     setSelectedLanguages([]);
+    setSelectedCities([]);
     setTags([]);
   };
 
@@ -260,19 +294,13 @@ export function InviteInfluencerForm() {
             {/* Row 2: City + Gender */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>
-                  City <span className="text-red-400">*</span>
-                </label>
-                <select name="city" required defaultValue="" className={`${inputClass} appearance-none`}>
-                  <option value="" disabled>
-                    Select a city
-                  </option>
-                  {INDIAN_CITIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                <MultiSelectChips
+                  label="City"
+                  options={INDIAN_CITIES}
+                  selected={selectedCities}
+                  onChange={setSelectedCities}
+                  required
+                />
               </div>
               <div>
                 <label className={labelClass}>

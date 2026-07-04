@@ -7,6 +7,7 @@ import { deleteInfluencerInvitation, updateInfluencerInvitation } from "./action
 import { sendInfluencerInvitationEmail } from "./invitation-email-actions";
 import { Avatar } from "@/components/avatar";
 import { INDIAN_CITIES } from "@/lib/cities";
+import { MultiSelectChips } from "@/components/multi-select-chips";
 import { useRole } from "@/components/role-context";
 import { SendInviteEmailModal } from "@/components/send-invite-email-modal";
 
@@ -121,9 +122,18 @@ function EditInfluencerInviteModal({ invitation, text, meta, onClose }: { invita
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // City is now a multiselect; comma-joined into the "city" form field
+  // on submit so the server action (which reads formData.get("city"))
+  // sees a single scalar string exactly like the invite form.
+  const [selectedCities, setSelectedCities] = useState<string[]>(
+    typeof meta?.city === "string" && meta.city
+      ? meta.city.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : [],
+  );
 
   const handleSubmit = async (formData: FormData) => {
     setError(""); setLoading(true);
+    formData.set("city", selectedCities.join(", "));
     const result = await updateInfluencerInvitation(invitation.id, formData);
     if (result.error) { setError(result.error); setLoading(false); }
     else { router.refresh(); onClose(); }
@@ -153,11 +163,12 @@ function EditInfluencerInviteModal({ invitation, text, meta, onClose }: { invita
           </div>
           <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">City</label>
-                <select name="city" defaultValue={meta?.city || ""} className={`${inputClass} appearance-none`}>
-                  <option value="">Select a city</option>
-                  {INDIAN_CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <MultiSelectChips
+                  label="City"
+                  options={INDIAN_CITIES}
+                  selected={selectedCities}
+                  onChange={setSelectedCities}
+                />
               </div>
               <div>
                 <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Gender</label>
@@ -169,6 +180,20 @@ function EditInfluencerInviteModal({ invitation, text, meta, onClose }: { invita
                   <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
               </div>
+          </div>
+          <div>
+            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Profile Type <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <select
+              name="creator_type"
+              defaultValue={meta?.creator_type || ""}
+              className={`${inputClass} appearance-none`}
+            >
+              <option value="">— Not classified —</option>
+              <option value="meme_page">Meme page</option>
+              <option value="celebrity">Celebrity</option>
+            </select>
           </div>
           <div>
             <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Categories <span className="text-gray-400 font-normal">(comma-separated)</span></label>
