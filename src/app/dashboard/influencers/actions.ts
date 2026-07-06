@@ -175,8 +175,10 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
   const languages = formData.getAll("languages") as string[];
   const tags = formData.getAll("tags") as string[];
   // Profile Type — optional; stored in the invitation notes metadata so it
-  // rides across to the influencer_profiles row on claim (create-profile
-  // reads notes.creator_type when converting an invitation to a profile).
+  // rides across to the influencer_profiles row on claim. The RS_Gossips
+  // create-profile edge function reads notes.creator_type (+ categories,
+  // gender, city) and copies them onto the profile columns — keep the key
+  // names aligned with that function or the classification silently drops.
   const rawCreatorType = (formData.get("creator_type") as string) || "";
   const creatorType = rawCreatorType === "meme_page" || rawCreatorType === "celebrity" ? rawCreatorType : "";
 
@@ -253,20 +255,45 @@ export async function updateInfluencerInvitation(invitationId: string, formData:
   if (!fullName) return { error: "Name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
 
-  const metadata: Record<string, unknown> = {};
-  if (city) metadata.city = city;
-  if (gender) metadata.gender = gender;
-  if (categoriesCsv.length > 0) metadata.categories = categoriesCsv;
-  if (languagesCsv.length > 0) metadata.languages = languagesCsv;
-  if (tagsCsv.length > 0) metadata.tags = tagsCsv;
-  if (creatorType) metadata.creator_type = creatorType;
+  const adminClient = createAdminClient();
+
+  // Read-merge-write the notes trailer. The edit form only knows about a
+  // fixed set of keys (city, gender, categories, languages, tags,
+  // creator_type); other keys — e.g. `followers`/`bio` written by the
+  // RS_Gossips enrichment script and read by the featured-creators /
+  // creator-stories pickers — must survive an edit. So we start from the
+  // existing metadata and only mutate the keys this form owns.
+  const { data: existing } = await adminClient
+    .from("influencer_invitations")
+    .select("notes")
+    .eq("id", invitationId)
+    .maybeSingle();
+
+  let metadata: Record<string, unknown> = {};
+  if (existing?.notes) {
+    const sep = existing.notes.indexOf("\n---\n");
+    const jsonStr = sep !== -1 ? existing.notes.slice(sep + 5) : (existing.notes.startsWith("{") ? existing.notes : "");
+    if (jsonStr) { try { metadata = JSON.parse(jsonStr) || {}; } catch { metadata = {}; } }
+  }
+
+  // Form-owned keys: set when present, delete when cleared — so the admin
+  // can remove a value, but keys the form doesn't manage are untouched.
+  const setOrDelete = (key: string, value: unknown, keep: boolean) => {
+    if (keep) metadata[key] = value;
+    else delete metadata[key];
+  };
+  setOrDelete("city", city, !!city);
+  setOrDelete("gender", gender, !!gender);
+  setOrDelete("categories", categoriesCsv, categoriesCsv.length > 0);
+  setOrDelete("languages", languagesCsv, languagesCsv.length > 0);
+  setOrDelete("tags", tagsCsv, tagsCsv.length > 0);
+  setOrDelete("creator_type", creatorType, !!creatorType);
 
   let notes = notesText;
   if (Object.keys(metadata).length > 0) {
     notes = notes ? `${notes}\n---\n${JSON.stringify(metadata)}` : JSON.stringify(metadata);
   }
 
-  const adminClient = createAdminClient();
   const { error } = await adminClient.from("influencer_invitations").update({
     full_name: fullName,
     instagram_username: instagramUsername,
@@ -304,7 +331,11 @@ export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
     const rowNum = i + 2;
     const fullName = (row.full_name || "").toString().trim();
     const ig = (row.instagram_username || "").toString().replace(/^@/, "").trim();
-    const city = (row.city || "").toString().trim();
+    // City may hold multiple values separated by ',' or ';' (same
+    // convention as categories/languages). Normalize to the canonical
+    // comma-joined string the edit modals parse, so "Mumbai; Pune" isn't
+    // stored as one unsplittable token.
+    const city = (row.city || "").toString().split(/[,;]/).map((s) => s.trim()).filter(Boolean).join(", ");
     const gender = (row.gender || "").toString().trim().toLowerCase();
 
     if (!fullName) { results.failed.push({ row: rowNum, reason: "Name is required", data: row }); continue; }

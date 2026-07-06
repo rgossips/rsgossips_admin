@@ -4,6 +4,12 @@
 // — any edit here should mirror there (and vice-versa) so an
 // invitation created here validates against the same list a creator
 // sees on the influencer profile page.
+//
+// NOTE: some entries are deliberate spelling aliases kept for
+// backward-compat with values already stored under the older, shorter
+// list — e.g. "Hubli" alongside "Hubli-Dharwad", "Tiruchirappalli"
+// alongside "Tiruchirapalli", plus "Goa" / "Gulbarga". Don't "dedupe"
+// these away or previously-saved rows stop matching any option.
 
 export const INDIAN_CITIES: string[] = [
   "Abohar",
@@ -207,6 +213,7 @@ export const INDIAN_CITIES: string[] = [
   "Ghaziabad",
   "Ghazipur",
   "Giridih",
+  "Goa",
   "Godhra",
   "Gokak",
   "Golaghat",
@@ -214,6 +221,7 @@ export const INDIAN_CITIES: string[] = [
   "Gondia",
   "Gorakhpur",
   "Greater Noida",
+  "Gulbarga",
   "Guna",
   "Guntakal",
   "Guntur",
@@ -243,6 +251,7 @@ export const INDIAN_CITIES: string[] = [
   "Hoshiarpur",
   "Hospet",
   "Howrah",
+  "Hubli",
   "Hubli-Dharwad",
   "Hugli-Chinsurah",
   "Hyderabad",
@@ -581,6 +590,7 @@ export const INDIAN_CITIES: string[] = [
   "Tinsukia",
   "Tiruchendur",
   "Tiruchirapalli",
+  "Tiruchirappalli",
   "Tirunelveli",
   "Tirupati",
   "Tiruppur",
@@ -623,3 +633,25 @@ export const INDIAN_CITIES: string[] = [
   "Yemmiganur",
   "Zirakpur",
 ];
+
+// Case-insensitive lookup from a lowercased city name to its canonical
+// casing. Built once at module load.
+const CITY_BY_LOWER = new Map(INDIAN_CITIES.map((c) => [c.toLowerCase(), c]));
+
+// Parse a stored city/location string (comma-joined) into an array of
+// KNOWN canonical cities. This is the single owner of the split/normalize
+// contract shared by the influencer forms — it drops tokens that aren't
+// real cities (e.g. legacy free-text "Mumbai, India" → ["Mumbai"], since
+// "India" is a country not a city) and normalizes casing so a saved
+// "mumbai" round-trips as "Mumbai". Use for prefilling MultiSelectChips.
+export function parseStoredCities(raw: string | null | undefined): string[] {
+  if (!raw || typeof raw !== "string") return [];
+  const out: string[] = [];
+  for (const token of raw.split(",")) {
+    const t = token.trim();
+    if (!t) continue;
+    const canonical = CITY_BY_LOWER.get(t.toLowerCase());
+    if (canonical && !out.includes(canonical)) out.push(canonical);
+  }
+  return out;
+}

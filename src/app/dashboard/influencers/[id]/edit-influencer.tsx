@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateInfluencer, uploadInfluencerPhoto } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { MultiSelectChips } from "@/components/multi-select-chips";
-import { INDIAN_CITIES } from "@/lib/cities";
+import { INDIAN_CITIES, parseStoredCities } from "@/lib/cities";
 
 const inputClass = "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
 const labelClass = "block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
@@ -36,14 +36,13 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
   const [photoPreview, setPhotoPreview] = useState<string>(influencer.profile_photo_url || "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Location is a scalar text column on influencer_profiles but
-  // rendered as a multiselect. Split on load, comma-join on save so
-  // downstream fuzzy match stays unchanged. Empty string means the
-  // influencer never set one.
+  // Location is a scalar text column on influencer_profiles but rendered
+  // as a multiselect. parseStoredCities keeps only tokens that are real
+  // cities, so legacy free-text like "Mumbai, India" loads as ["Mumbai"]
+  // (dropping the "India" token) instead of turning a country into an
+  // unremovable phantom chip. Comma-join on save keeps the DB scalar valid.
   const [selectedCities, setSelectedCities] = useState<string[]>(
-    typeof influencer.location === "string" && influencer.location
-      ? influencer.location.split(",").map((s: string) => s.trim()).filter(Boolean)
-      : [],
+    parseStoredCities(influencer.location),
   );
 
   const handlePhotoSelect = (files: FileList | null) => {
@@ -64,9 +63,9 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
       if (uploadResult.error) { setError(uploadResult.error); setLoading(false); return; }
       if (uploadResult.url) formData.append("profile_photo_url", uploadResult.url);
     }
-    // Overwrite whatever's in the hidden input with the current
-    // multiselect state — joined so the DB scalar column stays valid
-    // and the downstream fuzzy match still finds each city.
+    // MultiSelectChips renders no form field, so this is the only thing
+    // that puts location on the payload — comma-joined so the DB scalar
+    // column stays valid and the downstream matcher finds each city.
     formData.set("location", selectedCities.join(", "));
     const result = await updateInfluencer(influencer.influencer_id, formData);
     if (result.error) {

@@ -6,7 +6,7 @@ import { ButtonSpinner } from "@/components/spinner";
 import { deleteInfluencerInvitation, updateInfluencerInvitation } from "./actions";
 import { sendInfluencerInvitationEmail } from "./invitation-email-actions";
 import { Avatar } from "@/components/avatar";
-import { INDIAN_CITIES } from "@/lib/cities";
+import { INDIAN_CITIES, parseStoredCities } from "@/lib/cities";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { useRole } from "@/components/role-context";
 import { SendInviteEmailModal } from "@/components/send-invite-email-modal";
@@ -125,10 +125,9 @@ function EditInfluencerInviteModal({ invitation, text, meta, onClose }: { invita
   // City is now a multiselect; comma-joined into the "city" form field
   // on submit so the server action (which reads formData.get("city"))
   // sees a single scalar string exactly like the invite form.
+  // parseStoredCities keeps only known cities (shared parse owner).
   const [selectedCities, setSelectedCities] = useState<string[]>(
-    typeof meta?.city === "string" && meta.city
-      ? meta.city.split(",").map((s: string) => s.trim()).filter(Boolean)
-      : [],
+    parseStoredCities(typeof meta?.city === "string" ? meta.city : ""),
   );
 
   const handleSubmit = async (formData: FormData) => {

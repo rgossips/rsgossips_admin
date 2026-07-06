@@ -81,6 +81,17 @@ Destructive flows split into ordered steps so admins see per-step progress:
 
 Creators sign in by phone. `phone` lives on `auth.users`, **not** on `influencer_profiles`. Fetch via `admin.auth.admin.getUserById(id)` for details or bulk via `admin.auth.admin.listUsers({ page: 1, perPage: 1000 })` for list views. See [influencers/page.tsx](src/app/dashboard/influencers/page.tsx) for the list pattern.
 
+### Cities / location (multi-select, comma-joined scalar)
+
+- The influencer forms (invite, edit, invited-invitation edit) render **city/location as a multiselect** ([MultiSelectChips](src/components/multi-select-chips.tsx)) but persist it as a **comma-joined scalar string** — `metadata.city` on invitations, the `location` column on `influencer_profiles`. This is deliberate: a deployed RS_Gossips edge function (`brand-campaigns`) matches by substring (`city.includes(c) || c.includes(city)`) and `list-influencers` does `.toLowerCase()` on the value, so a JSON array would break them. Do not "normalize" to a single city or an array.
+- [parseStoredCities()](src/lib/cities.ts) is the single owner of the split/normalize contract — splits on comma, keeps only known cities (case-insensitively → canonical), drops legacy free-text tokens like the country in "Mumbai, India". Use it to prefill the multiselect everywhere.
+- [cities.ts](src/lib/cities.ts) intentionally keeps spelling **aliases** (Hubli/Hubli-Dharwad, Tiruchirappalli/Tiruchirapalli, plus Goa, Gulbarga) for back-compat with values saved under the older shorter list. Kept hand-synced with the web repo's `src/utils/indianCities.js` — mirror any edit there.
+
+### Invitation → profile claim (cross-repo)
+
+- Admin-curated invitation metadata (`creator_type`, `categories`, `gender`, `city`) is packed into `influencer_invitations.notes` and only becomes real profile columns when the creator **claims** the invitation — that copy happens in the **RS_Gossips `create-profile` edge function**, not here. If you add a field to the invite/edit form that must survive claim, update that edge function too or it silently drops on signup.
+- **`updateInfluencerInvitation` must read-merge-write the notes trailer**, not rebuild it — the RS_Gossips enrichment script writes keys (`followers`, `bio`, …) the admin form doesn't know about, and the featured-creators / creator-stories pickers read `meta.followers`. A wholesale rebuild wipes them. See the merge in [influencers/actions.ts](src/app/dashboard/influencers/actions.ts).
+
 ### Email / SMTP
 
 - [src/lib/mailer.ts](src/lib/mailer.ts) invokes the Supabase Edge Function `send-email` with the service-role JWT. It does NOT talk SMTP directly.
@@ -132,6 +143,7 @@ The Supabase project also hosts the `send-email` Edge Function with SMTP secrets
 
 Newest first. Add a bullet when you land something the next session should know about (a new subsystem, a non-obvious constraint, a bug you fixed that will bite again). Delete stale entries as they're normalized into the sections above.
 
+- Influencer city/location is now a comma-joined multiselect (see "Cities / location" above). [MultiSelectChips](src/components/multi-select-chips.tsx) is the shared picker — do NOT re-add a local copy inside a form (the invite form used to carry one and it drifted). It shows a search box when `options.length > 20` and resets that search on close.
 - Sidebar was refactored from flat `mainNav` to grouped `navGroups` (Overview / Influencers / Brands / Operations). If you see a `ReferenceError: mainNav is not defined`, the render loop is out of sync with the data shape.
 - Global scrollbar styling lives in `src/app/globals.css` — `color-scheme` + Firefox `scrollbar-color` + WebKit pseudo-elements, dark overrides gated on `.dark`. No component-level scrollbar CSS needed.
 - Platform fees were removed from service quote requests. `platform_fee_amount` is still written as `0` for schema compatibility; UI copy no longer mentions a fee. If you re-introduce fees, update `sendQuote`, `acceptCounterOffer`, `QuoteResponseForm`, and the detail page summary card together.

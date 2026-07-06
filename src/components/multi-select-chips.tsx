@@ -29,9 +29,12 @@ export function MultiSelectChips({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  // Clear the search text whenever the dropdown closes so reopening never
+  // shows a stale-filtered (or "No matches") list from a prior session.
+  const close = () => { setOpen(false); setSearch(""); };
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setSearch(""); }
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -49,7 +52,7 @@ export function MultiSelectChips({
       </label>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => (open ? close() : setOpen(true))}
         className={`${inputClass} text-left flex items-center justify-between cursor-pointer`}
       >
         <span className={selected.length > 0 ? "text-gray-900 dark:text-white" : "text-gray-400"}>
