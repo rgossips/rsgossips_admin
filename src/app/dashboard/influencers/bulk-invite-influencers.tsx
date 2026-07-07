@@ -7,7 +7,7 @@ const COLUMNS = [
   { key: "full_name", label: "Full Name", required: true, example: "Priya Sharma", helper: "Required" },
   { key: "instagram_username", label: "Instagram Username", required: true, example: "priyasharma", helper: "Required (without @)" },
   { key: "city", label: "City", required: true, example: "Mumbai; Pune", helper: "Required (semicolon-separated for multiple)" },
-  { key: "gender", label: "Gender", required: true, example: "female", helper: "Required (female/male/non_binary/prefer_not_to_say)" },
+  { key: "gender", label: "Gender", example: "Female", helper: "Optional (male / female / non-binary — any other value becomes prefer_not_to_say)" },
   { key: "categories", label: "Categories", example: "Fashion & Lifestyle; Beauty & Skincare", helper: "Optional (semicolon-separated)" },
   { key: "languages", label: "Languages", example: "English; Hindi", helper: "Optional (semicolon-separated)" },
   { key: "tags", label: "Tags", example: "fitness; vegan", helper: "Optional (semicolon-separated)" },

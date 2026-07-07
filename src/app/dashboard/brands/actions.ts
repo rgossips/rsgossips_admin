@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, adminGate } from "@/lib/require-super-admin";
+import { fetchExistingHandles } from "@/lib/bulk-invite-utils";
 
 export async function updateBrandVerification(brandId: string, action: "verified" | "rejected" | "pending"): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
@@ -184,7 +185,11 @@ interface BulkBrandRow {
   notes?: string;
 }
 
-export async function bulkInviteBrands(rows: BulkBrandRow[]) {
+// One chunk of the bulk brand invite. Mirrors bulkInviteInfluencers:
+// client-chunked with a `startRow` offset, bulk existence check, batch
+// insert, and duplicates/invalid rows collected into `failed` (never
+// halting the run) so the whole file always finishes.
+export async function bulkInviteBrands(rows: BulkBrandRow[], startRow = 2) {
   let actingUserId: string;
   try { actingUserId = await requireAdmin(); }
   catch (e) {
@@ -194,25 +199,26 @@ export async function bulkInviteBrands(rows: BulkBrandRow[]) {
   const adminClient = createAdminClient();
   const results: { success: number; failed: Array<{ row: number; reason: string; data: BulkBrandRow }> } = { success: 0, failed: [] };
 
+  type Prepared = { rowNum: number; igLower: string; data: BulkBrandRow; insert: Record<string, unknown> };
+  const prepared: Prepared[] = [];
+  const seenInFile = new Set<string>();
+
+  // Pass 1 — validate + normalize in memory.
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const rowNum = i + 2;
+    const rowNum = startRow + i;
     const brandName = (row.brand_name || "").toString().trim();
     const ig = (row.instagram_username || "").toString().replace(/^@/, "").trim();
 
     if (!brandName) { results.failed.push({ row: rowNum, reason: "Brand name is required", data: row }); continue; }
     if (!ig) { results.failed.push({ row: rowNum, reason: "Instagram username is required", data: row }); continue; }
 
-    const { data: existingInvite } = await adminClient.from("brand_invitations").select("id").ilike("instagram_username", ig).limit(1);
-    if (existingInvite && existingInvite.length > 0) {
-      results.failed.push({ row: rowNum, reason: `Invitation for @${ig} already exists`, data: row });
+    const igLower = ig.toLowerCase();
+    if (seenInFile.has(igLower)) {
+      results.failed.push({ row: rowNum, reason: `Duplicate of @${ig} earlier in the file`, data: row });
       continue;
     }
-    const { data: existingProfile } = await adminClient.from("brand_profiles").select("brand_id").ilike("instagram_username", ig).limit(1);
-    if (existingProfile && existingProfile.length > 0) {
-      results.failed.push({ row: rowNum, reason: `Brand @${ig} already registered`, data: row });
-      continue;
-    }
+    seenInFile.add(igLower);
 
     const category = (row.category || "").toString().trim();
     const igVerifiedStr = (row.instagram_verified || "").toString().trim().toLowerCase();
@@ -225,19 +231,50 @@ export async function bulkInviteBrands(rows: BulkBrandRow[]) {
     const notesText = (row.notes || "").toString().trim();
     const notes = notesText ? `${notesText}\n---\n${JSON.stringify(metadata)}` : JSON.stringify(metadata);
 
-    const { error } = await adminClient.from("brand_invitations").insert({
-      brand_name: brandName,
-      instagram_username: ig,
-      logo_url: "",
-      notes,
-      created_by: actingUserId,
-      status: "pending",
+    prepared.push({
+      rowNum,
+      igLower,
+      data: row,
+      insert: {
+        brand_name: brandName,
+        instagram_username: ig,
+        logo_url: "",
+        notes,
+        created_by: actingUserId,
+        status: "pending",
+      },
     });
+  }
 
-    if (error) {
-      results.failed.push({ row: rowNum, reason: error.message, data: row });
+  // Pass 2 — bulk existence check across invitations + registered brands.
+  const igs = prepared.map((p) => p.igLower);
+  const [existingInvites, existingProfiles] = await Promise.all([
+    fetchExistingHandles(adminClient, "brand_invitations", "instagram_username", igs),
+    fetchExistingHandles(adminClient, "brand_profiles", "instagram_username", igs),
+  ]);
+
+  const toInsert: Prepared[] = [];
+  for (const p of prepared) {
+    if (existingInvites.has(p.igLower)) {
+      results.failed.push({ row: p.rowNum, reason: `Invitation for @${p.insert.instagram_username} already exists`, data: p.data });
+    } else if (existingProfiles.has(p.igLower)) {
+      results.failed.push({ row: p.rowNum, reason: `Brand @${p.insert.instagram_username} already registered`, data: p.data });
     } else {
-      results.success++;
+      toInsert.push(p);
+    }
+  }
+
+  // Pass 3 — batch insert, per-row fallback on batch error.
+  if (toInsert.length > 0) {
+    const { error } = await adminClient.from("brand_invitations").insert(toInsert.map((p) => p.insert));
+    if (error) {
+      for (const p of toInsert) {
+        const { error: rowErr } = await adminClient.from("brand_invitations").insert(p.insert);
+        if (rowErr) results.failed.push({ row: p.rowNum, reason: rowErr.message, data: p.data });
+        else results.success++;
+      }
+    } else {
+      results.success += toInsert.length;
     }
   }
 

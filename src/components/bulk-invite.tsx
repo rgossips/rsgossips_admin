@@ -11,9 +11,17 @@ type BulkResult = { success: number; failed: Array<{ row: number; reason: string
 interface BulkInviteProps {
   type: "influencer" | "brand";
   templateColumns: { key: string; label: string; required?: boolean; example?: string; helper?: string }[];
+  // Processes one chunk. `startRow` is the spreadsheet row number of
+  // rows[0] so failure messages can point at the right line.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onSubmit: (rows: any[]) => Promise<any>;
+  onSubmit: (rows: any[], startRow: number) => Promise<any>;
 }
+
+// Rows per server call. Keeps each invocation well under the serverless
+// timeout regardless of how large the uploaded file is; the client loops
+// chunks and aggregates. Tuned so a chunk's bulk existence check + batch
+// insert stays fast.
+const CHUNK_SIZE = 200;
 
 export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps) {
   const router = useRouter();
@@ -107,15 +115,34 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
   const handleSubmit = async () => {
     if (parsedRows.length === 0) return;
     setLoading(true);
-    setLoadingMsg(`Importing ${parsedRows.length} ${type === "influencer" ? "influencers" : "brands"}...`);
+    const noun = type === "influencer" ? "influencers" : "brands";
     try {
-      const res = await onSubmit(parsedRows);
-      if ("error" in res && res.error) {
-        setParseError(res.error);
-      } else {
-        setResult(res as BulkResult);
-        if ((res as BulkResult).success > 0) router.refresh();
+      // Send the file in chunks so a large upload never trips the
+      // serverless timeout. Results are aggregated across chunks; a
+      // chunk that fails outright (network/auth) stops the run and
+      // surfaces the error, but per-row failures inside a chunk are just
+      // collected and shown at the end.
+      const aggregate: BulkResult = { success: 0, failed: [] };
+      const total = parsedRows.length;
+      for (let offset = 0; offset < total; offset += CHUNK_SIZE) {
+        const chunk = parsedRows.slice(offset, offset + CHUNK_SIZE);
+        // +2: row 1 is the header in the spreadsheet, so data starts at 2.
+        const startRow = offset + 2;
+        setLoadingMsg(`Importing ${Math.min(offset + chunk.length, total)} of ${total} ${noun}...`);
+        const res = await onSubmit(chunk, startRow);
+        if (res && "error" in res && res.error) {
+          setParseError(`${res.error} (stopped after ${aggregate.success} imported)`);
+          setLoading(false);
+          if (aggregate.success > 0) router.refresh();
+          return;
+        }
+        aggregate.success += (res as BulkResult).success || 0;
+        if (Array.isArray((res as BulkResult).failed)) {
+          aggregate.failed.push(...(res as BulkResult).failed);
+        }
       }
+      setResult(aggregate);
+      if (aggregate.success > 0) router.refresh();
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Bulk import failed");
     }

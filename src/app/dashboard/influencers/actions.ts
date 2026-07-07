@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 import { sendMail } from "@/lib/mailer";
 import { renderUserStatusEmail } from "@/lib/email-templates";
+import { normalizeGender, fetchExistingHandles } from "@/lib/bulk-invite-utils";
 
 // Admin-only override of an influencer's subscription plan. Bypasses
 // Stripe entirely — useful for comping accounts, granting trials, or
@@ -316,7 +317,14 @@ interface BulkInfluencerRow {
   notes?: string;
 }
 
-export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
+// Processes one chunk of bulk-invite rows. The client sends the file in
+// chunks (see bulk-invite.tsx) so no single invocation risks the serverless
+// timeout; `startRow` is the spreadsheet row number of rows[0] so failure
+// messages point at the right line. Existence is checked in bulk (a few
+// batched queries instead of 2 per row) and survivors are inserted in one
+// batch — a duplicate/invalid row never halts the run, it's collected into
+// `failed` and reported at the end.
+export async function bulkInviteInfluencers(rows: BulkInfluencerRow[], startRow = 2) {
   let actingUserId: string;
   try { actingUserId = await requireAdmin(); }
   catch (e) {
@@ -325,36 +333,39 @@ export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
 
   const adminClient = createAdminClient();
   const results: { success: number; failed: Array<{ row: number; reason: string; data: BulkInfluencerRow }> } = { success: 0, failed: [] };
+  const splitField = (val?: string) => (val || "").toString().split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+
+  // Pass 1 — validate + normalize in memory. Collect the rows that are
+  // structurally valid along with the row they'll insert; everything else
+  // goes straight to `failed`.
+  type Prepared = { rowNum: number; igLower: string; data: BulkInfluencerRow; insert: Record<string, unknown> };
+  const prepared: Prepared[] = [];
+  const seenInFile = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const rowNum = i + 2;
+    const rowNum = startRow + i;
     const fullName = (row.full_name || "").toString().trim();
     const ig = (row.instagram_username || "").toString().replace(/^@/, "").trim();
     // City may hold multiple values separated by ',' or ';' (same
     // convention as categories/languages). Normalize to the canonical
-    // comma-joined string the edit modals parse, so "Mumbai; Pune" isn't
-    // stored as one unsplittable token.
-    const city = (row.city || "").toString().split(/[,;]/).map((s) => s.trim()).filter(Boolean).join(", ");
-    const gender = (row.gender || "").toString().trim().toLowerCase();
+    // comma-joined string the edit modals parse.
+    const city = splitField(row.city).join(", ");
+    // Gender is lenient: any spelling of male/female/non-binary maps to the
+    // canonical value; anything else (incl. blank) → prefer_not_to_say.
+    const gender = normalizeGender(row.gender);
 
     if (!fullName) { results.failed.push({ row: rowNum, reason: "Name is required", data: row }); continue; }
     if (!ig) { results.failed.push({ row: rowNum, reason: "Instagram username is required", data: row }); continue; }
     if (!city) { results.failed.push({ row: rowNum, reason: "City is required", data: row }); continue; }
-    if (!gender) { results.failed.push({ row: rowNum, reason: "Gender is required", data: row }); continue; }
 
-    const { data: existingInvite } = await adminClient.from("influencer_invitations").select("id").ilike("instagram_username", ig).limit(1);
-    if (existingInvite && existingInvite.length > 0) {
-      results.failed.push({ row: rowNum, reason: `Invitation for @${ig} already exists`, data: row });
+    const igLower = ig.toLowerCase();
+    if (seenInFile.has(igLower)) {
+      results.failed.push({ row: rowNum, reason: `Duplicate of @${ig} earlier in the file`, data: row });
       continue;
     }
-    const { data: existingProfile } = await adminClient.from("influencer_profiles").select("influencer_id").ilike("instagram_handle", ig).limit(1);
-    if (existingProfile && existingProfile.length > 0) {
-      results.failed.push({ row: rowNum, reason: `Influencer @${ig} already registered`, data: row });
-      continue;
-    }
+    seenInFile.add(igLower);
 
-    const splitField = (val?: string) => (val || "").toString().split(/[,;]/).map((s) => s.trim()).filter(Boolean);
     const metadata: Record<string, unknown> = { city, gender };
     const cats = splitField(row.categories);
     if (cats.length > 0) metadata.categories = cats;
@@ -366,19 +377,53 @@ export async function bulkInviteInfluencers(rows: BulkInfluencerRow[]) {
     const notesText = (row.notes || "").toString().trim();
     const notes = notesText ? `${notesText}\n---\n${JSON.stringify(metadata)}` : JSON.stringify(metadata);
 
-    const { error } = await adminClient.from("influencer_invitations").insert({
-      full_name: fullName,
-      instagram_username: ig,
-      profile_photo_url: "",
-      notes,
-      created_by: actingUserId,
-      status: "pending",
+    prepared.push({
+      rowNum,
+      igLower,
+      data: row,
+      insert: {
+        full_name: fullName,
+        instagram_username: ig,
+        profile_photo_url: "",
+        notes,
+        created_by: actingUserId,
+        status: "pending",
+      },
     });
+  }
 
-    if (error) {
-      results.failed.push({ row: rowNum, reason: error.message, data: row });
+  // Pass 2 — one bulk existence check across both tables (instead of 2
+  // queries per row), then drop rows that already exist as an invitation
+  // or a registered profile.
+  const igs = prepared.map((p) => p.igLower);
+  const [existingInvites, existingProfiles] = await Promise.all([
+    fetchExistingHandles(adminClient, "influencer_invitations", "instagram_username", igs),
+    fetchExistingHandles(adminClient, "influencer_profiles", "instagram_handle", igs),
+  ]);
+
+  const toInsert: Prepared[] = [];
+  for (const p of prepared) {
+    if (existingInvites.has(p.igLower)) {
+      results.failed.push({ row: p.rowNum, reason: `Invitation for @${p.insert.instagram_username} already exists`, data: p.data });
+    } else if (existingProfiles.has(p.igLower)) {
+      results.failed.push({ row: p.rowNum, reason: `Influencer @${p.insert.instagram_username} already registered`, data: p.data });
     } else {
-      results.success++;
+      toInsert.push(p);
+    }
+  }
+
+  // Pass 3 — batch insert survivors. On a batch-level error fall back to
+  // per-row inserts so one bad row doesn't sink the whole chunk.
+  if (toInsert.length > 0) {
+    const { error } = await adminClient.from("influencer_invitations").insert(toInsert.map((p) => p.insert));
+    if (error) {
+      for (const p of toInsert) {
+        const { error: rowErr } = await adminClient.from("influencer_invitations").insert(p.insert);
+        if (rowErr) results.failed.push({ row: p.rowNum, reason: rowErr.message, data: p.data });
+        else results.success++;
+      }
+    } else {
+      results.success += toInsert.length;
     }
   }
 
