@@ -149,6 +149,10 @@ export async function uploadInfluencerPhoto(formData: FormData): Promise<{ error
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file" };
   if (!file.type.startsWith("image/")) return { error: "Only images allowed" };
+  // Explicit cap BEFORE buffering into memory — the bucket's
+  // fileSizeLimit only rejects at storage time, after the whole payload
+  // has already streamed through the server action.
+  if (file.size > 5 * 1024 * 1024) return { error: "Image too large — maximum size is 5MB." };
 
   const adminClient = createAdminClient();
   await adminClient.storage.createBucket("influencer-photos", { public: true, fileSizeLimit: 5 * 1024 * 1024, allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"] });

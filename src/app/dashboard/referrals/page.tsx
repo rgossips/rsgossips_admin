@@ -82,54 +82,33 @@ export default async function ReferralsPage({
     });
   }
 
-  // Simple KPI counts for the top strip.
-  const { data: allRows } = await admin.from("referrals").select("status");
-  const statuses = (allRows || []).map((r: any) => r.status);
+  // KPI counts + RC sums — one aggregate RPC (migration 040) instead of
+  // shipping every referrals row AND every ledger row to the server
+  // action just to derive twelve numbers. Payload is one small jsonb
+  // regardless of table size.
+  const { data: stats } = await admin.rpc("get_referral_admin_stats");
+  const s = (stats || {}) as Record<string, number>;
   const counts = {
-    total: statuses.length,
-    rewarded: statuses.filter((s) => s === "REWARDED").length,
-    signed_up: statuses.filter((s) => s === "PENDING" || s === "SIGNED_UP").length,
-    review: statuses.filter((s) => s === "MANUAL_REVIEW").length,
+    total: s.total || 0,
+    rewarded: s.rewarded || 0,
+    signed_up: s.signed_up || 0,
+    review: s.review || 0,
   };
-
-  // Funnel + spend analytics — six numbers that tell you whether the
-  // program is working. Everything runs off the same referrals + ledger
-  // tables so it stays consistent with the queue below.
-  const signed = statuses.filter(
-    (s) => s === "SIGNED_UP" || s === "QUALIFIED" || s === "REWARDED" || s === "MANUAL_REVIEW",
-  ).length;
+  const signed = s.signed || 0;
   const rewardedCount = counts.rewarded;
-  const reversedCount = statuses.filter((s) => s === "REVERSED").length;
+  const reversedCount = s.reversed || 0;
   const conversionPct = signed > 0 ? Math.round((rewardedCount / signed) * 100) : 0;
   const clawbackPct = rewardedCount + reversedCount > 0
     ? Math.round((reversedCount / (rewardedCount + reversedCount)) * 100)
     : 0;
-
-  // RC lifetime totals — earned, redeemed, expired, clawed back, admin-
-  // adjusted. Used together they show "how much program cost we've
-  // realised" vs "what's still sitting in wallets waiting to be spent".
-  const { data: ledgerRows } = await admin
-    .from("reward_credits_ledger")
-    .select("delta_rc, reason");
   const ledgerSums = {
-    earned: 0,
-    welcome: 0,
-    redeemed: 0,
-    clawback: 0,
-    expired: 0,
-    admin: 0,
+    earned: s.earned || 0,
+    welcome: s.welcome || 0,
+    redeemed: s.redeemed || 0,
+    clawback: s.clawback || 0,
+    expired: s.expired || 0,
+    admin: s.admin_rc || 0,
   };
-  (ledgerRows || []).forEach((r: any) => {
-    const d = r.delta_rc || 0;
-    switch (r.reason) {
-      case "REFERRAL_EARN": ledgerSums.earned += d; break;
-      case "WELCOME_BONUS": ledgerSums.welcome += d; break;
-      case "REDEMPTION": ledgerSums.redeemed += -d; break;
-      case "CLAWBACK": ledgerSums.clawback += -d; break;
-      case "EXPIRY": ledgerSums.expired += -d; break;
-      case "ADMIN_ADJUSTMENT": ledgerSums.admin += d; break;
-    }
-  });
   const rcOutstanding =
     ledgerSums.earned + ledgerSums.welcome + ledgerSums.admin
     - ledgerSums.redeemed - ledgerSums.clawback - ledgerSums.expired;
