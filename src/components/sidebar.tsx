@@ -54,6 +54,7 @@ const navGroups: NavGroup[] = [
 
 const adminNav: NavSpec[] = [
   { label: "Admin Users", href: "/dashboard/admins", icon: "shield" },
+  { label: "Load Test", href: "/dashboard/load-test", icon: "grid" },
 ];
 
 const icons: Record<string, React.ReactNode> = {
