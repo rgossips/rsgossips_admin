@@ -7,6 +7,9 @@ import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 import { sendMail } from "@/lib/mailer";
 import { renderUserStatusEmail } from "@/lib/email-templates";
 import { normalizeGender, fetchExistingHandles } from "@/lib/bulk-invite-utils";
+import { enforceRateLimit, auditLog } from "@/lib/rate-limit";
+import { logError } from "@/lib/log";
+import { isHttpUrl, isInstagramHandle, clampLen } from "@/lib/validation";
 
 // Admin-only override of an influencer's subscription plan. Bypasses
 // Stripe entirely — useful for comping accounts, granting trials, or
@@ -26,10 +29,13 @@ const TEMPLATE_MIN_PLAN: Record<string, string> = {
 const PLAN_RANK: Record<string, number> = { trial: 2, starter: 1, pro: 2, elite: 3 };
 
 export async function updateInfluencerPlan(influencerId: string, plan: string): Promise<{ error?: string; success?: boolean }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+  // Money-relevant (comps a paid tier for free) — capture the actor for audit.
+  let actorId: string;
+  try { actorId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   if (!VALID_PLANS.has(plan)) return { error: "Invalid plan" };
+  await auditLog("update_plan", actorId, `${influencerId}:${plan}`);
 
   const adminClient = createAdminClient();
 
@@ -78,40 +84,59 @@ export async function updateInfluencerPlan(influencerId: string, plan: string): 
   return { success: true };
 }
 
-export async function toggleInfluencerStatus(influencerId: string, currentStatus: string): Promise<{ error?: string; success?: boolean; newStatus?: string; emailSent?: boolean; emailError?: string }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+export async function toggleInfluencerStatus(influencerId: string, _currentStatus?: string): Promise<{ error?: string; success?: boolean; newStatus?: string; emailSent?: boolean; emailError?: string }> {
+  let actorId: string;
+  try { actorId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
-  const newStatus = currentStatus === "active" ? "suspended" : "active";
   const adminClient = createAdminClient();
-  const { error } = await adminClient.from("influencer_profiles").update({ status: newStatus }).eq("influencer_id", influencerId);
-  if (error) return { error: error.message };
 
-  // Notify the creator. Non-fatal — the status change itself already
-  // succeeded, so a mail failure shouldn't roll it back.
+  // Read the CURRENT status from the DB rather than trusting the client's
+  // `currentStatus` — a stale value could otherwise flip the account the
+  // wrong way and fire a wrong-direction email.
+  const { data: profile, error: readErr } = await adminClient
+    .from("influencer_profiles")
+    .select("full_name, username, email, status")
+    .eq("influencer_id", influencerId)
+    .maybeSingle();
+  if (readErr) { logError("toggle-status.read", readErr, { influencerId }); return { error: "Could not load the influencer. Please try again." }; }
+  if (!profile) return { error: "Influencer not found." };
+
+  const newStatus = profile.status === "active" ? "suspended" : "active";
+  const { error } = await adminClient.from("influencer_profiles").update({ status: newStatus }).eq("influencer_id", influencerId);
+  if (error) { logError("toggle-status.update", error, { influencerId, newStatus }); return { error: "Could not update the status. Please try again." }; }
+
+  // Notify the creator. Non-fatal — the status change already succeeded.
+  // Rate-limited per (admin, creator) so a rapid suspend↔reactivate loop
+  // can't flood the creator's mailbox / burn SMTP quota.
   let emailSent = false;
   let emailError: string | undefined;
-  try {
-    const { data: profile } = await adminClient
-      .from("influencer_profiles")
-      .select("full_name, username, email")
-      .eq("influencer_id", influencerId)
-      .maybeSingle();
-    if (profile?.email) {
-      const { html, text, subjectFragment } = renderUserStatusEmail({
-        fullName: profile.full_name || profile.username || "there",
-        action: newStatus === "suspended" ? "suspended" : "reactivated",
-      });
-      await sendMail({
-        to: profile.email,
-        subject: `Your RecentGossips account has been ${subjectFragment}`,
-        html,
-        text,
-      });
-      emailSent = true;
+  if (profile.email) {
+    const rl = await enforceRateLimit({
+      action: "status_email",
+      actorId,
+      limit: 3,
+      windowSec: 60 * 60,
+      target: influencerId,
+    });
+    if (rl.allowed) {
+      try {
+        const { html, text, subjectFragment } = renderUserStatusEmail({
+          fullName: profile.full_name || profile.username || "there",
+          action: newStatus === "suspended" ? "suspended" : "reactivated",
+        });
+        await sendMail({
+          to: profile.email,
+          subject: `Your RecentGossips account has been ${subjectFragment}`,
+          html,
+          text,
+        });
+        emailSent = true;
+      } catch (e) {
+        emailError = e instanceof Error ? e.message : "Failed to send notification email";
+        logError("toggle-status.email", e, { influencerId, newStatus });
+      }
     }
-  } catch (e) {
-    emailError = e instanceof Error ? e.message : "Failed to send notification email";
   }
 
   revalidatePath("/dashboard/influencers");
@@ -170,11 +195,11 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
   try { actingUserId = await requireAdmin(); }
   catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
-  const fullName = formData.get("full_name") as string;
-  const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();
+  const fullName = clampLen(formData.get("full_name") as string, 120);
+  const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim() || "";
   const profilePhotoUrl = (formData.get("profile_photo_url") as string) || "";
-  const notesText = (formData.get("notes") as string) || "";
-  const city = (formData.get("city") as string) || "";
+  const notesText = clampLen(formData.get("notes") as string, 2000);
+  const city = clampLen(formData.get("city") as string, 300);
   const gender = (formData.get("gender") as string) || "";
   const categories = formData.getAll("categories") as string[];
   const languages = formData.getAll("languages") as string[];
@@ -189,8 +214,10 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
 
   if (!fullName) return { error: "Name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
+  if (!isInstagramHandle(instagramUsername)) return { error: "Enter a valid Instagram username (letters, numbers, . and _, max 30)." };
   if (!city) return { error: "City is required" };
   if (!gender) return { error: "Gender is required" };
+  if (profilePhotoUrl && !isHttpUrl(profilePhotoUrl)) return { error: "Profile photo URL must start with http:// or https://." };
 
   // Build notes with metadata
   const metadata: Record<string, unknown> = {};
@@ -208,11 +235,15 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
 
   const adminClient = createAdminClient();
 
-  // Check uniqueness
-  const { data: existingInvite } = await adminClient.from("influencer_invitations").select("id").ilike("instagram_username", instagramUsername).limit(1);
+  // Check uniqueness. A FAILED lookup must not be read as "no duplicate" —
+  // that would let a duplicate through. Surface the error and let the admin
+  // retry.
+  const { data: existingInvite, error: invLookupErr } = await adminClient.from("influencer_invitations").select("id").ilike("instagram_username", instagramUsername).limit(1);
+  if (invLookupErr) { logError("invite-influencer.dupcheck", invLookupErr, { instagramUsername }); return { error: "Could not verify uniqueness right now. Please retry." }; }
   if (existingInvite && existingInvite.length > 0) return { error: `An invitation for @${instagramUsername} already exists` };
 
-  const { data: existingProfile } = await adminClient.from("influencer_profiles").select("influencer_id").ilike("instagram_handle", instagramUsername).limit(1);
+  const { data: existingProfile, error: profLookupErr } = await adminClient.from("influencer_profiles").select("influencer_id").ilike("instagram_handle", instagramUsername).limit(1);
+  if (profLookupErr) { logError("invite-influencer.dupcheck2", profLookupErr, { instagramUsername }); return { error: "Could not verify uniqueness right now. Please retry." }; }
   if (existingProfile && existingProfile.length > 0) return { error: `An influencer with @${instagramUsername} is already registered` };
 
   const { error } = await adminClient.from("influencer_invitations").insert({
@@ -224,7 +255,7 @@ export async function inviteInfluencer(formData: FormData): Promise<{ error?: st
     status: "pending",
   });
 
-  if (error) return { error: error.message };
+  if (error) { logError("invite-influencer.insert", error, { instagramUsername }); return { error: "Could not create the invitation. Please try again." }; }
   revalidatePath("/dashboard/influencers");
   return { success: true };
 }
@@ -333,6 +364,18 @@ export async function bulkInviteInfluencers(rows: BulkInfluencerRow[], startRow 
   try { actingUserId = await requireAdmin(); }
   catch (e) {
     return { error: e instanceof Error ? e.message : "Forbidden", success: 0, failed: [] };
+  }
+
+  // Hard server-side cap — the client chunks at 200, so a payload bigger
+  // than this bypassed the UI. Rejects unbounded arrays (memory/DoS).
+  if (!Array.isArray(rows)) return { error: "Invalid payload.", success: 0, failed: [] };
+  if (rows.length > 500) {
+    return { error: "Too many rows in one request (max 500). Use the bulk uploader, which batches automatically.", success: 0, failed: [] };
+  }
+  // Per-admin throughput cap across chunks (60 calls/hour ≈ up to 12k rows).
+  const rl = await enforceRateLimit({ action: "bulk_invite", actorId: actingUserId, limit: 60, windowSec: 60 * 60 });
+  if (!rl.allowed) {
+    return { error: "Bulk import rate limit reached. Please wait a bit and retry the remaining rows.", success: 0, failed: [] };
   }
 
   const adminClient = createAdminClient();

@@ -5,6 +5,7 @@ import { InviteInfluencerForm } from "./invite-influencer-form";
 import { InvitedInfluencerRow } from "./invited-influencer-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 const INVITES_PER_PAGE = 12;
 
@@ -18,6 +19,9 @@ export default async function InfluencersPage({
   const supabase = createAdminClient();
   const activeTab = tab || "all";
   const invitePage = Math.max(1, parseInt(invite_page || "1", 10) || 1);
+  // Sanitize before it ever reaches a hand-built PostgREST .or() filter
+  // (the query runs on the RLS-bypassing service-role client).
+  const searchTerm = sanitizeSearchTerm(search);
 
   // Fetch all distinct categories
   const { data: allInfluencers } = await supabase.from("influencer_profiles").select("categories");
@@ -34,7 +38,7 @@ export default async function InfluencersPage({
 
   // Fetch influencers
   let query = supabase.from("influencer_profiles").select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle").order("updated_at", { ascending: false });
-  if (search) query = query.or(`full_name.ilike.%${search}%,username.ilike.%${search}%`);
+  if (searchTerm) query = query.or(`full_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%`);
   if (status) query = query.eq("status", status);
   if (followers) { const [min, max] = followers.split("-"); if (min) query = query.gte("followers_count", parseInt(min)); if (max) query = query.lte("followers_count", parseInt(max)); }
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
@@ -65,7 +69,7 @@ export default async function InfluencersPage({
     .eq("status", "pending")
     .order("created_at", { ascending: false })
     .range(inviteFrom, inviteTo);
-  if (search) inviteQuery = inviteQuery.or(`full_name.ilike.%${search}%,instagram_username.ilike.%${search}%`);
+  if (searchTerm) inviteQuery = inviteQuery.or(`full_name.ilike.%${searchTerm}%,instagram_username.ilike.%${searchTerm}%`);
   const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
   const invitesTotal = pendingInviteCount ?? 0;
 

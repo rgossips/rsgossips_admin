@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { adminGate } from "@/lib/require-super-admin";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 // Stays in lockstep with public.featured_creators (see migration 017).
 function readForm(formData: FormData) {
@@ -157,10 +158,15 @@ export async function uploadFeaturedCreatorAvatar(formData: FormData): Promise<{
 // both registered influencers AND pending invitations so admin can feature
 // pre-onboarded creators too. Limited to 20 hits combined.
 export async function searchInfluencersForFeature(query: string) {
+  // Reachable directly (server actions bypass the dashboard layout) — gate it.
+  const gate = await adminGate();
+  if (gate) return [];
   const admin = createAdminClient();
-  const q = query.trim();
+  // sanitizeSearchTerm strips PostgREST-reserved chars + LIKE wildcards, so
+  // the term can only be a literal substring (no .or() filter injection).
+  const q = sanitizeSearchTerm(query);
   if (!q) return [];
-  const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+  const like = `%${q}%`;
 
   const [registeredRes, invitedRes] = await Promise.all([
     admin

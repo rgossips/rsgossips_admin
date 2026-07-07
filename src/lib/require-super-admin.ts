@@ -79,3 +79,15 @@ export async function superAdminGate(): Promise<{ error: string } | null> {
     return { error: e instanceof Error ? e.message : "Forbidden" };
   }
 }
+
+// Passes for ANY admin role (super_admin | admin | viewer), rejects a
+// caller with no admin_profiles row. Use to gate READ-only server actions
+// that viewers legitimately need (e.g. the featured-* pickers, section-
+// title getters) — server actions bypass the dashboard layout, so an
+// ungated read action is directly reachable by any authenticated user of
+// the shared Supabase project and leaks data. Returns null when allowed.
+export async function viewerGate(): Promise<{ error: string } | null> {
+  const { role } = await getCurrentAdminRole();
+  if (role === "super_admin" || role === "admin" || role === "viewer") return null;
+  return { error: "This action requires admin access." };
+}

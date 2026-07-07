@@ -3,13 +3,16 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { adminGate } from "@/lib/require-super-admin";
+import { adminGate, viewerGate } from "@/lib/require-super-admin";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 // homepage_settings key backing the editable section title above the
 // Top Creator Stories carousel on the marketing home (migration 030).
 const SECTION_TITLE_KEY = "creator_stories_section_title";
 
 export async function getCreatorStoriesSectionTitle(): Promise<string> {
+  // Any admin role (incl. viewer) may read; non-admins get the default.
+  if (await viewerGate()) return "TOP CREATOR STORIES";
   const admin = createAdminClient();
   const { data } = await admin
     .from("homepage_settings")
@@ -162,10 +165,12 @@ export async function moveCreatorStory(id: string, direction: "up" | "down"): Pr
 // registered influencers AND pending invitations so admin can pick
 // pre-onboarded creators too.
 export async function searchInfluencersForStory(query: string) {
+  const gate = await adminGate();
+  if (gate) return [];
   const admin = createAdminClient();
-  const q = query.trim();
+  const q = sanitizeSearchTerm(query);
   if (!q) return [];
-  const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+  const like = `%${q}%`;
 
   const [registeredRes, invitedRes] = await Promise.all([
     admin

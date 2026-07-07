@@ -5,6 +5,7 @@ import { AddBrandForm } from "./add-brand-form";
 import { InvitedBrandRow } from "./invited-brand-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 const INVITES_PER_PAGE = 12;
 
@@ -33,6 +34,9 @@ export default async function BrandsPage({
   const supabase = createAdminClient();
   const activeTab = tab || "all";
   const invitePage = Math.max(1, parseInt(invite_page || "1", 10) || 1);
+  // Sanitize before it feeds a hand-built PostgREST .or() on the
+  // service-role client (filter-injection guard).
+  const searchTerm = sanitizeSearchTerm(search);
 
   // Fetch registered brands
   let brandQuery = supabase
@@ -40,8 +44,8 @@ export default async function BrandsPage({
     .select("brand_id, brand_name, logo_url, contact_phone, verification_status, gstin, instagram_username")
     .order("updated_at", { ascending: false });
 
-  if (search) {
-    brandQuery = brandQuery.or(`brand_name.ilike.%${search}%,gstin.ilike.%${search}%`);
+  if (searchTerm) {
+    brandQuery = brandQuery.or(`brand_name.ilike.%${searchTerm}%,gstin.ilike.%${searchTerm}%`);
   }
   if (verification) {
     brandQuery = brandQuery.eq("verification_status", verification);
@@ -60,8 +64,8 @@ export default async function BrandsPage({
     .order("created_at", { ascending: false })
     .range(inviteFrom, inviteTo);
 
-  if (search) {
-    inviteQuery = inviteQuery.or(`brand_name.ilike.%${search}%,instagram_username.ilike.%${search}%`);
+  if (searchTerm) {
+    inviteQuery = inviteQuery.or(`brand_name.ilike.%${searchTerm}%,instagram_username.ilike.%${searchTerm}%`);
   }
 
   const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;

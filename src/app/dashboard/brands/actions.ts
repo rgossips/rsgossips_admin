@@ -4,6 +4,9 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 import { fetchExistingHandles } from "@/lib/bulk-invite-utils";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { logError } from "@/lib/log";
+import { isEmail, isHttpUrl, isInstagramHandle, clampLen } from "@/lib/validation";
 
 export async function updateBrandVerification(brandId: string, action: "verified" | "rejected" | "pending"): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
@@ -65,15 +68,17 @@ export async function inviteBrand(formData: FormData): Promise<{ error?: string;
   try { actingUserId = await requireAdmin(); }
   catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
-  const brandName = formData.get("brand_name") as string;
-  const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim();
+  const brandName = clampLen(formData.get("brand_name") as string, 160);
+  const instagramUsername = (formData.get("instagram_username") as string)?.replace(/^@/, "").trim() || "";
   const logoUrl = (formData.get("logo_url") as string) || "";
-  const notesText = (formData.get("notes") as string) || "";
+  const notesText = clampLen(formData.get("notes") as string, 2000);
   const category = (formData.get("category") as string) || "";
   const instagramVerified = (formData.get("instagram_verified") as string) === "yes";
 
   if (!brandName) return { error: "Brand name is required" };
   if (!instagramUsername) return { error: "Instagram username is required" };
+  if (!isInstagramHandle(instagramUsername)) return { error: "Enter a valid Instagram username (letters, numbers, . and _, max 30)." };
+  if (logoUrl && !isHttpUrl(logoUrl)) return { error: "Logo URL must start with http:// or https://." };
 
   // Build notes with metadata
   const metadata: Record<string, unknown> = {};
@@ -87,24 +92,23 @@ export async function inviteBrand(formData: FormData): Promise<{ error?: string;
 
   const adminClient = createAdminClient();
 
-  // Check if instagram_username already exists in brand_invitations
-  const { data: existing } = await adminClient
+  // Uniqueness — a failed lookup must not be treated as "no duplicate".
+  const { data: existing, error: invErr } = await adminClient
     .from("brand_invitations")
     .select("id")
     .ilike("instagram_username", instagramUsername)
     .limit(1);
-
+  if (invErr) { logError("invite-brand.dupcheck", invErr, { instagramUsername }); return { error: "Could not verify uniqueness right now. Please retry." }; }
   if (existing && existing.length > 0) {
     return { error: `An invitation for @${instagramUsername} already exists` };
   }
 
-  // Check if instagram_username already exists in brand_profiles
-  const { data: existingProfile } = await adminClient
+  const { data: existingProfile, error: profErr } = await adminClient
     .from("brand_profiles")
     .select("brand_id")
     .ilike("instagram_username", instagramUsername)
     .limit(1);
-
+  if (profErr) { logError("invite-brand.dupcheck2", profErr, { instagramUsername }); return { error: "Could not verify uniqueness right now. Please retry." }; }
   if (existingProfile && existingProfile.length > 0) {
     return { error: `A brand with @${instagramUsername} is already registered` };
   }
@@ -118,7 +122,7 @@ export async function inviteBrand(formData: FormData): Promise<{ error?: string;
     status: "pending",
   });
 
-  if (error) return { error: error.message };
+  if (error) { logError("invite-brand.insert", error, { instagramUsername }); return { error: "Could not create the invitation. Please try again." }; }
 
   revalidatePath("/dashboard/brands");
   return { success: true };
@@ -152,13 +156,15 @@ export async function addBrand(formData: FormData): Promise<{ error?: string; su
   const gate = await adminGate();
   if (gate) return gate;
 
-  const brandName = formData.get("brand_name") as string;
-  const contactName = formData.get("contact_name") as string;
-  const contactPhone = formData.get("contact_phone") as string;
-  const contactEmail = formData.get("contact_email") as string;
-  const gstin = formData.get("gstin") as string;
+  const brandName = clampLen(formData.get("brand_name") as string, 160);
+  const contactName = clampLen(formData.get("contact_name") as string, 120);
+  const contactPhone = clampLen(formData.get("contact_phone") as string, 20);
+  const contactEmail = (formData.get("contact_email") as string || "").trim();
+  const gstin = clampLen(formData.get("gstin") as string, 20);
 
   if (!brandName) return { error: "Brand name is required" };
+  if (contactEmail && !isEmail(contactEmail)) return { error: "Enter a valid contact email address." };
+  if (contactPhone && !/^[+\d][\d\s-]{5,19}$/.test(contactPhone)) return { error: "Enter a valid contact phone number." };
 
   const adminClient = createAdminClient();
   const { error } = await adminClient.from("brand_profiles").insert({
@@ -171,7 +177,7 @@ export async function addBrand(formData: FormData): Promise<{ error?: string; su
     status: "active",
   });
 
-  if (error) return { error: error.message };
+  if (error) { logError("add-brand.insert", error, { brandName }); return { error: "Could not add the brand. Please try again." }; }
 
   revalidatePath("/dashboard/brands");
   return { success: true };
@@ -194,6 +200,15 @@ export async function bulkInviteBrands(rows: BulkBrandRow[], startRow = 2) {
   try { actingUserId = await requireAdmin(); }
   catch (e) {
     return { error: e instanceof Error ? e.message : "Forbidden", success: 0, failed: [] };
+  }
+
+  if (!Array.isArray(rows)) return { error: "Invalid payload.", success: 0, failed: [] };
+  if (rows.length > 500) {
+    return { error: "Too many rows in one request (max 500). Use the bulk uploader, which batches automatically.", success: 0, failed: [] };
+  }
+  const rl = await enforceRateLimit({ action: "bulk_invite", actorId: actingUserId, limit: 60, windowSec: 60 * 60 });
+  if (!rl.allowed) {
+    return { error: "Bulk import rate limit reached. Please wait a bit and retry the remaining rows.", success: 0, failed: [] };
   }
 
   const adminClient = createAdminClient();

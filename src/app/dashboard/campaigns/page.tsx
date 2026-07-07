@@ -4,6 +4,7 @@ import { CampaignsTable } from "./campaigns-table";
 import { CampaignFilters } from "./campaign-filters";
 import { RefreshButton } from "@/components/refresh-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 export default async function CampaignsPage({
   searchParams,
@@ -13,14 +14,15 @@ export default async function CampaignsPage({
   const { search, status, category } = await searchParams;
   const supabase = createAdminClient();
   const canWrite = await isAdminOrAbove();
+  const searchTerm = sanitizeSearchTerm(search);
 
   let query = supabase
     .from("campaigns")
     .select("campaign_id, title, status, max_influencers, campaign_start_date, campaign_end_date, target_categories, brand_id, brand_invitation_id, created_by_admin, brand_profiles(brand_name), brand_invitations(brand_name)")
     .order("created_at", { ascending: false });
 
-  if (search) {
-    query = query.ilike("title", `%${search}%`);
+  if (searchTerm) {
+    query = query.ilike("title", `%${searchTerm}%`);
   }
   if (status) {
     query = query.eq("status", status);

@@ -2,7 +2,10 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { adminGate } from "@/lib/require-super-admin";
+import { requireAdmin } from "@/lib/require-super-admin";
+import { auditLog } from "@/lib/rate-limit";
+import { logError } from "@/lib/log";
+import { isValidDate, clampLen } from "@/lib/validation";
 
 // Manual payout completion. After replacing RazorpayX with admin-driven
 // bank transfers (Option 1), an admin processes payouts via their own
@@ -15,12 +18,16 @@ export async function markPayoutPaid(
   paidAt?: string | null,
   method?: "upi" | "imps" | "neft" | "rtgs" | null,
 ): Promise<{ ok?: boolean; error?: string }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+  // Money-moving action — capture the actor for the audit trail.
+  let actorId: string;
+  try { actorId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
-  const cleanUtr = (utr || "").trim();
+  const cleanUtr = clampLen(utr, 50);
   if (!cleanUtr) return { error: "UTR is required." };
-  if (cleanUtr.length > 50) return { error: "UTR looks too long (max 50 chars)." };
+  // Guard the optional paid-at BEFORE toISOString() — an invalid date
+  // string throws RangeError and would crash the action after the gate.
+  if (paidAt && !isValidDate(paidAt)) return { error: "Paid-at date is invalid." };
 
   const admin = createAdminClient();
 
@@ -33,7 +40,7 @@ export async function markPayoutPaid(
     )
     .eq("id", applicationId)
     .maybeSingle();
-  if (appErr) return { error: "Lookup failed: " + appErr.message };
+  if (appErr) { logError("payout.lookup", appErr, { applicationId }); return { error: "Could not load the payout. Please try again." }; }
   if (!app) return { error: "Application not found." };
   if (app.payout_status === "processed" || app.payout_status === "completed") {
     return { error: "This payout is already marked paid." };
@@ -57,7 +64,10 @@ export async function markPayoutPaid(
       status: "completed",
     })
     .eq("id", applicationId);
-  if (updErr) return { error: "Update failed: " + updErr.message };
+  if (updErr) { logError("payout.update", updErr, { applicationId }); return { error: "Could not update the payout. Please try again." }; }
+
+  // Audit: who marked this payout paid, and for which application.
+  await auditLog("payout_marked_paid", actorId, applicationId);
 
   // 2. Mirror the existing escrow side — once payout is processed, the
   // brand's escrow leg moves from `released_pending` to `released`.

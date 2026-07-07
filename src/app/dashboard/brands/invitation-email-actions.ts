@@ -1,9 +1,16 @@
 "use server";
 
 import { createAdminClient } from "@/utils/supabase/admin";
-import { adminGate, getCurrentAdminRole } from "@/lib/require-super-admin";
+import { requireAdmin } from "@/lib/require-super-admin";
 import { sendMail } from "@/lib/mailer";
 import { renderOnboardingInviteEmail } from "@/lib/email-templates";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { isEmail, clampLen } from "@/lib/validation";
+import { logError } from "@/lib/log";
+
+const MAX_CUSTOM_MSG = 500;
+const EMAIL_LIMIT = 30;
+const EMAIL_WINDOW_SEC = 60 * 60;
 
 // Manually send an onboarding email to an invited brand. Mirrors the
 // influencer side — see [[sendInfluencerInvitationEmail]].
@@ -12,12 +19,24 @@ export async function sendBrandInvitationEmail(
   email: string,
   customMessage?: string,
 ): Promise<{ error?: string; success?: boolean }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+  let actorId: string;
+  try { actorId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const cleaned = (email || "").trim().toLowerCase();
-  if (!cleaned || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
+  if (!isEmail(cleaned)) {
     return { error: "Enter a valid email address" };
+  }
+
+  const rl = await enforceRateLimit({
+    action: "send_invite_email",
+    actorId,
+    limit: EMAIL_LIMIT,
+    windowSec: EMAIL_WINDOW_SEC,
+    target: cleaned,
+  });
+  if (!rl.allowed) {
+    return { error: "You're sending invite emails too quickly. Try again later." };
   }
 
   const adminClient = createAdminClient();
@@ -26,7 +45,7 @@ export async function sendBrandInvitationEmail(
     .select("id, brand_name, instagram_username, status")
     .eq("id", invitationId)
     .maybeSingle();
-  if (invErr) return { error: invErr.message };
+  if (invErr) { logError("send-brand-invite-email.lookup", invErr, { invitationId }); return { error: "Could not load the invitation. Please try again." }; }
   if (!invitation) return { error: "Invitation not found" };
   if (invitation.status !== "pending") {
     return { error: `Invitation is already ${invitation.status}` };
@@ -34,15 +53,12 @@ export async function sendBrandInvitationEmail(
 
   let invitedByName: string | undefined;
   try {
-    const { userId } = await getCurrentAdminRole();
-    if (userId) {
-      const { data: me } = await adminClient
-        .from("admin_profiles")
-        .select("full_name, email")
-        .eq("id", userId)
-        .maybeSingle();
-      invitedByName = me?.full_name || me?.email || undefined;
-    }
+    const { data: me } = await adminClient
+      .from("admin_profiles")
+      .select("full_name, email")
+      .eq("id", actorId)
+      .maybeSingle();
+    invitedByName = me?.full_name || me?.email || undefined;
   } catch {
     /* non-fatal */
   }
@@ -55,7 +71,7 @@ export async function sendBrandInvitationEmail(
     instagramUsername: invitation.instagram_username,
     inviteUrl,
     invitedByName,
-    customMessage: customMessage?.trim() || undefined,
+    customMessage: clampLen(customMessage, MAX_CUSTOM_MSG) || undefined,
   });
 
   try {
@@ -66,7 +82,8 @@ export async function sendBrandInvitationEmail(
       text,
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to send email" };
+    logError("send-brand-invite-email.send", e, { invitationId, actorId });
+    return { error: "Could not send the email right now. Please try again." };
   }
 
   return { success: true };

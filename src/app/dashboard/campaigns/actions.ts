@@ -100,6 +100,14 @@ export async function createCampaign(formData: FormData): Promise<{ error?: stri
   if (!startDate) return { error: "Start date is required" };
   if (!deadline) return { error: "Application deadline is required" };
   if (!endDate) return { error: "Campaign end date is required" };
+  // Reject unparseable dates BEFORE comparing — a NaN date makes every
+  // `>` comparison false, so a garbage date would otherwise slip through.
+  if ([startDate, deadline, endDate].some((d) => Number.isNaN(new Date(d).getTime()))) {
+    return { error: "One of the dates is invalid." };
+  }
+  if (new Date(startDate) > new Date(endDate)) {
+    return { error: "Campaign start date must be on or before the end date." };
+  }
   if (new Date(deadline) > new Date(endDate)) {
     return { error: "Application deadline must be on or before the campaign end date" };
   }

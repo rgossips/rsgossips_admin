@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { adminGate } from "@/lib/require-super-admin";
+import { requireAdmin } from "@/lib/require-super-admin";
 
 // Manual RC adjustment (Phase-0 decision #11). Two modes:
 //   grant  → positive delta
@@ -19,8 +19,13 @@ export async function adjustRc(
   deltaRc: number,
   note: string,
 ): Promise<{ ok?: boolean; error?: string; balanceAfter?: number }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+  // requireAdmin returns the acting admin's id — needed for the audit
+  // trail below. (The old admin.auth.getUser() on the service-role client
+  // has no session and always returned null, so admin_id was never
+  // recorded on these financial ledger rows.)
+  let adminId: string;
+  try { adminId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const cleanNote = (note || "").trim();
   const cleanDelta = Math.trunc(Number(deltaRc));
@@ -36,15 +41,6 @@ export async function adjustRc(
   if (cleanNote.length > 500) return { error: "Note is too long (max 500 chars)" };
 
   const admin = createAdminClient();
-
-  // Resolve the acting admin's id via the session helper. `adminGate`
-  // already verified we're admin+ role, so this lookup should always
-  // succeed — but fall back to null so the DB doesn't reject.
-  let adminId: string | null = null;
-  try {
-    const { data: { user } } = await admin.auth.getUser();
-    adminId = user?.id ?? null;
-  } catch { /* leave null */ }
 
   // Current balance for the snapshot.
   const { data: balRow } = await admin
@@ -100,18 +96,13 @@ export async function resolveManualReview(
   referralId: string,
   decision: "approve" | "reject",
 ): Promise<{ ok?: boolean; error?: string }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+  // requireAdmin returns the reviewer's id for the audit trail (the old
+  // service-role admin.auth.getUser() always returned null).
+  let reviewerId: string;
+  try { reviewerId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
   const admin = createAdminClient();
-
-  // Resolve acting admin id for the review audit trail. Non-fatal if
-  // lookup fails — the row still transitions, just without a reviewer id.
-  let reviewerId: string | null = null;
-  try {
-    const { data: { user } } = await admin.auth.getUser();
-    reviewerId = user?.id ?? null;
-  } catch { /* leave null */ }
 
   if (decision === "reject") {
     const { error } = await admin

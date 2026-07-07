@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { adminGate } from "@/lib/require-super-admin";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 // Stays in lockstep with public.featured_brands (migration 020). Display
 // fields are denormalised at add-time so the influencer carousel renders
@@ -97,10 +98,12 @@ export async function moveFeaturedBrand(id: string, direction: "up" | "down"): P
 // name or Instagram handle. Hides brands already featured. Returns the
 // denormalised display fields the add action needs.
 export async function searchBrandsForFeature(query: string) {
+  const gate = await adminGate();
+  if (gate) return [];
   const admin = createAdminClient();
-  const q = query.trim();
+  const q = sanitizeSearchTerm(query);
   if (!q) return [];
-  const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+  const like = `%${q}%`;
 
   const [profilesRes, invitesRes] = await Promise.all([
     admin

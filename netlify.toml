@@ -1,0 +1,23 @@
+# Netlify config for the RecentGossips admin portal.
+# Security headers apply to every response. See docs/SECURITY.md.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Force HTTPS for 2 years incl. subdomains; eligible for preload lists.
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    # Block MIME sniffing.
+    X-Content-Type-Options = "nosniff"
+    # Don't leak full URLs (which can carry tokens) to other origins.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # This admin panel needs none of these device APIs.
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    # Clickjacking defense — the admin panel must never be framed
+    # (a framed admin session can be click-jacked into destructive actions).
+    X-Frame-Options = "DENY"
+    # CSP: self-hosted app that talks to Supabase (REST/auth/storage/realtime)
+    # and Razorpay/Stripe. frame-ancestors 'none' is the modern clickjacking
+    # guard. 'unsafe-inline'/'unsafe-eval' on script-src are required by the
+    # current Next.js runtime; tighten to nonces in a later pass (see
+    # docs/SECURITY.md 3.5). connect-src includes wss for Supabase realtime.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://api.stripe.com; frame-src https://checkout.razorpay.com https://js.stripe.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"

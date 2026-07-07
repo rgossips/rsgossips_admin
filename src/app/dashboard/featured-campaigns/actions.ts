@@ -2,7 +2,8 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { adminGate } from "@/lib/require-super-admin";
+import { adminGate, viewerGate } from "@/lib/require-super-admin";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 // Stays in lockstep with public.featured_campaigns (migration 019)
 // + the section column added in migration 033. Featured Campaigns
@@ -20,6 +21,7 @@ const SECTION_TITLE_KEY = "featured_campaigns_section_title";
 const DEFAULT_SECTION_TITLE = "FEATURED CAMPAIGNS";
 
 export async function getFeaturedSectionTitle(): Promise<string> {
+  if (await viewerGate()) return DEFAULT_SECTION_TITLE;
   const admin = createAdminClient();
   const { data } = await admin
     .from("homepage_settings")
@@ -127,10 +129,12 @@ export async function moveFeaturedCampaign(id: string, direction: "up" | "down")
 // brand_profiles / brand_invitations so admin can find a campaign by its
 // brand even if the campaign title is generic.
 export async function searchCampaignsForFeature(query: string) {
+  const gate = await adminGate();
+  if (gate) return [];
   const admin = createAdminClient();
-  const q = query.trim();
+  const q = sanitizeSearchTerm(query);
   if (!q) return [];
-  const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+  const like = `%${q}%`;
 
   // Direct title match first
   const { data: byTitle } = await admin

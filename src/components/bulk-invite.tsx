@@ -22,6 +22,10 @@ interface BulkInviteProps {
 // chunks and aggregates. Tuned so a chunk's bulk existence check + batch
 // insert stays fast.
 const CHUNK_SIZE = 200;
+// Upper bound on a single file. Parsing is synchronous on the main thread,
+// so a huge sheet would freeze the tab before chunking ever helps — cap it
+// and tell the admin to split the file.
+const MAX_ROWS = 5000;
 
 export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps) {
   const router = useRouter();
@@ -102,6 +106,10 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
           setParseError("No data rows found. Make sure you've added rows below the header.");
           return;
         }
+        if (mapped.length > MAX_ROWS) {
+          setParseError(`Too many rows (${mapped.length.toLocaleString()}). Split the file into batches of ${MAX_ROWS.toLocaleString()} or fewer and upload them separately.`);
+          return;
+        }
 
         setParsedRows(mapped);
         setFileName(file.name);
@@ -116,13 +124,15 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
     if (parsedRows.length === 0) return;
     setLoading(true);
     const noun = type === "influencer" ? "influencers" : "brands";
+    // Hoisted out of try so the catch can still report/keep partial progress
+    // if a chunk call rejects mid-run (network/timeout).
+    const aggregate: BulkResult = { success: 0, failed: [] };
     try {
       // Send the file in chunks so a large upload never trips the
       // serverless timeout. Results are aggregated across chunks; a
       // chunk that fails outright (network/auth) stops the run and
       // surfaces the error, but per-row failures inside a chunk are just
       // collected and shown at the end.
-      const aggregate: BulkResult = { success: 0, failed: [] };
       const total = parsedRows.length;
       for (let offset = 0; offset < total; offset += CHUNK_SIZE) {
         const chunk = parsedRows.slice(offset, offset + CHUNK_SIZE);
@@ -144,7 +154,14 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
       setResult(aggregate);
       if (aggregate.success > 0) router.refresh();
     } catch (e) {
-      setParseError(e instanceof Error ? e.message : "Bulk import failed");
+      // A chunk threw (network/timeout). Don't lose what already imported.
+      const base = e instanceof Error ? e.message : "Bulk import failed";
+      setParseError(
+        aggregate.success > 0
+          ? `${base}. ${aggregate.success} row(s) imported before the error — re-upload only the remaining rows.`
+          : base,
+      );
+      if (aggregate.success > 0) router.refresh();
     }
     setLoading(false);
   };

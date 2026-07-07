@@ -24,38 +24,54 @@ export default async function DashboardLayout({
   }
 
   // Verify the user has an admin_profiles row. Use the service-role client so
-  // RLS / cookie races can't return a misleading empty result and sign someone
-  // out mid-session.
+  // RLS can't return a misleading empty result. This layout is the READ gate
+  // for every dashboard page (pages fetch with the service-role client), so
+  // it must FAIL CLOSED — a user we can't positively confirm as an admin does
+  // not get rendered the dashboard. This portal shares a Supabase project with
+  // the consumer app, so a non-admin user CAN hold a valid session here.
   const { createAdminClient } = await import("@/utils/supabase/admin");
   const adminClient = createAdminClient();
 
-  const { count, error: profileError } = await adminClient
-    .from("admin_profiles")
-    .select("*", { count: "exact", head: true });
-
-  const tableExists = !profileError;
-  const tableHasRows = tableExists && (count ?? 0) > 0;
-
-  // Read the role and decide what to render. We still allow users in
-  // even if the lookup fails (network blip) — see comment in the gate
-  // below — but we want the role for downstream UI gating.
+  // Look up THIS user's admin row, with one bounded retry to ride out a
+  // transient error (avoids logging a real admin out on a network blip)
+  // without the old "let everyone in on error" fail-open.
   let role: "super_admin" | "admin" | "viewer" | null = null;
   let fullName = "";
-  if (tableHasRows) {
+  let confirmed = false;
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
     const { data: adminProfile, error: lookupErr } = await adminClient
       .from("admin_profiles")
       .select("id, role, full_name")
       .eq("id", user.id)
       .maybeSingle();
-
-    // Only sign out when we definitively confirm the user isn't in the
-    // admins table. Any lookup error → keep them in (avoids log-out on refresh).
-    if (!lookupErr && !adminProfile) {
-      await supabase.auth.signOut();
-      redirect("/login");
+    if (!lookupErr) {
+      confirmed = true;
+      if (adminProfile) {
+        role = (adminProfile.role as typeof role) || null;
+        fullName = adminProfile.full_name || "";
+      }
+      break;
     }
-    role = (adminProfile?.role as typeof role) || null;
-    fullName = adminProfile?.full_name || "";
+    lastErr = lookupErr;
+  }
+
+  // Confirmed-not-an-admin OR confirmed-but-no-valid-role → this is not an
+  // admin. Sign out and bounce. (A consumer user landing here gets ejected.)
+  if (confirmed && (!role || !["super_admin", "admin", "viewer"].includes(role))) {
+    await supabase.auth.signOut();
+    redirect("/login");
+  }
+
+  // Could not confirm after retries (persistent lookup error) → fail closed.
+  // Redirect to /login WITHOUT signing out, so a genuine admin simply retries
+  // and a transient error doesn't nuke their session.
+  if (!confirmed) {
+    console.error("[dashboard-layout] admin_profiles lookup failed; failing closed", {
+      userId: user.id,
+      err: lastErr instanceof Error ? lastErr.message : String(lastErr),
+    });
+    redirect("/login");
   }
 
   return (

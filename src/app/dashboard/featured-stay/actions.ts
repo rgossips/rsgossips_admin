@@ -2,7 +2,8 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { adminGate } from "@/lib/require-super-admin";
+import { adminGate, viewerGate } from "@/lib/require-super-admin";
+import { sanitizeSearchTerm } from "@/lib/validation";
 
 // Plan Your Stay carousel — admin-curated list backed by
 // public.featured_campaigns with section='stay' (migration 033).
@@ -17,6 +18,7 @@ const SECTION_TITLE_KEY = "featured_section_title";
 const DEFAULT_SECTION_TITLE = "Plan your stay with us";
 
 export async function getStaySectionTitle(): Promise<string> {
+  if (await viewerGate()) return DEFAULT_SECTION_TITLE;
   const admin = createAdminClient();
   const { data } = await admin
     .from("homepage_settings")
@@ -122,10 +124,12 @@ export async function moveStayCampaign(id: string, direction: "up" | "down"): Pr
 
 // Picker — campaigns not already pinned to the 'stay' section.
 export async function searchCampaignsForStay(query: string) {
+  const gate = await adminGate();
+  if (gate) return [];
   const admin = createAdminClient();
-  const q = query.trim();
+  const q = sanitizeSearchTerm(query);
   if (!q) return [];
-  const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+  const like = `%${q}%`;
 
   const { data: byTitle } = await admin
     .from("campaigns")
