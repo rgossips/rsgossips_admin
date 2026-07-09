@@ -1,6 +1,28 @@
-# Netlify config for the RecentGossips admin portal.
-# Security headers apply to every response. See docs/SECURITY.md.
+# Netlify config for the RecentGossips admin portal (Next.js 16 SSR).
+#
+# Pin the Next.js runtime explicitly. Previously this file was headers-only,
+# which left the build relying on Netlify's auto-detection; the adapter must
+# run so `_next/static` assets get the correct Content-Type (a .css served
+# as text/plain is refused once X-Content-Type-Options: nosniff is set) and
+# so React server-action IDs are registered (otherwise clients hit
+# "Server Action … was not found on the server").
 
+[build]
+  command = "next build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Long-lived immutable caching for fingerprinted build assets. These names
+# change every build, so caching them forever is safe and avoids re-fetch
+# churn. (The Next runtime also sets this; pinning it here is harmless.)
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Security headers on every response. See docs/SECURITY.md.
 [[headers]]
   for = "/*"
   [headers.values]
