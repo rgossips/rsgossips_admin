@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { updateInfluencer, uploadInfluencerPhoto } from "../actions";
-import { ButtonSpinner } from "@/components/spinner";
+import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { INDIAN_CITIES, parseStoredCities } from "@/lib/cities";
 
@@ -32,6 +32,7 @@ export function EditInfluencerButton({ influencer }: { influencer: any }) {
 function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose: () => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("Saving changes...");
   const [error, setError] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string>(influencer.profile_photo_url || "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -56,6 +57,7 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
     setLoading(true);
     // Upload new photo first if selected
     if (photoFile) {
+      setLoadingMsg("Uploading photo...");
       const fd = new FormData();
       fd.append("file", photoFile);
       fd.append("folder", "influencer-photos");
@@ -63,6 +65,7 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
       if (uploadResult.error) { setError(uploadResult.error); setLoading(false); return; }
       if (uploadResult.url) formData.append("profile_photo_url", uploadResult.url);
     }
+    setLoadingMsg("Saving changes...");
     // MultiSelectChips renders no form field, so this is the only thing
     // that puts location on the payload — comma-joined so the DB scalar
     // column stays valid and the downstream matcher finds each city.
@@ -79,6 +82,7 @@ function EditInfluencerModal({ influencer, onClose }: { influencer: any; onClose
 
   return (
     <>
+      {loading && <FullPageLoader message={loadingMsg} />}
       <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed z-50 inset-4 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:w-full lg:max-w-2xl lg:max-h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">

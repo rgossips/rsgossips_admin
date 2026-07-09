@@ -9,6 +9,7 @@ import { AddFeaturedCampaignButton } from "./_components/add-featured-campaign";
 import { SectionTitleEditor } from "./_components/section-title-editor";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
+import { ActionButton } from "@/components/action-button";
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedCampaignsPage() {
@@ -168,13 +169,12 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
               await moveFeaturedCampaign(row.id, "up");
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               title="Move up"
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↑
-            </button>
+            </ActionButton>
           </form>
           <form
             action={async () => {
@@ -182,13 +182,12 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
               await moveFeaturedCampaign(row.id, "down");
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               title="Move down"
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↓
-            </button>
+            </ActionButton>
           </form>
         </>
       )}
@@ -209,12 +208,11 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
               await toggleFeaturedCampaignActive(row.id, !row.is_active);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               {row.is_active ? "Hide" : "Show"}
-            </button>
+            </ActionButton>
           </form>
 
           <form
@@ -223,12 +221,11 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
               await deleteFeaturedCampaign(row.id);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
             >
               Delete
-            </button>
+            </ActionButton>
           </form>
         </>
       )}

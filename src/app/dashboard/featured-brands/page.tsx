@@ -7,6 +7,7 @@ import {
 import { AddFeaturedBrandButton } from "./_components/add-featured-brand";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
+import { ActionButton } from "@/components/action-button";
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedBrandsPage() {
@@ -115,13 +116,12 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
               await moveFeaturedBrand(brand.id, "up");
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               title="Move up"
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↑
-            </button>
+            </ActionButton>
           </form>
           <form
             action={async () => {
@@ -129,13 +129,12 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
               await moveFeaturedBrand(brand.id, "down");
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               title="Move down"
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↓
-            </button>
+            </ActionButton>
           </form>
         </>
       )}
@@ -156,12 +155,11 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
               await toggleFeaturedBrandActive(brand.id, !brand.is_active);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               {brand.is_active ? "Hide" : "Show"}
-            </button>
+            </ActionButton>
           </form>
 
           <form
@@ -170,12 +168,11 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
               await deleteFeaturedBrand(brand.id);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
             >
               Delete
-            </button>
+            </ActionButton>
           </form>
         </>
       )}

@@ -7,6 +7,7 @@ import {
   toggleCreatorStoryActive,
 } from "./actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { ActionButton } from "@/components/action-button";
 import { CreatorStoriesSectionTitleEditor } from "./_components/section-title-editor";
 
 export const dynamic = "force-dynamic";
@@ -128,13 +129,12 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
               await moveCreatorStory(story.id, "up");
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               title="Move up"
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↑
-            </button>
+            </ActionButton>
           </form>
           <form
             action={async () => {
@@ -142,13 +142,12 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
               await moveCreatorStory(story.id, "down");
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               title="Move down"
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↓
-            </button>
+            </ActionButton>
           </form>
         </>
       )}
@@ -176,12 +175,11 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
               await toggleCreatorStoryActive(story.id, !story.is_active);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               {story.is_active ? "Hide" : "Show"}
-            </button>
+            </ActionButton>
           </form>
 
           <form
@@ -190,12 +188,11 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
               await deleteCreatorStory(story.id);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
             >
               Delete
-            </button>
+            </ActionButton>
           </form>
         </>
       )}

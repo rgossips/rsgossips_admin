@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { ActionButton } from "@/components/action-button";
 import { AdjustRcForm } from "./_components/adjust-rc-form";
 import { resolveManualReview } from "./actions";
 
@@ -232,12 +233,11 @@ export default async function ReferralsPage({
                             await resolveManualReview(r.id, "approve");
                           }}
                         >
-                          <button
-                            type="submit"
+                          <ActionButton
                             className="w-full px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold cursor-pointer"
                           >
                             Approve
-                          </button>
+                          </ActionButton>
                         </form>
                         <form
                           action={async () => {
@@ -245,12 +245,11 @@ export default async function ReferralsPage({
                             await resolveManualReview(r.id, "reject");
                           }}
                         >
-                          <button
-                            type="submit"
+                          <ActionButton
                             className="w-full px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 text-[12px] font-bold cursor-pointer"
                           >
                             Reject
-                          </button>
+                          </ActionButton>
                         </form>
                       </>
                     )}

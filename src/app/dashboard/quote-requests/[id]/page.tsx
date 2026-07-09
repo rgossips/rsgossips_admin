@@ -8,6 +8,7 @@ import { acceptCounterOffer } from "../actions";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
+import { ActionButton } from "@/components/action-button";
 export const dynamic = "force-dynamic";
 
 export default async function QuoteRequestDetailPage({
@@ -191,12 +192,11 @@ export default async function QuoteRequestDetailPage({
                   }}
                   className="mt-3"
                 >
-                  <button
-                    type="submit"
+                  <ActionButton
                     className="w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold cursor-pointer"
                   >
                     Accept counter — ₹{Number(order.counter_amount || 0).toLocaleString("en-IN")}
-                  </button>
+                  </ActionButton>
                 </form>
               </div>
               <QuoteResponseForm

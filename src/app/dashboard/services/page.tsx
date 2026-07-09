@@ -3,6 +3,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { toggleServiceActive } from "./actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
+import { ActionButton } from "@/components/action-button";
 export const dynamic = "force-dynamic";
 
 export default async function ServicesPage({
@@ -183,12 +184,11 @@ function ServiceRow({ service, canWrite }: { service: any; canWrite: boolean }) 
               await toggleServiceActive(service.id, !service.is_active);
             }}
           >
-            <button
-              type="submit"
+            <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               {service.is_active ? "Deactivate" : "Activate"}
-            </button>
+            </ActionButton>
           </form>
         </>
       )}
