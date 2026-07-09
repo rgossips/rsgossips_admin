@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { MarkPaidForm } from "./_components/mark-paid-form";
@@ -229,10 +230,28 @@ function PayoutRow({
 
   return (
     <div className="p-4 grid grid-cols-12 gap-4 items-start">
-      {/* Creator */}
-      <div className="col-span-3">
-        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{creatorName}</p>
-        {handle && <p className="text-[11px] text-gray-400 truncate">{handle}</p>}
+      {/* Creator — name + handle link to the influencer detail page */}
+      <div className="col-span-3 min-w-0">
+        {creator?.influencer_id ? (
+          <Link
+            href={`/dashboard/influencers/${creator.influencer_id}`}
+            className="group block"
+          >
+            <p className="text-sm font-bold text-gray-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:underline transition-colors">
+              {creatorName}
+            </p>
+            {handle && (
+              <p className="text-[11px] text-gray-400 truncate group-hover:text-indigo-500 transition-colors">
+                {handle}
+              </p>
+            )}
+          </Link>
+        ) : (
+          <>
+            <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{creatorName}</p>
+            {handle && <p className="text-[11px] text-gray-400 truncate">{handle}</p>}
+          </>
+        )}
         {campaign?.title && (
           <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
             {campaign.title}
