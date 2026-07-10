@@ -5,6 +5,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { EditInfluencerButton } from "./edit-influencer";
 import { ChangePlanButton } from "./change-plan";
 import { DeleteInfluencerButton } from "./delete-influencer";
+import { ReferralLinkCard } from "./referral-link-card";
 import { Avatar } from "@/components/avatar";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
 
@@ -144,6 +145,7 @@ export default async function InfluencerDetailPage({
             ["Media", inf.media_count?.toLocaleString() || "0"],
             ["Engagement", inf.engagement_rate ? `${inf.engagement_rate}%` : "—"],
           ]} />
+          <ReferralLinkCard referralCode={inf.referral_code} />
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800"><h2 className="text-sm font-semibold text-gray-900 dark:text-white">Timeline</h2></div>
             <div className="p-5 space-y-3">
