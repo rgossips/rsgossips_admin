@@ -3,13 +3,14 @@
 import { useState } from "react";
 
 // Shows the creator's Refer & Earn share link (mirrors the consumer app:
-// influencer/refer builds https://rgossips.com/?ref=<referral_code>) with a
-// one-click copy. The referral_code lives on influencer_profiles and is
-// what the creator shares to earn reward credits.
+// influencer/refer builds https://rgossips.com/login?ref=<referral_code>)
+// with a one-click copy. The link drops the visitor into the influencer
+// sign-up flow with the referral code prefilled. The referral_code lives on
+// influencer_profiles and is what the creator shares to earn reward credits.
 export function ReferralLinkCard({ referralCode }: { referralCode: string | null | undefined }) {
   const [copied, setCopied] = useState(false);
   const code = (referralCode || "").trim();
-  const shareUrl = code ? `https://rgossips.com/?ref=${code}` : "";
+  const shareUrl = code ? `https://rgossips.com/login?ref=${code}` : "";
 
   const copy = async () => {
     if (!shareUrl) return;
