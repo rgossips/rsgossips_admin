@@ -6,6 +6,7 @@ import { DeliverDraftForm } from "../_components/deliver-draft-form";
 import { DeliverFinalForm } from "../_components/deliver-final-form";
 import { acceptCounterOffer } from "../actions";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { RefreshButton } from "@/components/refresh-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 import { ActionButton } from "@/components/action-button";
@@ -66,9 +67,12 @@ export default async function QuoteRequestDetailPage({
             {userEmail && <> · {userEmail}</>}
           </p>
         </div>
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded bg-amber-50 text-amber-700">
-          {order.status.replace(/_/g, " ")}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded bg-amber-50 text-amber-700">
+            {order.status.replace(/_/g, " ")}
+          </span>
+          <RefreshButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
