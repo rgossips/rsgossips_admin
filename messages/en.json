@@ -1,0 +1,21 @@
+{
+  "Common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "search": "Search",
+    "somethingWentWrong": "Something went wrong. Please try again."
+  },
+  "Sidebar": {
+    "groups": {
+      "overview": "Overview",
+      "influencers": "Influencers",
+      "brands": "Brands",
+      "operations": "Operations",
+      "adminPanel": "Admin Panel"
+    }
+  }
+}

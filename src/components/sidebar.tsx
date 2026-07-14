@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/utils/supabase/client";
 import { useRole } from "@/components/role-context";
 
 type NavSpec = { label: string; href: string; icon: string; badgeKey?: string };
-type NavGroup = { title?: string; items: NavSpec[] };
+// `titleKey` maps to Sidebar.groups.* in the message catalog; `title` is the
+// English fallback used until a group is added to the catalog.
+type NavGroup = { title?: string; titleKey?: string; items: NavSpec[] };
 
 // Sidebar navigation, grouped so influencer- and brand-related items
 // no longer sit side-by-side with each other and with operations.
@@ -17,12 +20,14 @@ const navGroups: NavGroup[] = [
     // Top strip — everything cross-cutting sits under a "Overview" heading
     // rather than crowding the influencer/brand groups below.
     title: "Overview",
+    titleKey: "overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "grid" },
     ],
   },
   {
     title: "Influencers",
+    titleKey: "influencers",
     items: [
       { label: "Influencers", href: "/dashboard/influencers", icon: "users" },
       { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
@@ -32,6 +37,7 @@ const navGroups: NavGroup[] = [
   },
   {
     title: "Brands",
+    titleKey: "brands",
     items: [
       { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
       { label: "Featured Brands", href: "/dashboard/featured-brands", icon: "tag" },
@@ -42,6 +48,7 @@ const navGroups: NavGroup[] = [
   },
   {
     title: "Operations",
+    titleKey: "operations",
     items: [
       { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
       { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
@@ -181,6 +188,7 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { isSuperAdmin, role } = useRole();
+  const t = useTranslations("Sidebar");
 
   // Live counts used by nav badges. Currently just the inbox of pending
   // quote requests; refresh every 30 s so admins see new submissions
@@ -289,7 +297,7 @@ export function Sidebar({
             <div key={group.title || `group-${gi}`} className={gi > 0 ? "mt-5" : ""}>
               {group.title && (
                 <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
-                  {group.title}
+                  {group.titleKey ? t(`groups.${group.titleKey}`) : group.title}
                 </p>
               )}
               <div className="space-y-0.5">
@@ -308,7 +316,7 @@ export function Sidebar({
           {isSuperAdmin && (
             <div className="mt-5">
               <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-600">
-                Admin Panel
+                {t("groups.adminPanel")}
               </p>
               <div className="space-y-0.5">
                 {adminNav.map((item) => (
