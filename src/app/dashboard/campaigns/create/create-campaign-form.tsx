@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { createCampaign, updateCampaign, uploadCampaignImage } from "../actions";
 import { FullPageLoader } from "@/components/spinner";
 
@@ -94,9 +95,6 @@ interface ImagePreview {
   url: string;
 }
 
-const DESCRIPTION_TEMPLATE =
-  "What is this campaign about?\n\nWhat do you want the influencer to highlight?\n\nAny specific messaging or hashtags?";
-
 // Defined outside CreateCampaignForm so React doesn't see a new component
 // identity on every render. When these lived inside the form, any state
 // change (typing in a deliverable count) remounted every input under
@@ -130,6 +128,7 @@ function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () 
 
 export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initial?: CampaignInitial }) {
   const router = useRouter();
+  const t = useTranslations("DashboardCampaignsCreateCreateCampaignForm");
   const isEdit = !!initial;
   // The "brand_id" select expects format "registered:uuid" or "invited:uuid".
   // Build that prefilled value when we're editing an existing row.
@@ -140,7 +139,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
       : "";
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState(isEdit ? "Saving campaign..." : "Creating campaign...");
+  const [loadingMsg, setLoadingMsg] = useState(isEdit ? t("loading.savingCampaign") : t("loading.creatingCampaign"));
 
   const [campaignType, setCampaignType] = useState<"barter" | "paid" | "hybrid">(initial?.campaign_type || "barter");
   const [status, setStatus] = useState<string>(initial?.status || "draft");
@@ -277,21 +276,21 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
     // case. Otherwise the user sees nothing until uploads start, which
     // reads as a dead button.
     setLoading(true);
-    setLoadingMsg(isEdit ? "Saving campaign..." : "Creating campaign...");
+    setLoadingMsg(isEdit ? t("loading.savingCampaign") : t("loading.creatingCampaign"));
     setError("");
 
     if (totalDeliverables < 1) {
-      setError("Add at least 1 deliverable");
+      setError(t("errors.addDeliverable"));
       setLoading(false);
       return;
     }
     if (selectedCategories.length < 1) {
-      setError("Select at least 1 category");
+      setError(t("errors.selectCategory"));
       setLoading(false);
       return;
     }
     if (selectedPlatforms.length < 1) {
-      setError("Select at least 1 platform");
+      setError(t("errors.selectPlatform"));
       setLoading(false);
       return;
     }
@@ -315,7 +314,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
 
       // Banner: new file overrides existing; otherwise reuse the existing URL.
       if (bannerImage) {
-        setLoadingMsg("Uploading banner image...");
+        setLoadingMsg(t("loading.uploadingBanner"));
         const bannerUrl = await uploadImage(bannerImage.file, "banners");
         if (bannerUrl) formData.append("banner_image_url", bannerUrl);
       } else if (existingBannerUrl) {
@@ -329,7 +328,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
       }
       if (galleryImages.length > 0) {
         for (let i = 0; i < galleryImages.length; i++) {
-          setLoadingMsg(`Uploading gallery image ${i + 1} of ${galleryImages.length}...`);
+          setLoadingMsg(t("loading.uploadingGallery", { current: i + 1, total: galleryImages.length }));
           const url = await uploadImage(galleryImages[i].file, "gallery");
           if (url) formData.append("gallery_image_urls", url);
         }
@@ -338,7 +337,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
       // Status is only set explicitly in edit mode — create defaults to "draft" server-side.
       if (isEdit) formData.append("status", status);
 
-      setLoadingMsg(isEdit ? "Saving campaign..." : "Creating campaign...");
+      setLoadingMsg(isEdit ? t("loading.savingCampaign") : t("loading.creatingCampaign"));
       const result = isEdit
         ? await updateCampaign(initial!.campaign_id, formData)
         : await createCampaign(formData);
@@ -350,7 +349,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
         router.refresh();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : t("errors.somethingWentWrong"));
       setLoading(false);
     }
   };
@@ -370,34 +369,34 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Basic information">
+          <Card title={t("cards.basicInfo")}>
             <div>
-              <label className={labelClass}>Campaign Title <span className="text-red-400">*</span></label>
+              <label className={labelClass}>{t("fields.campaignTitle")} <span className="text-red-400">*</span></label>
               <input
                 name="title"
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Summer Fashion 2026"
+                placeholder={t("placeholders.campaignTitle")}
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass}>Description</label>
+              <label className={labelClass}>{t("fields.description")}</label>
               <textarea
                 name="description"
                 rows={5}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={DESCRIPTION_TEMPLATE}
+                placeholder={t("placeholders.description")}
                 className={`${inputClass} resize-none`}
               />
-              <p className="text-[11px] text-gray-400 mt-1">A guided template helps creators understand what you need.</p>
+              <p className="text-[11px] text-gray-400 mt-1">{t("hints.description")}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Brand <span className="text-red-400">*</span></label>
+                <label className={labelClass}>{t("fields.brand")} <span className="text-red-400">*</span></label>
                 <select
                   name="brand_id"
                   required
@@ -405,16 +404,16 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                   onChange={(e) => setBrandSelect(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">Select a brand</option>
+                  <option value="">{t("options.selectBrand")}</option>
                   {brands.map((b) => (
                     <option key={b.id} value={`${b.type}:${b.id}`}>
-                      {b.name || b.id}{b.type === "invited" ? " (Invited)" : ""}
+                      {b.name || b.id}{b.type === "invited" ? t("brandInvitedSuffix") : ""}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Campaign Type <span className="text-red-400">*</span></label>
+                <label className={labelClass}>{t("fields.campaignType")} <span className="text-red-400">*</span></label>
                 <select
                   name="campaign_type"
                   value={campaignType}
@@ -422,26 +421,26 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                   required
                   className={inputClass}
                 >
-                  <option value="barter">Barter</option>
-                  <option value="paid">Paid</option>
-                  <option value="hybrid">Hybrid</option>
+                  <option value="barter">{t("campaignType.barter")}</option>
+                  <option value="paid">{t("campaignType.paid")}</option>
+                  <option value="hybrid">{t("campaignType.hybrid")}</option>
                 </select>
               </div>
             </div>
             {isEdit && (
               <div>
-                <label className={labelClass}>Status</label>
+                <label className={labelClass}>{t("fields.status")}</label>
                 <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="completed">Completed</option>
+                  <option value="draft">{t("status.draft")}</option>
+                  <option value="active">{t("status.active")}</option>
+                  <option value="paused">{t("status.paused")}</option>
+                  <option value="completed">{t("status.completed")}</option>
                 </select>
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>Total Slots</label>
+                <label className={labelClass}>{t("fields.totalSlots")}</label>
                 <input
                   name="max_influencers"
                   type="number"
@@ -454,7 +453,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               </div>
               {!isBarter && (
                 <div>
-                  <label className={labelClass}>Total Budget</label>
+                  <label className={labelClass}>{t("fields.totalBudget")}</label>
                   <input
                     name="budget_total"
                     type="number"
@@ -468,7 +467,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               )}
               {!isBarter && (
                 <div>
-                  <label className={labelClass}>Budget / Influencer</label>
+                  <label className={labelClass}>{t("fields.budgetPerInfluencer")}</label>
                   <input
                     name="budget_per_influencer"
                     type="number"
@@ -477,12 +476,12 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                     placeholder="—"
                     className={`${inputClass} bg-gray-100 dark:bg-gray-700 cursor-not-allowed`}
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Auto-calculated from total ÷ slots</p>
+                  <p className="text-[10px] text-gray-400 mt-1">{t("hints.budgetAutoCalc")}</p>
                 </div>
               )}
               {(isBarter || isHybrid) && (
                 <div>
-                  <label className={labelClass}>Product value (approx.)</label>
+                  <label className={labelClass}>{t("fields.productValue")}</label>
                   <input
                     name="product_value"
                     type="number"
@@ -497,9 +496,9 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             </div>
           </Card>
 
-          <Card title="Product / service">
+          <Card title={t("cards.productService")}>
             <div>
-              <label className={labelClass}>What are you promoting? <span className="text-red-400">*</span></label>
+              <label className={labelClass}>{t("fields.whatPromoting")} <span className="text-red-400">*</span></label>
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
                   type="button"
@@ -510,7 +509,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                       : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600"
                   }`}
                 >
-                  📦 Product
+                  {t("offering.product")}
                 </button>
                 <button
                   type="button"
@@ -521,7 +520,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                       : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600"
                   }`}
                 >
-                  🛎️ Service / Experience
+                  {t("offering.service")}
                 </button>
               </div>
               <input
@@ -530,8 +529,8 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 placeholder={offeringType === "product"
-                  ? 'e.g. "Moisturizing cream — 50ml tube"'
-                  : 'e.g. "Weekend stay at our Mussoorie resort"'}
+                  ? t("placeholders.productNameProduct")
+                  : t("placeholders.productNameService")}
                 className={inputClass}
               />
             </div>
@@ -539,21 +538,21 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             {offeringType === "product" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>Will product be shipped?</label>
+                  <label className={labelClass}>{t("fields.willBeShipped")}</label>
                   <select
                     name="shipping_required"
                     value={shippingRequired}
                     onChange={(e) => setShippingRequired(e.target.value as any)}
                     className={inputClass}
                   >
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
-                    <option value="pickup">Pickup required</option>
+                    <option value="no">{t("shipping.no")}</option>
+                    <option value="yes">{t("shipping.yes")}</option>
+                    <option value="pickup">{t("shipping.pickup")}</option>
                   </select>
                 </div>
                 {shippingRequired === "yes" && (
                   <div>
-                    <label className={labelClass}>Shipping timeline (days)</label>
+                    <label className={labelClass}>{t("fields.shippingTimeline")}</label>
                     <input
                       name="shipping_timeline_days"
                       type="number"
@@ -570,67 +569,67 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
 
             {offeringType === "service" && (
               <div>
-                <label className={labelClass}>Service location</label>
+                <label className={labelClass}>{t("fields.serviceLocation")}</label>
                 <input
                   name="service_location"
                   type="text"
                   value={serviceLocation}
                   onChange={(e) => setServiceLocation(e.target.value)}
-                  placeholder='e.g. "Mussoorie, India" or "Online / virtual"'
+                  placeholder={t("placeholders.serviceLocation")}
                   className={inputClass}
                 />
-                <p className="text-[11px] text-gray-400 mt-1">Where the influencer experiences the service.</p>
+                <p className="text-[11px] text-gray-400 mt-1">{t("hints.serviceLocation")}</p>
               </div>
             )}
 
             {(isBarter || isHybrid) && (
               <div>
-                <label className={labelClass}>What does the influencer get? (compensation)</label>
+                <label className={labelClass}>{t("fields.compensation")}</label>
                 <textarea
                   name="barter_compensation"
                   rows={2}
                   value={barterCompensation}
                   onChange={(e) => setBarterCompensation(e.target.value)}
                   placeholder={offeringType === "product"
-                    ? 'e.g. "Full skincare kit worth ₹3,500"'
-                    : 'e.g. "Free 2-night stay + meals + spa session"'}
+                    ? t("placeholders.compensationProduct")
+                    : t("placeholders.compensationService")}
                   className={`${inputClass} resize-none`}
                 />
               </div>
             )}
           </Card>
 
-          <Card title="Banner image">
+          <Card title={t("cards.bannerImage")}>
             {bannerImage ? (
               <div className="relative group rounded-xl overflow-hidden">
-                <img src={bannerImage.url} alt="Banner preview" className="w-full h-48 object-cover" />
+                <img src={bannerImage.url} alt={t("alt.bannerPreview")} className="w-full h-48 object-cover" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
                   <button
                     type="button"
                     onClick={removeBanner}
                     className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-red-600 font-medium text-sm cursor-pointer shadow-lg"
                   >
-                    Remove
+                    {t("actions.remove")}
                   </button>
                 </div>
               </div>
             ) : existingBannerUrl ? (
               <div className="relative group rounded-xl overflow-hidden">
-                <img src={existingBannerUrl} alt="Existing banner" className="w-full h-48 object-cover" />
+                <img src={existingBannerUrl} alt={t("alt.existingBanner")} className="w-full h-48 object-cover" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => bannerInputRef.current?.click()}
                     className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-gray-700 font-medium text-sm cursor-pointer shadow-lg"
                   >
-                    Replace
+                    {t("actions.replace")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setExistingBannerUrl("")}
                     className="opacity-0 group-hover:opacity-100 transition-opacity px-4 py-2 rounded-xl bg-white/90 text-red-600 font-medium text-sm cursor-pointer shadow-lg"
                   >
-                    Remove
+                    {t("actions.remove")}
                   </button>
                 </div>
               </div>
@@ -646,8 +645,8 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                     : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:border-gray-300"
                 }`}
               >
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Click or drag to upload</p>
-                <p className="text-[11px] text-gray-400 mt-1">PNG, JPG, WebP up to 10MB</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("banner.uploadPrompt")}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{t("banner.uploadHint")}</p>
               </div>
             )}
             <input
@@ -659,12 +658,12 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             />
           </Card>
 
-          <Card title="Gallery">
+          <Card title={t("cards.gallery")}>
             {(existingGalleryUrls.length > 0 || galleryImages.length > 0) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {existingGalleryUrls.map((url, i) => (
                   <div key={`existing-${i}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
-                    <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                    <img src={url} alt={t("alt.gallery", { index: i + 1 })} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setExistingGalleryUrls((prev) => prev.filter((_, j) => j !== i))}
@@ -676,8 +675,8 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 ))}
                 {galleryImages.map((img, i) => (
                   <div key={`new-${i}`} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
-                    <img src={img.url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
-                    <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded bg-indigo-600 text-white font-bold">NEW</span>
+                    <img src={img.url} alt={t("alt.gallery", { index: i + 1 })} className="w-full h-full object-cover" />
+                    <span className="absolute top-1.5 left-1.5 text-[9px] px-1.5 py-0.5 rounded bg-indigo-600 text-white font-bold">{t("gallery.newBadge")}</span>
                     <button
                       type="button"
                       onClick={() => removeGalleryImage(i)}
@@ -701,7 +700,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               }`}
             >
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {(galleryImages.length > 0 || existingGalleryUrls.length > 0) ? "Add more images" : "Click or drag to upload images"}
+                {(galleryImages.length > 0 || existingGalleryUrls.length > 0) ? t("gallery.addMore") : t("gallery.uploadPrompt")}
               </p>
             </div>
             <input
@@ -714,53 +713,53 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             />
           </Card>
 
-          <Card title={`Content deliverables · ${totalDeliverables} piece${totalDeliverables !== 1 ? "s" : ""}`}>
+          <Card title={t("cards.contentDeliverables", { count: totalDeliverables })}>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               <div>
-                <label className={labelClass}>Reels</label>
+                <label className={labelClass}>{t("deliverables.reels")}</label>
                 <input name="num_reels" type="number" min="0" value={numReels} onChange={(e) => setNumReels(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
               </div>
               <div>
-                <label className={labelClass}>Posts</label>
+                <label className={labelClass}>{t("deliverables.posts")}</label>
                 <input name="num_posts" type="number" min="0" value={numPosts} onChange={(e) => setNumPosts(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
               </div>
               <div>
-                <label className={labelClass}>Stories</label>
+                <label className={labelClass}>{t("deliverables.stories")}</label>
                 <input name="num_stories" type="number" min="0" value={numStories} onChange={(e) => setNumStories(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
               </div>
               <div>
-                <label className={labelClass}>Videos</label>
+                <label className={labelClass}>{t("deliverables.videos")}</label>
                 <input name="num_videos" type="number" min="0" value={numVideos} onChange={(e) => setNumVideos(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
               </div>
               <div>
-                <label className={labelClass}>Blogs</label>
+                <label className={labelClass}>{t("deliverables.blogs")}</label>
                 <input name="num_blogs" type="number" min="0" value={numBlogs} onChange={(e) => setNumBlogs(e.target.value)} placeholder="0" className={`${inputClass} text-center`} />
               </div>
             </div>
             {totalDeliverables === 0 && (
-              <p className="text-[11px] text-amber-600 dark:text-amber-400">At least 1 deliverable is required.</p>
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">{t("deliverables.required")}</p>
             )}
           </Card>
 
-          <Card title="Influencer requirements">
+          <Card title={t("cards.influencerRequirements")}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>Influencer Tier</label>
+                <label className={labelClass}>{t("fields.influencerTier")}</label>
                 <select
                   name="target_influencer_tier"
                   value={tier}
                   onChange={(e) => setTier(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="all">All Tiers</option>
-                  <option value="nano">Nano (1K-10K)</option>
-                  <option value="micro">Micro (10K-100K)</option>
-                  <option value="macro">Macro (100K-1M)</option>
-                  <option value="mega">Mega (1M+)</option>
+                  <option value="all">{t("tier.all")}</option>
+                  <option value="nano">{t("tier.nano")}</option>
+                  <option value="micro">{t("tier.micro")}</option>
+                  <option value="macro">{t("tier.macro")}</option>
+                  <option value="mega">{t("tier.mega")}</option>
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Min. Followers</label>
+                <label className={labelClass}>{t("fields.minFollowers")}</label>
                 <input
                   name="target_follower_min"
                   type="number"
@@ -772,7 +771,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 />
               </div>
               <div>
-                <label className={labelClass}>Max. Followers</label>
+                <label className={labelClass}>{t("fields.maxFollowers")}</label>
                 <input
                   name="target_follower_max"
                   type="number"
@@ -785,7 +784,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               </div>
             </div>
             <div>
-              <label className={labelClass}>Min. Engagement Rate (%)</label>
+              <label className={labelClass}>{t("fields.minEngagement")}</label>
               <input
                 name="min_engagement_rate"
                 type="number"
@@ -799,7 +798,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className={labelClass} style={{ marginBottom: 0 }}>Locations</label>
+                <label className={labelClass} style={{ marginBottom: 0 }}>{t("fields.locations")}</label>
                 <label className="flex items-center gap-2 text-[11px] font-medium text-gray-600 dark:text-gray-400 cursor-pointer">
                   <input
                     type="checkbox"
@@ -807,7 +806,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                     onChange={(e) => setAllIndia(e.target.checked)}
                     className="w-4 h-4 accent-indigo-500"
                   />
-                  All India
+                  {t("allIndia")}
                 </label>
               </div>
               {!allIndia && (
@@ -819,7 +818,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               )}
             </div>
             <div>
-              <label className={labelClass}>Preferred gender</label>
+              <label className={labelClass}>{t("fields.preferredGender")}</label>
               <div className="flex flex-wrap gap-2">
                 {GENDERS.map((g) => (
                   <Chip key={g} label={g} on={selectedGenders.includes(g)} onClick={() => toggle(setSelectedGenders)(g)} />
@@ -827,7 +826,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               </div>
             </div>
             <div>
-              <label className={labelClass}>Preferred languages</label>
+              <label className={labelClass}>{t("fields.preferredLanguages")}</label>
               <div className="flex flex-wrap gap-2">
                 {LANGUAGES.map((l) => (
                   <Chip key={l} label={l} on={selectedLanguages.includes(l)} onClick={() => toggle(setSelectedLanguages)(l)} />
@@ -836,32 +835,32 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             </div>
           </Card>
 
-          <Card title="Content guidelines">
+          <Card title={t("cards.contentGuidelines")}>
             <div>
-              <label className={labelClass}>Must include (Do&apos;s)</label>
+              <label className={labelClass}>{t("fields.mustInclude")}</label>
               <textarea
                 name="content_dos"
                 rows={2}
                 value={contentDos}
                 onChange={(e) => setContentDos(e.target.value)}
-                placeholder='"Show product packaging, mention discount code SAVE20"'
+                placeholder={t("placeholders.contentDos")}
                 className={`${inputClass} resize-none`}
               />
             </div>
             <div>
-              <label className={labelClass}>Must avoid (Don&apos;ts)</label>
+              <label className={labelClass}>{t("fields.mustAvoid")}</label>
               <textarea
                 name="content_donts"
                 rows={2}
                 value={contentDonts}
                 onChange={(e) => setContentDonts(e.target.value)}
-                placeholder='"No competitor products, no copyrighted music"'
+                placeholder={t("placeholders.contentDonts")}
                 className={`${inputClass} resize-none`}
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Required hashtags</label>
+                <label className={labelClass}>{t("fields.requiredHashtags")}</label>
                 <input
                   name="required_hashtags"
                   type="text"
@@ -872,7 +871,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 />
               </div>
               <div>
-                <label className={labelClass}>Brand handle(s) to tag</label>
+                <label className={labelClass}>{t("fields.brandHandles")}</label>
                 <input
                   name="brand_handles_to_tag"
                   type="text"
@@ -885,65 +884,65 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             </div>
           </Card>
 
-          <Card title="Terms & rights">
+          <Card title={t("cards.termsRights")}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Content usage rights</label>
+                <label className={labelClass}>{t("fields.usageRights")}</label>
                 <select
                   name="usage_rights"
                   value={usageRights || "creator_only"}
                   onChange={(e) => setUsageRights(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="creator_only">Influencer&apos;s page only</option>
-                  <option value="brand_repost">Brand can repost</option>
-                  <option value="paid_ads">Brand can use in paid ads</option>
-                  <option value="full_rights">Full rights transfer</option>
+                  <option value="creator_only">{t("usageRights.creatorOnly")}</option>
+                  <option value="brand_repost">{t("usageRights.brandRepost")}</option>
+                  <option value="paid_ads">{t("usageRights.paidAds")}</option>
+                  <option value="full_rights">{t("usageRights.fullRights")}</option>
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Content keep-up duration</label>
+                <label className={labelClass}>{t("fields.keepupDuration")}</label>
                 <select
                   name="keepup_duration"
                   value={keepupDuration || "permanent"}
                   onChange={(e) => setKeepupDuration(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="24h">24 hours (stories)</option>
-                  <option value="7d">7 days</option>
-                  <option value="30d">30 days</option>
-                  <option value="permanent">Permanent</option>
+                  <option value="24h">{t("keepup.24h")}</option>
+                  <option value="7d">{t("keepup.7d")}</option>
+                  <option value="30d">{t("keepup.30d")}</option>
+                  <option value="permanent">{t("keepup.permanent")}</option>
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Exclusivity (no competing brands)</label>
+                <label className={labelClass}>{t("fields.exclusivity")}</label>
                 <select
                   name="exclusivity_days"
                   value={exclusivityDays || "0"}
                   onChange={(e) => setExclusivityDays(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="0">No exclusivity</option>
-                  <option value="7">7 days</option>
-                  <option value="15">15 days</option>
-                  <option value="30">30 days</option>
-                  <option value="60">60 days</option>
-                  <option value="90">90 days</option>
+                  <option value="0">{t("exclusivity.none")}</option>
+                  <option value="7">{t("exclusivity.7")}</option>
+                  <option value="15">{t("exclusivity.15")}</option>
+                  <option value="30">{t("exclusivity.30")}</option>
+                  <option value="60">{t("exclusivity.60")}</option>
+                  <option value="90">{t("exclusivity.90")}</option>
                 </select>
               </div>
               {!isBarter && (
                 <div>
-                  <label className={labelClass}>Payment timeline</label>
+                  <label className={labelClass}>{t("fields.paymentTimeline")}</label>
                   <select
                     name="payment_timeline"
                     value={paymentTimeline || "on_approval"}
                     onChange={(e) => setPaymentTimeline(e.target.value)}
                     className={inputClass}
                   >
-                    <option value="advance">Advance</option>
-                    <option value="on_approval">On content approval</option>
-                    <option value="7_days">Within 7 days of posting</option>
-                    <option value="30_days">Within 30 days</option>
+                    <option value="advance">{t("payment.advance")}</option>
+                    <option value="on_approval">{t("payment.onApproval")}</option>
+                    <option value="7_days">{t("payment.within7days")}</option>
+                    <option value="30_days">{t("payment.within30days")}</option>
                   </select>
                 </div>
               )}
@@ -953,31 +952,31 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
 
         {/* Right column — sidebar */}
         <div className="space-y-6">
-          <Card title="Platforms *">
+          <Card title={t("cards.platforms")}>
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => (
                 <Chip key={p} label={p} on={selectedPlatforms.includes(p)} onClick={() => toggle(setSelectedPlatforms)(p)} />
               ))}
             </div>
             {selectedPlatforms.length === 0 && (
-              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">Select at least 1 platform.</p>
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">{t("platforms.selectAtLeastOne")}</p>
             )}
           </Card>
 
-          <Card title={`Categories · ${selectedCategories.length} of ${CATEGORIES.length}`}>
+          <Card title={t("cards.categories", { selected: selectedCategories.length, total: CATEGORIES.length })}>
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => (
                 <Chip key={cat} label={cat} on={selectedCategories.includes(cat)} onClick={() => toggle(setSelectedCategories)(cat)} />
               ))}
             </div>
             {selectedCategories.length === 0 && (
-              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">Select at least 1 category.</p>
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">{t("categories.selectAtLeastOne")}</p>
             )}
           </Card>
 
-          <Card title="Schedule">
+          <Card title={t("cards.schedule")}>
             <div>
-              <label className={labelClass}>Start Date <span className="text-red-400">*</span></label>
+              <label className={labelClass}>{t("fields.startDate")} <span className="text-red-400">*</span></label>
               <input
                 name="campaign_start_date"
                 type="date"
@@ -988,7 +987,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
               />
             </div>
             <div>
-              <label className={labelClass}>Application Deadline <span className="text-red-400">*</span></label>
+              <label className={labelClass}>{t("fields.applicationDeadline")} <span className="text-red-400">*</span></label>
               <input
                 name="application_deadline"
                 type="date"
@@ -997,10 +996,10 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 onChange={(e) => setApplicationDeadline(e.target.value)}
                 className={inputClass}
               />
-              <p className="text-[11px] text-gray-400 mt-1">Last day for influencers to apply.</p>
+              <p className="text-[11px] text-gray-400 mt-1">{t("hints.applicationDeadline")}</p>
             </div>
             <div>
-              <label className={labelClass}>Campaign End Date <span className="text-red-400">*</span></label>
+              <label className={labelClass}>{t("fields.campaignEndDate")} <span className="text-red-400">*</span></label>
               <input
                 name="campaign_end_date"
                 type="date"
@@ -1009,11 +1008,11 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 onChange={(e) => setEndDate(e.target.value)}
                 className={inputClass}
               />
-              <p className="text-[11px] text-gray-400 mt-1">All content must be delivered by this date.</p>
+              <p className="text-[11px] text-gray-400 mt-1">{t("hints.campaignEndDate")}</p>
             </div>
           </Card>
 
-          <Card title={isEdit ? "Save changes" : "Submit"}>
+          <Card title={isEdit ? t("cards.saveChanges") : t("cards.submit")}>
             <button
               type="submit"
               disabled={loading}
@@ -1027,17 +1026,17 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 </svg>
               )}
               {loading
-                ? (loadingMsg || (isEdit ? "Saving..." : "Creating..."))
-                : (isEdit ? "Save Changes" : "Create Campaign")}
+                ? (loadingMsg || (isEdit ? t("actions.saving") : t("actions.creating")))
+                : (isEdit ? t("actions.saveChanges") : t("actions.createCampaign"))}
             </button>
             <button
               type="button"
               onClick={() => router.push(isEdit ? `/dashboard/campaigns/${initial!.campaign_id}` : "/dashboard/campaigns")}
               className="w-full px-6 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 text-gray-600 text-sm font-medium cursor-pointer"
             >
-              Cancel
+              {t("actions.cancel")}
             </button>
-            {!isEdit && <p className="text-[11px] text-gray-400 text-center">Campaign will be created as a draft</p>}
+            {!isEdit && <p className="text-[11px] text-gray-400 text-center">{t("hints.createdAsDraft")}</p>}
           </Card>
         </div>
       </div>

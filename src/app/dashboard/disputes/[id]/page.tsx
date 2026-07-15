@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { ResolveActions } from "./resolve-actions";
 
@@ -19,6 +20,7 @@ const formatDate = (iso: string | null) =>
 
 export default async function DisputeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const t = await getTranslations("DashboardDisputesId");
   const admin = createAdminClient();
   const { data: d, error } = await admin
     .from("escrow_disputes_v")
@@ -29,8 +31,8 @@ export default async function DisputeDetailPage({ params }: { params: Promise<{ 
   if (error || !d) {
     return (
       <div>
-        <Link href="/dashboard/disputes" className="text-violet-600 text-sm font-semibold">← Back to disputes</Link>
-        <p className="mt-6 text-gray-500">Dispute not found.</p>
+        <Link href="/dashboard/disputes" className="text-violet-600 text-sm font-semibold">{t("backToDisputes")}</Link>
+        <p className="mt-6 text-gray-500">{t("notFound")}</p>
       </div>
     );
   }
@@ -40,45 +42,50 @@ export default async function DisputeDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div>
-      <Link href="/dashboard/disputes" className="text-violet-600 text-sm font-semibold">← Back to disputes</Link>
+      <Link href="/dashboard/disputes" className="text-violet-600 text-sm font-semibold">{t("backToDisputes")}</Link>
 
       <div className="mt-4 mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {d.campaign_title || "Campaign"}
+          {d.campaign_title || t("campaign")}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-          Dispute on application <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{d.application_id}</code>
+          {t.rich("disputeOnApplication", {
+            id: d.application_id,
+            code: (chunks) => (
+              <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{chunks}</code>
+            ),
+          })}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Section title="Escrow">
+          <Section title={t("escrow")}>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Amount held" value={formatINR(d.escrow_amount)} highlight />
-              <Field label="Funded at" value={formatDate(d.escrow_funded_at)} />
-              <Field label="Razorpay payment" value={d.escrow_payment_id || "—"} mono />
-              <Field label="Current status" value={d.escrow_status} />
+              <Field label={t("amountHeld")} value={formatINR(d.escrow_amount)} highlight />
+              <Field label={t("fundedAt")} value={formatDate(d.escrow_funded_at)} />
+              <Field label={t("razorpayPayment")} value={d.escrow_payment_id || "—"} mono />
+              <Field label={t("currentStatus")} value={d.escrow_status} />
             </div>
           </Section>
 
-          <Section title="Dispute">
+          <Section title={t("dispute")}>
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <Field label="Opened at" value={formatDate(d.dispute_opened_at)} />
-              <Field label="Resolution" value={d.dispute_resolution || "—"} />
-              <Field label="Resolved at" value={formatDate(d.dispute_resolved_at)} />
-              <Field label="Application status" value={d.application_status} />
+              <Field label={t("openedAt")} value={formatDate(d.dispute_opened_at)} />
+              <Field label={t("resolution")} value={d.dispute_resolution || "—"} />
+              <Field label={t("resolvedAt")} value={formatDate(d.dispute_resolved_at)} />
+              <Field label={t("applicationStatus")} value={d.application_status} />
             </div>
             {d.dispute_reason && (
               <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Brand's reason</p>
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">{t("brandsReason")}</p>
                 <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{d.dispute_reason}</p>
               </div>
             )}
           </Section>
 
           {links.length > 0 && (
-            <Section title={`Deliverables submitted (${links.length})`}>
+            <Section title={t("deliverablesSubmitted", { count: links.length })}>
               <ul className="space-y-2">
                 {links.map((l: any, i: number) => (
                   <li key={i} className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
@@ -88,7 +95,7 @@ export default async function DisputeDetailPage({ params }: { params: Promise<{ 
                       rel="noopener noreferrer"
                       className="text-violet-600 font-semibold text-sm hover:underline break-all"
                     >
-                      {l.label || l.type || `Deliverable ${i + 1}`}
+                      {l.label || l.type || t("deliverableN", { n: i + 1 })}
                     </a>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{l.url}</p>
                   </li>
@@ -99,7 +106,7 @@ export default async function DisputeDetailPage({ params }: { params: Promise<{ 
         </div>
 
         <div className="space-y-6">
-          <Section title="Parties">
+          <Section title={t("parties")}>
             <div className="flex items-center gap-3 mb-4">
               {d.brand_logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -110,7 +117,7 @@ export default async function DisputeDetailPage({ params }: { params: Promise<{ 
                 </div>
               )}
               <div>
-                <p className="text-xs uppercase font-bold text-gray-400">Brand</p>
+                <p className="text-xs uppercase font-bold text-gray-400">{t("brand")}</p>
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">{d.brand_name || "—"}</p>
               </div>
             </div>
@@ -124,26 +131,29 @@ export default async function DisputeDetailPage({ params }: { params: Promise<{ 
                 </div>
               )}
               <div>
-                <p className="text-xs uppercase font-bold text-gray-400">Creator</p>
+                <p className="text-xs uppercase font-bold text-gray-400">{t("creator")}</p>
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">
                   {d.influencer_name || (d.influencer_username ? `@${d.influencer_username}` : "—")}
                 </p>
                 {d.final_agreed_rate != null && (
-                  <p className="text-xs text-gray-500 mt-0.5">Agreed: ₹{Number(d.final_agreed_rate).toLocaleString("en-IN")}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{t("agreedRate", { rate: Number(d.final_agreed_rate).toLocaleString("en-IN") })}</p>
                 )}
               </div>
             </div>
           </Section>
 
           {!resolved ? (
-            <Section title="Resolve">
+            <Section title={t("resolve")}>
               <ResolveActions applicationId={d.application_id} amount={d.escrow_amount} />
             </Section>
           ) : (
-            <Section title="Resolved">
+            <Section title={t("resolved")}>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                This dispute was resolved via <strong>{d.dispute_resolution}</strong> on{" "}
-                {formatDate(d.dispute_resolved_at)}.
+                {t.rich("resolvedVia", {
+                  resolution: d.dispute_resolution,
+                  date: formatDate(d.dispute_resolved_at),
+                  strong: (chunks) => <strong>{chunks}</strong>,
+                })}
               </p>
             </Section>
           )}

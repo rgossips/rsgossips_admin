@@ -1,0 +1,10 @@
+{
+  "DashboardPayoutsComponentsMarkPaidForm": {
+    "markAsPaid": "Mark as paid",
+    "utrPlaceholder": "UTR / reference",
+    "leaveBlankNow": "leave blank = now",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "confirmPaid": "Confirm paid"
+  }
+}

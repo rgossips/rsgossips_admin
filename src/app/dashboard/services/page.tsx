@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { toggleServiceActive } from "./actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
@@ -11,6 +12,7 @@ export default async function ServicesPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
+  const t = await getTranslations("DashboardServices");
   const sp = (await searchParams) || {};
   const status = sp.status || "all"; // 'all' | 'active' | 'inactive'
 
@@ -38,9 +40,9 @@ export default async function ServicesPage({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Services</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Catalogue shown to influencers. Edits go live immediately.
+            {t("subtitle")}
           </p>
         </div>
         {canWrite && (

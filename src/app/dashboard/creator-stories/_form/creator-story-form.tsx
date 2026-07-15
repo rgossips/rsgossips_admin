@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { searchInfluencersForStory, uploadStoryVideo } from "../actions";
 
 type Initial = {
@@ -29,6 +30,7 @@ export function CreatorStoryForm({
   initial?: Initial;
   submitLabel: string;
 }) {
+  const t = useTranslations("DashboardCreatorStoriesFormCreatorStoryForm");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -103,38 +105,38 @@ export function CreatorStoryForm({
 
       <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 flex items-center gap-4">
         <div className="flex-1">
-          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Attach an existing influencer</p>
-          <p className="text-[12px] text-indigo-700 dark:text-indigo-300/80">Auto-fills the username and avatar.</p>
+          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">{t("attachInfluencerTitle")}</p>
+          <p className="text-[12px] text-indigo-700 dark:text-indigo-300/80">{t("attachInfluencerSubtitle")}</p>
         </div>
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
           className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold cursor-pointer"
         >
-          Search creators
+          {t("searchCreators")}
         </button>
       </div>
 
-      <Field label="Instagram username" name="username" value={state.username} onChange={(v) => setState({ ...state, username: v.replace(/^@/, "") })} placeholder="cristiano" />
+      <Field label={t("usernameLabel")} name="username" value={state.username} onChange={(v) => setState({ ...state, username: v.replace(/^@/, "") })} placeholder={t("usernamePlaceholder")} />
 
-      <Field label="Avatar URL" name="avatar_url" value={state.avatar_url} onChange={(v) => setState({ ...state, avatar_url: v })} placeholder="https://…/photo.jpg" />
+      <Field label={t("avatarUrlLabel")} name="avatar_url" value={state.avatar_url} onChange={(v) => setState({ ...state, avatar_url: v })} placeholder={t("avatarUrlPlaceholder")} />
       {state.avatar_url && (
         <div className="flex items-center gap-3">
           <img
             src={state.avatar_url}
-            alt="avatar"
+            alt={t("avatarAlt")}
             className="w-14 h-14 rounded-full object-cover border border-gray-200"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
-          <span className="text-[11px] text-gray-400">preview</span>
+          <span className="text-[11px] text-gray-400">{t("preview")}</span>
         </div>
       )}
 
       {/* Video — upload OR paste URL */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Video</span>
-          <span className="text-[10px] text-gray-400">MP4, up to 50 MB</span>
+          <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{t("videoLabel")}</span>
+          <span className="text-[10px] text-gray-400">{t("videoHint")}</span>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
@@ -142,11 +144,11 @@ export function CreatorStoryForm({
             type="text"
             value={state.video_url}
             onChange={(e) => setState({ ...state, video_url: e.target.value })}
-            placeholder="Paste a hosted video URL"
+            placeholder={t("videoUrlPlaceholder")}
             className="flex-1 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:border-indigo-400"
           />
           <label className={`px-3 py-2.5 rounded-lg border border-dashed text-[12px] font-semibold text-center cursor-pointer ${uploading ? "border-indigo-200 text-indigo-400" : "border-indigo-300 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"}`}>
-            {uploading ? "Uploading…" : "Upload from device"}
+            {uploading ? t("uploading") : t("uploadFromDevice")}
             <input
               type="file"
               accept="video/*"
@@ -166,11 +168,11 @@ export function CreatorStoryForm({
         )}
       </div>
 
-      <Field label="Poster image URL (optional)" name="poster_url" value={state.poster_url} onChange={(v) => setState({ ...state, poster_url: v })} placeholder="https://…/poster.jpg" hint="Thumbnail shown before the video loads." />
+      <Field label={t("posterLabel")} name="poster_url" value={state.poster_url} onChange={(v) => setState({ ...state, poster_url: v })} placeholder={t("posterPlaceholder")} hint={t("posterHint")} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Position" name="position" value={String(state.position)} onChange={(v) => setState({ ...state, position: Number(v) || 0 })} type="number" hint="Lower numbers appear first." />
-        <Toggle label="Active (visible to brands)" name="is_active" checked={state.is_active} onChange={(v) => setState({ ...state, is_active: v })} />
+        <Field label={t("positionLabel")} name="position" value={String(state.position)} onChange={(v) => setState({ ...state, position: Number(v) || 0 })} type="number" hint={t("positionHint")} />
+        <Toggle label={t("activeLabel")} name="is_active" checked={state.is_active} onChange={(v) => setState({ ...state, is_active: v })} />
       </div>
 
       {error && (
@@ -185,7 +187,7 @@ export function CreatorStoryForm({
           disabled={pending}
           className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold cursor-pointer"
         >
-          {pending ? "Saving…" : submitLabel}
+          {pending ? t("saving") : submitLabel}
         </button>
       </div>
 
@@ -280,6 +282,7 @@ function PickerDialog({
   onPick: (inf: any) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("DashboardCreatorStoriesFormCreatorStoryForm");
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 w-[min(560px,95vw)] max-h-[85vh] flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl">
@@ -287,7 +290,7 @@ function PickerDialog({
           <input
             type="text"
             autoFocus
-            placeholder="Search by handle, name or username…"
+            placeholder={t("pickerSearchPlaceholder")}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:border-indigo-400"
@@ -295,10 +298,10 @@ function PickerDialog({
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {searching ? (
-            <div className="text-center text-sm text-gray-400 py-8">Searching…</div>
+            <div className="text-center text-sm text-gray-400 py-8">{t("searching")}</div>
           ) : results.length === 0 ? (
             <div className="text-center text-sm text-gray-400 py-8">
-              {query.trim().length < 2 ? "Type at least 2 characters." : "No matches."}
+              {query.trim().length < 2 ? t("typeAtLeast") : t("noMatches")}
             </div>
           ) : (
             results.map((inf) => {
@@ -320,7 +323,7 @@ function PickerDialog({
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{inf.full_name || handle}</p>
-                    <p className="text-[12px] text-gray-500 truncate">@{handle} · {formatFollowers(inf.followers_count || 0) || "?"} followers</p>
+                    <p className="text-[12px] text-gray-500 truncate">{t("pickerFollowers", { handle, count: formatFollowers(inf.followers_count || 0) || "?" })}</p>
                   </div>
                 </button>
               );
@@ -333,7 +336,7 @@ function PickerDialog({
             onClick={onClose}
             className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
           >
-            Close
+            {t("close")}
           </button>
         </div>
       </div>

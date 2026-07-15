@@ -1,0 +1,17 @@
+{
+  "DashboardQuoteRequestsComponentsDeliverDraftForm": {
+    "cta.deliver": "Deliver draft",
+    "cta.deliverRevised": "Deliver revised draft",
+    "heading.revisionPending": "Revision pending",
+    "heading.workInProgress": "Work in progress",
+    "desc.revision": "User asked for a revision ({used}/{allowed} used). Upload the new watermarked cut and deliver it back.",
+    "desc.workInProgress": "When the watermarked draft is ready, paste the preview URL to send it for review.",
+    "field.draftUrlLabel": "Draft URL (watermarked)",
+    "field.draftUrlPlaceholder": "https://drive.google.com/… or https://vimeo.com/…",
+    "field.draftUrlHint": "Drive / Frame.io / Vimeo / YouTube unlisted — pick whatever lets the user preview without exposing the final file.",
+    "field.editorNoteLabel": "Editor note (optional)",
+    "field.editorNotePlaceholder": "Short context — what's in this cut, what you'd like the user to focus on…",
+    "button.cancel": "Cancel",
+    "button.delivering": "Delivering…"
+  }
+}

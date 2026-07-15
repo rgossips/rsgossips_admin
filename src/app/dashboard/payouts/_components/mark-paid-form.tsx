@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { markPayoutPaid } from "../actions";
 
 // Inline "Mark as paid" form. Collapsed by default — admin clicks the
@@ -31,6 +32,7 @@ export function MarkPaidForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
+  const t = useTranslations("DashboardPayoutsComponentsMarkPaidForm");
 
   if (!canWrite) return null;
 
@@ -41,7 +43,7 @@ export function MarkPaidForm({
         onClick={() => setOpen(true)}
         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-semibold cursor-pointer"
       >
-        Mark as paid
+        {t("markAsPaid")}
       </button>
     );
   }
@@ -67,7 +69,7 @@ export function MarkPaidForm({
           value={utr}
           onChange={(e) => setUtr(e.target.value)}
           maxLength={50}
-          placeholder="UTR / reference"
+          placeholder={t("utrPlaceholder")}
           className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-[12px] outline-none focus:ring-2 focus:ring-indigo-500"
           autoFocus
         />
@@ -88,7 +90,7 @@ export function MarkPaidForm({
           onChange={(e) => setPaidAt(e.target.value)}
           className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-[12px] outline-none focus:ring-2 focus:ring-indigo-500"
         />
-        <span className="text-[10px] text-gray-400">leave blank = now</span>
+        <span className="text-[10px] text-gray-400">{t("leaveBlankNow")}</span>
       </div>
       <div className="flex items-center justify-end gap-2">
         <button
@@ -99,7 +101,7 @@ export function MarkPaidForm({
           }}
           className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
         >
-          Cancel
+          {t("cancel")}
         </button>
         <button
           type="button"
@@ -107,7 +109,7 @@ export function MarkPaidForm({
           disabled={saving || !utr.trim()}
           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-semibold disabled:opacity-50 cursor-pointer"
         >
-          {saving ? "Saving…" : "Confirm paid"}
+          {saving ? t("saving") : t("confirmPaid")}
         </button>
       </div>
       {error && <p className="text-[12px] text-red-600">{error}</p>}

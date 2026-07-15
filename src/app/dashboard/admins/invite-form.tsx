@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { inviteAdmin } from "./actions";
 import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 
 export function InviteForm() {
+  const t = useTranslations("DashboardAdminsInviteForm");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -18,11 +20,11 @@ export function InviteForm() {
 
     // Best-effort progress copy — the server action runs all steps in
     // one call so we step the message client-side to indicate progress.
-    setLoadingMsg("Preparing invitation…");
+    setLoadingMsg(t("progress.preparing"));
     const ticks = setInterval(() => {
       setLoadingMsg((prev) => {
-        if (prev === "Preparing invitation…") return "Generating secure link…";
-        if (prev === "Generating secure link…") return "Sending email…";
+        if (prev === t("progress.preparing")) return t("progress.generatingLink");
+        if (prev === t("progress.generatingLink")) return t("progress.sendingEmail");
         return prev;
       });
     }, 900);
@@ -33,7 +35,7 @@ export function InviteForm() {
     if (result.error) {
       setError(result.error);
     } else {
-      setSuccess("Invite sent successfully!");
+      setSuccess(t("successMessage"));
       setOpen(false);
     }
     setLoading(false);
@@ -42,7 +44,7 @@ export function InviteForm() {
 
   return (
     <div className="mb-6">
-      {loading && <FullPageLoader message={loadingMsg || "Sending invitation…"} />}
+      {loading && <FullPageLoader message={loadingMsg || t("progress.sendingInvitation")} />}
       {success && (
         <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 text-sm mb-4">
           {success}
@@ -54,12 +56,12 @@ export function InviteForm() {
           onClick={() => setOpen(true)}
           className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors cursor-pointer"
         >
-          Invite Admin
+          {t("inviteAdmin")}
         </button>
       ) : (
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Invite New Admin
+            {t("inviteNewAdmin")}
           </h3>
 
           {error && (
@@ -71,19 +73,19 @@ export function InviteForm() {
           <form action={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
-                <input name="full_name" type="text" required placeholder="John Doe" className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("fullNameLabel")}</label>
+                <input name="full_name" type="text" required placeholder={t("fullNamePlaceholder")} className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                <input name="email" type="email" required placeholder="user@example.com" className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("emailLabel")}</label>
+                <input name="email" type="email" required placeholder={t("emailPlaceholder")} className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("roleLabel")}</label>
                 <select name="role" className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                  <option value="admin">Admin</option>
-                  <option value="viewer">Viewer</option>
-                  <option value="super_admin">Super Admin</option>
+                  <option value="admin">{t("roleAdmin")}</option>
+                  <option value="viewer">{t("roleViewer")}</option>
+                  <option value="super_admin">{t("roleSuperAdmin")}</option>
                 </select>
               </div>
             </div>
@@ -91,10 +93,10 @@ export function InviteForm() {
             <div className="flex gap-3">
               <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors cursor-pointer">
                 {loading && <ButtonSpinner />}
-                {loading ? "Sending..." : "Send Invite"}
+                {loading ? t("sending") : t("sendInvite")}
               </button>
               <button type="button" onClick={() => { setOpen(false); setError(""); }} className="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium transition-colors cursor-pointer">
-                Cancel
+                {t("cancel")}
               </button>
             </div>
           </form>

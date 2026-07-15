@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { sendQuote, declineOrder } from "../actions";
 
 type Props = {
@@ -19,6 +20,7 @@ function defaultDeliveryISO(desired?: string | null) {
 }
 
 export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }: Props) {
+  const t = useTranslations("DashboardQuoteRequestsComponentsQuoteResponseForm");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"none" | "quote" | "decline">("none");
@@ -45,22 +47,22 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
   if (mode === "none") {
     return (
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Respond to this request</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("respondHeading")}</h3>
         <p className="text-[12px] text-gray-500 dark:text-gray-400">
-          Send a quote with your price, delivery date and revisions allowed — or decline if it's not a fit.
+          {t("respondDescription")}
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => setMode("quote")}
             className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer"
           >
-            Send a quote
+            {t("sendQuote")}
           </button>
           <button
             onClick={() => setMode("decline")}
             className="px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
           >
-            Decline
+            {t("decline")}
           </button>
         </div>
       </div>
@@ -73,11 +75,11 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
         action={onDecline}
         className="bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800 rounded-xl p-5 space-y-3"
       >
-        <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">Decline this request</h3>
+        <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">{t("declineHeading")}</h3>
         <textarea
           name="decline_reason"
           rows={3}
-          placeholder="Optional — short reason shared with the requester"
+          placeholder={t("declineReasonPlaceholder")}
           className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
         />
         {error && <p className="text-[12px] text-red-600">{error}</p>}
@@ -88,14 +90,14 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
             disabled={pending}
             className="flex-1 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer disabled:opacity-50"
           >
-            Cancel
+            {t("cancel")}
           </button>
           <button
             type="submit"
             disabled={pending}
             className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-60"
           >
-            {pending ? "Declining…" : "Decline request"}
+            {pending ? t("declining") : t("declineRequest")}
           </button>
         </div>
       </form>
@@ -109,14 +111,14 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
       className="bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 rounded-xl p-5 space-y-4"
     >
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Send quote — {serviceTitle}</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("sendQuoteHeading", { serviceTitle })}</h3>
         <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
-          The user pays exactly the amount you quote — no platform fee added on top.
+          {t("noPlatformFeeNote")}
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FieldL label="Quoted amount (₹)" required>
+        <FieldL label={t("quotedAmountLabel")} required>
           <input
             name="quoted_amount"
             value={amount}
@@ -128,7 +130,7 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
             placeholder="3600"
           />
         </FieldL>
-        <FieldL label="Advance %" hint="What share the user pays now">
+        <FieldL label={t("advancePctLabel")} hint={t("advancePctHint")}>
           <input
             name="advance_pct"
             defaultValue="50"
@@ -138,7 +140,7 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
             className="input"
           />
         </FieldL>
-        <FieldL label="Quoted delivery date" required>
+        <FieldL label={t("quotedDeliveryDateLabel")} required>
           <input
             name="quoted_delivery_date"
             defaultValue={defaultDeliveryISO(desiredDeliveryDate)}
@@ -147,10 +149,10 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
             className="input"
           />
         </FieldL>
-        <FieldL label="Turnaround days" hint="Working days after advance payment">
+        <FieldL label={t("turnaroundDaysLabel")} hint={t("turnaroundDaysHint")}>
           <input name="quoted_turnaround_days" defaultValue="4" type="number" min={1} className="input" />
         </FieldL>
-        <FieldL label="Revisions allowed">
+        <FieldL label={t("revisionsAllowedLabel")}>
           <input name="revisions_allowed" defaultValue="2" type="number" min={0} max={10} className="input" />
         </FieldL>
         <FieldL label="Quote validity (days)" hint="After this, the order auto-expires">

@@ -1,0 +1,27 @@
+{
+  "DashboardDisputes": {
+    "title": "Escrow Disputes",
+    "subtitle": "Resolve held escrow funds by refunding the brand or releasing them to the creator.",
+    "filters": {
+      "disputed": "Open",
+      "resolved": "Resolved",
+      "all": "All"
+    },
+    "loadError": "Failed to load disputes: {message}",
+    "empty": "No disputes here.",
+    "columns": {
+      "campaign": "Campaign",
+      "brand": "Brand",
+      "creator": "Creator",
+      "amount": "Amount",
+      "opened": "Opened",
+      "status": "Status"
+    },
+    "status": {
+      "disputed": "Open",
+      "refunded": "Refunded to brand",
+      "released": "Released to creator"
+    },
+    "review": "Review →"
+  }
+}

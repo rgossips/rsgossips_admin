@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteCampaigns } from "./actions";
@@ -42,6 +43,7 @@ function formatDate(d: string | null) {
 // Non-super-admins see exactly the table they saw before (no checkboxes,
 // no action bar), so the UI doesn't suggest an action they can't perform.
 export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
+  const t = useTranslations("DashboardCampaignsCampaignsTable");
   const router = useRouter();
   const { isSuperAdmin } = useRole();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -72,11 +74,10 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     confirmDelete.ask({
-      title: `Delete ${ids.length} campaign${ids.length === 1 ? "" : "s"}?`,
-      description:
-        "This permanently removes the selected campaigns, all of their applications, and any featured-campaign listings. This cannot be undone.",
-      confirmLabel: `Delete ${ids.length}`,
-      cancelLabel: "Cancel",
+      title: t("bulkDelete.title", { count: ids.length }),
+      description: t("bulkDelete.description"),
+      confirmLabel: t("bulkDelete.confirmLabel", { count: ids.length }),
+      cancelLabel: t("cancel"),
       variant: "danger",
       handler: async () => {
         setError("");
@@ -106,13 +107,13 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
       {showChecks && selected.size > 0 && (
         <div className="sticky top-2 z-10 mb-3 flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 shadow-lg shadow-gray-900/20">
           <div className="flex items-center gap-3 text-sm">
-            <span className="font-semibold">{selected.size} selected</span>
+            <span className="font-semibold">{t("selectedCount", { count: selected.size })}</span>
             <button
               type="button"
               onClick={clearSelection}
               className="text-xs opacity-70 hover:opacity-100 underline cursor-pointer"
             >
-              Clear
+              {t("clear")}
             </button>
           </div>
           <button
@@ -126,7 +127,7 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             )}
-            {pending ? "Deleting…" : `Delete ${selected.size}`}
+            {pending ? t("deleting") : t("deleteCount", { count: selected.size })}
           </button>
         </div>
       )}
@@ -146,16 +147,16 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
                     checked={allSelected}
                     ref={(el) => { if (el) el.indeterminate = someSelected; }}
                     onChange={toggleAll}
-                    aria-label="Select all"
+                    aria-label={t("selectAll")}
                     className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                   />
                 </th>
               )}
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Title</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Brand</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Status</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Slots</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Dates</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.title")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.brand")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.status")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.slots")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.dates")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -178,8 +179,8 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
                       </svg>
                     </div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No campaigns found</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Try adjusting your filters or create a new campaign</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("empty.title")}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{t("empty.subtitle")}</p>
                   </div>
                 </td>
               </tr>
@@ -202,6 +203,7 @@ function Row({
   checked: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations("DashboardCampaignsCampaignsTable");
   const brandName = campaign.brand_profiles?.brand_name || campaign.brand_invitations?.brand_name || "—";
   const status = campaign.status || "draft";
   return (
@@ -212,7 +214,7 @@ function Row({
             type="checkbox"
             checked={checked}
             onChange={onToggle}
-            aria-label={`Select ${campaign.title || "campaign"}`}
+            aria-label={t("selectRow", { title: campaign.title || t("campaignFallback") })}
             className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
           />
         </td>
@@ -232,7 +234,7 @@ function Row({
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {brandName}
         {campaign.brand_invitation_id && !campaign.brand_id && (
-          <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 font-semibold">Invited</span>
+          <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 font-semibold">{t("invited")}</span>
         )}
       </td>
       <td className="px-6 py-4">
@@ -246,7 +248,7 @@ function Row({
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         <div>{formatDate(campaign.campaign_start_date)}</div>
         {campaign.campaign_end_date && (
-          <div className="text-xs text-gray-400">to {formatDate(campaign.campaign_end_date)}</div>
+          <div className="text-xs text-gray-400">{t("dateRangeTo", { date: formatDate(campaign.campaign_end_date) })}</div>
         )}
       </td>
     </tr>

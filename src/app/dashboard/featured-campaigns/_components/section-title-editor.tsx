@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { SectionTitleEditor } from "@/components/section-title-editor";
 import { setFeaturedSectionTitle } from "../actions";
 
@@ -8,12 +9,13 @@ import { setFeaturedSectionTitle } from "../actions";
 // import path keeps working.
 
 export function FeaturedSectionTitleEditor({ initialTitle, canWrite }: { initialTitle: string; canWrite: boolean }) {
+  const t = useTranslations("DashboardFeaturedCampaignsComponentsSectionTitleEditor");
   return (
     <SectionTitleEditor
       initialTitle={initialTitle}
       canWrite={canWrite}
-      label="Section title (influencer home)"
-      placeholder="Plan your stay with us"
+      label={t("label")}
+      placeholder={t("placeholder")}
       onSave={setFeaturedSectionTitle}
     />
   );

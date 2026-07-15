@@ -6,6 +6,7 @@ import { InvitedInfluencerRow } from "./invited-influencer-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
 import { sanitizeSearchTerm } from "@/lib/validation";
+import { getTranslations } from "next-intl/server";
 
 const INVITES_PER_PAGE = 12;
 
@@ -14,6 +15,7 @@ export default async function InfluencersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
+  const t = await getTranslations("DashboardInfluencers");
   const params = await searchParams;
   const { search, status, followers, category, tab, invite_page } = params;
   const supabase = createAdminClient();
@@ -30,10 +32,10 @@ export default async function InfluencersPage({
   const categoryOptions = Array.from(allCategories).sort().map((cat) => ({ label: cat, value: cat }));
 
   const filterFields = [
-    { name: "search", label: "Search", type: "text" as const, placeholder: "Search by name or username..." },
-    { name: "status", label: "All Statuses", type: "select" as const, options: [{ label: "Active", value: "active" }, { label: "Suspended", value: "suspended" }, { label: "Pending", value: "pending" }] },
-    { name: "followers", label: "Followers", type: "select" as const, options: [{ label: "< 1K", value: "0-1000" }, { label: "1K - 10K", value: "1000-10000" }, { label: "10K - 100K", value: "10000-100000" }, { label: "100K+", value: "100000-" }] },
-    { name: "category", label: "All Categories", type: "multiselect" as const, options: categoryOptions },
+    { name: "search", label: t("filter.search"), type: "text" as const, placeholder: t("filter.searchPlaceholder") },
+    { name: "status", label: t("filter.allStatuses"), type: "select" as const, options: [{ label: t("filter.active"), value: "active" }, { label: t("filter.suspended"), value: "suspended" }, { label: t("filter.pending"), value: "pending" }] },
+    { name: "followers", label: t("filter.followers"), type: "select" as const, options: [{ label: t("filter.followersUnder1k"), value: "0-1000" }, { label: t("filter.followers1kTo10k"), value: "1000-10000" }, { label: t("filter.followers10kTo100k"), value: "10000-100000" }, { label: t("filter.followers100kPlus"), value: "100000-" }] },
+    { name: "category", label: t("filter.allCategories"), type: "multiselect" as const, options: categoryOptions },
   ];
 
   // Fetch influencers
@@ -79,8 +81,8 @@ export default async function InfluencersPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Influencers</h1>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">Manage influencer profiles and invitations</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{t("subtitle")}</p>
         </div>
         <RefreshButton />
       </div>
@@ -89,31 +91,31 @@ export default async function InfluencersPage({
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-6 w-fit">
-        <TabLink label="All" value="all" active={activeTab} count={allCount} />
-        <TabLink label="Registered" value="registered" active={activeTab} count={influencers?.length || 0} />
-        <TabLink label="Invited" value="invited" active={activeTab} count={invitesTotal} />
+        <TabLink label={t("tabs.all")} value="all" active={activeTab} count={allCount} />
+        <TabLink label={t("tabs.registered")} value="registered" active={activeTab} count={influencers?.length || 0} />
+        <TabLink label={t("tabs.invited")} value="invited" active={activeTab} count={invitesTotal} />
       </div>
 
       {(activeTab === "all" || activeTab === "registered") && (
         <>
           <FilterBar fields={filterFields} />
-          {error && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">Failed to load influencers: {error.message}</div>}
+          {error && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">{t("failedToLoadInfluencers", { message: error.message })}</div>}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Name</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Username</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Contact Number</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Followers</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Categories</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Status</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Actions</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.name")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.username")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.contactNumber")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.followers")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.categories")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.status")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {influencers && influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />) : (
-                  <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-400 dark:text-gray-500">No registered influencers found</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-400 dark:text-gray-500">{t("noRegisteredInfluencers")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -124,9 +126,9 @@ export default async function InfluencersPage({
       {(activeTab === "all" || activeTab === "invited") && (
         <>
           {activeTab === "all" && pendingInvites && pendingInvites.length > 0 && (
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-8 mb-4">Pending Invitations</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-8 mb-4">{t("pendingInvitations")}</h3>
           )}
-          {invitesError && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">Failed to load invitations: {invitesError.message}</div>}
+          {invitesError && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">{t("failedToLoadInvitations", { message: invitesError.message })}</div>}
           {pendingInvites && pendingInvites.length > 0 ? (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -143,8 +145,8 @@ export default async function InfluencersPage({
             </>
           ) : activeTab === "invited" ? (
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-16 text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">No pending invitations</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Click &quot;Invite Influencer&quot; above to create one</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("noPendingInvitations")}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t("clickInviteToCreate")}</p>
             </div>
           ) : null}
         </>

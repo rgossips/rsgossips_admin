@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { searchInfluencersForFeature, uploadFeaturedCreatorAvatar } from "../actions";
 
 type Initial = {
@@ -33,6 +34,7 @@ export function FeaturedCreatorForm({
   initial?: Initial;
   submitLabel: string;
 }) {
+  const t = useTranslations("DashboardFeaturedCreatorsFormFeaturedCreatorForm");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -126,28 +128,28 @@ export function FeaturedCreatorForm({
       {/* Pick existing */}
       <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 flex items-center gap-4">
         <div className="flex-1">
-          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Feature an existing influencer</p>
-          <p className="text-[12px] text-indigo-700 dark:text-indigo-300/80">Search the directory and auto-fill the display fields.</p>
+          <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">{t("pickExistingTitle")}</p>
+          <p className="text-[12px] text-indigo-700 dark:text-indigo-300/80">{t("pickExistingHint")}</p>
         </div>
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
           className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold cursor-pointer"
         >
-          Search creators
+          {t("searchCreators")}
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Instagram username" name="username" value={state.username} onChange={(v) => setState({ ...state, username: v.replace(/^@/, "") })} placeholder="cristiano" />
-        <Field label="Display name" name="display_name" value={state.display_name} onChange={(v) => setState({ ...state, display_name: v })} placeholder="Cristiano Ronaldo" />
+        <Field label={t("usernameLabel")} name="username" value={state.username} onChange={(v) => setState({ ...state, username: v.replace(/^@/, "") })} placeholder={t("usernamePlaceholder")} />
+        <Field label={t("displayNameLabel")} name="display_name" value={state.display_name} onChange={(v) => setState({ ...state, display_name: v })} placeholder={t("displayNamePlaceholder")} />
       </div>
 
       {/* Hidden input so the form still submits the avatar_url field (filled by the picker / set after upload). */}
       <input type="hidden" name="avatar_url" value={state.avatar_url} />
 
       <div>
-        <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Avatar</span>
+        <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{t("avatarLabel")}</span>
         <div className="mt-2 flex items-center gap-4">
           <div
             onClick={() => avatarInputRef.current?.click()}
@@ -156,7 +158,7 @@ export function FeaturedCreatorForm({
             {state.avatar_url ? (
               <img
                 src={state.avatar_url}
-                alt="avatar"
+                alt={t("avatarAlt")}
                 className="w-full h-full object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
@@ -179,26 +181,26 @@ export function FeaturedCreatorForm({
               onClick={() => avatarInputRef.current?.click()}
               className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
-              {state.avatar_url ? "Change avatar" : "Upload avatar"}
+              {state.avatar_url ? t("changeAvatar") : t("uploadAvatar")}
             </button>
-            <p className="text-[10px] text-gray-400 mt-1">JPG, PNG, WebP. Max 5MB.</p>
-            {avatarFile && <p className="text-[11px] text-emerald-600 mt-1">New avatar selected — will upload on save</p>}
-            {avatarUploading && <p className="text-[11px] text-indigo-600 mt-1">Uploading…</p>}
+            <p className="text-[10px] text-gray-400 mt-1">{t("avatarHint")}</p>
+            {avatarFile && <p className="text-[11px] text-emerald-600 mt-1">{t("avatarSelected")}</p>}
+            {avatarUploading && <p className="text-[11px] text-indigo-600 mt-1">{t("uploading")}</p>}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Field label="Followers label" name="followers_label" value={state.followers_label} onChange={(v) => setState({ ...state, followers_label: v })} placeholder="1.4M" />
-        <Field label="Rating (0–5)" name="rating" value={state.rating} onChange={(v) => setState({ ...state, rating: v })} placeholder="4.2" type="number" step="0.1" />
-        <Field label="Position" name="position" value={String(state.position)} onChange={(v) => setState({ ...state, position: Number(v) || 0 })} type="number" hint="Lower numbers appear first." />
+        <Field label={t("followersLabelLabel")} name="followers_label" value={state.followers_label} onChange={(v) => setState({ ...state, followers_label: v })} placeholder={t("followersPlaceholder")} />
+        <Field label={t("ratingLabel")} name="rating" value={state.rating} onChange={(v) => setState({ ...state, rating: v })} placeholder={t("ratingPlaceholder")} type="number" step="0.1" />
+        <Field label={t("positionLabel")} name="position" value={String(state.position)} onChange={(v) => setState({ ...state, position: Number(v) || 0 })} type="number" hint={t("positionHint")} />
       </div>
 
-      <Field label="Instagram URL" name="instagram_url" value={state.instagram_url} onChange={(v) => setState({ ...state, instagram_url: v })} placeholder="https://www.instagram.com/cristiano/" />
+      <Field label={t("instagramUrlLabel")} name="instagram_url" value={state.instagram_url} onChange={(v) => setState({ ...state, instagram_url: v })} placeholder="https://www.instagram.com/cristiano/" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Toggle label="Verified badge" name="verified" checked={state.verified} onChange={(v) => setState({ ...state, verified: v })} />
-        <Toggle label="Active (visible to brands)" name="is_active" checked={state.is_active} onChange={(v) => setState({ ...state, is_active: v })} />
+        <Toggle label={t("verifiedLabel")} name="verified" checked={state.verified} onChange={(v) => setState({ ...state, verified: v })} />
+        <Toggle label={t("activeLabel")} name="is_active" checked={state.is_active} onChange={(v) => setState({ ...state, is_active: v })} />
       </div>
 
       {error && (
@@ -213,7 +215,7 @@ export function FeaturedCreatorForm({
           disabled={pending}
           className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold cursor-pointer"
         >
-          {pending ? "Saving…" : submitLabel}
+          {pending ? t("saving") : submitLabel}
         </button>
       </div>
 
@@ -311,6 +313,7 @@ function PickerDialog({
   onPick: (inf: any) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("DashboardFeaturedCreatorsFormFeaturedCreatorForm");
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-900 w-[min(560px,95vw)] max-h-[85vh] flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl">
@@ -318,7 +321,7 @@ function PickerDialog({
           <input
             type="text"
             autoFocus
-            placeholder="Search by handle, name or username…"
+            placeholder={t("searchPlaceholder")}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:border-indigo-400"
@@ -326,10 +329,10 @@ function PickerDialog({
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {searching ? (
-            <div className="text-center text-sm text-gray-400 py-8">Searching…</div>
+            <div className="text-center text-sm text-gray-400 py-8">{t("searching")}</div>
           ) : results.length === 0 ? (
             <div className="text-center text-sm text-gray-400 py-8">
-              {query.trim().length < 2 ? "Type at least 2 characters." : "No matches."}
+              {query.trim().length < 2 ? t("typeAtLeast") : t("noMatches")}
             </div>
           ) : (
             results.map((inf) => {
@@ -351,7 +354,7 @@ function PickerDialog({
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{inf.full_name || handle}</p>
-                    <p className="text-[12px] text-gray-500 truncate">@{handle} · {formatFollowers(inf.followers_count || 0) || "?"} followers</p>
+                    <p className="text-[12px] text-gray-500 truncate">@{handle} · {formatFollowers(inf.followers_count || 0) || "?"} {t("followers")}</p>
                   </div>
                 </button>
               );
@@ -364,7 +367,7 @@ function PickerDialog({
             onClick={onClose}
             className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
           >
-            Close
+            {t("close")}
           </button>
         </div>
       </div>

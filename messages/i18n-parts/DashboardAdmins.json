@@ -1,0 +1,7 @@
+{
+  "DashboardAdmins": {
+    "title": "Admin Users",
+    "subtitle": "Manage who can access this admin panel",
+    "loadError": "Failed to load admins: {message}"
+  }
+}

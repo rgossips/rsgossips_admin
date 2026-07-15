@@ -1,0 +1,13 @@
+{
+  "DashboardFeaturedStayComponentsAddFeaturedCampaign": {
+    "featureCampaign": "Feature a campaign",
+    "searchCampaigns": "Search campaigns",
+    "close": "Close",
+    "searchPlaceholder": "Search by campaign title or brand…",
+    "searching": "Searching…",
+    "typeAtLeast2": "Type at least 2 characters.",
+    "noMatches": "No matches (already-featured campaigns are hidden).",
+    "untitledCampaign": "(untitled campaign)",
+    "unknownBrand": "Unknown brand"
+  }
+}

@@ -5,6 +5,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { EditBrandButton } from "./edit-brand";
 import { DeleteBrandButton } from "./delete-brand";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
+import { getTranslations } from "next-intl/server";
 
 export default async function BrandDetailPage({
   params,
@@ -16,6 +17,7 @@ export default async function BrandDetailPage({
   const { id } = await params;
   const { status: filterStatus } = await searchParams;
   const supabase = createAdminClient();
+  const t = await getTranslations("DashboardBrandsId");
 
   // Try brand_profiles first, then brand_invitations
   let brand: any = null;
@@ -110,10 +112,10 @@ export default async function BrandDetailPage({
             )}
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{brand.brand_name || "Unknown"}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{brand.brand_name || t("unknown")}</h1>
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${vs.bg}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${vs.dot}`} />
-                  {isInvited ? "Invited" : (brand.verification_status || "not_applied")}
+                  {isInvited ? t("invited") : (brand.verification_status || "not_applied")}
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -131,7 +133,7 @@ export default async function BrandDetailPage({
           {!isInvited && superAdmin && (
             <DeleteBrandButton
               brandId={brand.brand_id}
-              displayName={brand.brand_name || brand.instagram_username || "Brand"}
+              displayName={brand.brand_name || brand.instagram_username || t("brand")}
               confirmText={brand.instagram_username || brand.brand_name || "DELETE"}
             />
           )}
@@ -144,7 +146,7 @@ export default async function BrandDetailPage({
         <div className="lg:col-span-2 space-y-6">
           {/* Campaign Stats */}
           <div className="grid grid-cols-4 gap-3">
-            {([["All", "all", campaignCounts.all, ""], ["Draft", "draft", campaignCounts.draft, "draft"], ["Active", "active", campaignCounts.active, "active"], ["Completed", "completed", campaignCounts.completed, "completed"]] as const).map(([label, key, count, val]) => (
+            {([[t("all"), "all", campaignCounts.all, ""], [t("draft"), "draft", campaignCounts.draft, "draft"], [t("active"), "active", campaignCounts.active, "active"], [t("completed"), "completed", campaignCounts.completed, "completed"]] as const).map(([label, key, count, val]) => (
               <a key={key} href={`/dashboard/brands/${id}${val ? `?status=${val}` : ""}`}
                 className={`rounded-2xl p-4 text-center transition-all ${filterStatus === val || (!filterStatus && !val) ? "bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800" : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-indigo-200 dark:hover:border-indigo-800"}`}>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{count}</p>
@@ -156,9 +158,9 @@ export default async function BrandDetailPage({
           {/* Campaign List */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Campaigns</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("campaigns")}</h2>
               <Link href="/dashboard/campaigns/create" className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors">
-                + New Campaign
+                {t("newCampaign")}
               </Link>
             </div>
             {campaigns && campaigns.length > 0 ? (
@@ -168,7 +170,7 @@ export default async function BrandDetailPage({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">{c.title}</p>
-                        {c.created_by_admin && <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold shrink-0">Admin</span>}
+                        {c.created_by_admin && <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold shrink-0">{t("admin")}</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-xs text-gray-400">{c.campaign_type}</span>
@@ -185,8 +187,8 @@ export default async function BrandDetailPage({
               </div>
             ) : (
               <div className="px-6 py-12 text-center">
-                <p className="text-sm text-gray-400 dark:text-gray-500">No campaigns found</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Create one from the Campaigns page</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">{t("noCampaignsFound")}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t("createFromCampaignsPage")}</p>
               </div>
             )}
           </div>
@@ -197,17 +199,17 @@ export default async function BrandDetailPage({
           {/* Overview */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Overview</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("overview")}</h2>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              <Row label="Status" value={isInvited ? "Invited" : (brand.status || "—")} />
-              <Row label="Verification" value={isInvited ? "Awaiting Claim" : (brand.verification_status || "—")} />
-              {!isInvited && <Row label="Tier" value={brand.tier || "—"} />}
-              {!isInvited && <Row label="Listing" value={brand.listing_type || "—"} />}
-              {!isInvited && <Row label="Source" value={brand.source || "—"} />}
-              {!isInvited && <Row label="Completion" value={brand.profile_completion ? `${brand.profile_completion}%` : "—"} />}
-              {meta?.category && <Row label="Category" value={meta.category} />}
-              {meta?.instagram_verified && <Row label="IG Verified" value="Yes" />}
+              <Row label={t("statusLabel")} value={isInvited ? t("invited") : (brand.status || "—")} />
+              <Row label={t("verification")} value={isInvited ? t("awaitingClaim") : (brand.verification_status || "—")} />
+              {!isInvited && <Row label={t("tier")} value={brand.tier || "—"} />}
+              {!isInvited && <Row label={t("listing")} value={brand.listing_type || "—"} />}
+              {!isInvited && <Row label={t("source")} value={brand.source || "—"} />}
+              {!isInvited && <Row label={t("completion")} value={brand.profile_completion ? `${brand.profile_completion}%` : "—"} />}
+              {meta?.category && <Row label={t("category")} value={meta.category} />}
+              {meta?.instagram_verified && <Row label={t("igVerified")} value={t("yes")} />}
             </div>
           </div>
 
@@ -215,13 +217,13 @@ export default async function BrandDetailPage({
           {!isInvited && (
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Contact</h2>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("contact")}</h2>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                <Row label="Name" value={brand.contact_name || "—"} />
-                <Row label="Email" value={brand.contact_email || "—"} />
-                <Row label="Phone" value={brand.contact_phone || "—"} />
-                <Row label="Website" value={brand.website_url || "—"} />
+                <Row label={t("name")} value={brand.contact_name || "—"} />
+                <Row label={t("email")} value={brand.contact_email || "—"} />
+                <Row label={t("phone")} value={brand.contact_phone || "—"} />
+                <Row label={t("website")} value={brand.website_url || "—"} />
               </div>
             </div>
           )}
@@ -233,10 +235,10 @@ export default async function BrandDetailPage({
                 <h2 className="text-sm font-semibold text-gray-900 dark:text-white">GSTIN</h2>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                <Row label="GSTIN" value={brand.gstin} />
-                <Row label="Legal Name" value={brand.gstin_legal_name || "—"} />
-                <Row label="Trade Name" value={brand.gstin_trade_name || "—"} />
-                <Row label="State" value={brand.gstin_state || "—"} />
+                <Row label={t("gstin")} value={brand.gstin} />
+                <Row label={t("legalName")} value={brand.gstin_legal_name || "—"} />
+                <Row label={t("tradeName")} value={brand.gstin_trade_name || "—"} />
+                <Row label={t("state")} value={brand.gstin_state || "—"} />
               </div>
             </div>
           )}
@@ -244,17 +246,17 @@ export default async function BrandDetailPage({
           {/* Timeline */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Timeline</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("timeline")}</h2>
             </div>
             <div className="p-5 space-y-3">
-              <DateRow label="Created" date={formatDate(brand.created_at)} />
-              {brand.updated_at && <DateRow label="Updated" date={formatDate(brand.updated_at)} />}
+              <DateRow label={t("created")} date={formatDate(brand.created_at)} />
+              {brand.updated_at && <DateRow label={t("updated")} date={formatDate(brand.updated_at)} />}
             </div>
           </div>
 
           {/* Raw data */}
           <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <summary className="px-6 py-4 text-sm font-medium text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">Raw Data</summary>
+            <summary className="px-6 py-4 text-sm font-medium text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">{t("rawData")}</summary>
             <div className="px-6 pb-6"><pre className="text-xs text-gray-500 overflow-auto whitespace-pre-wrap bg-gray-50 dark:bg-gray-800 rounded-xl p-4">{JSON.stringify(brand, null, 2)}</pre></div>
           </details>
         </div>

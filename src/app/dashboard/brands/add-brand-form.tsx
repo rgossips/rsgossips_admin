@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { inviteBrand, uploadBrandIcon } from "./actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { FullPageLoader } from "@/components/spinner";
@@ -9,6 +10,7 @@ import { BulkInviteBrands } from "./bulk-invite-brands";
 import { useRole } from "@/components/role-context";
 
 export function AddBrandForm() {
+  const t = useTranslations("DashboardBrandsAddBrandForm");
   const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +38,7 @@ export function AddBrandForm() {
     try {
       // Upload icon if selected
       if (iconFile) {
-        setLoadingMsg("Uploading brand icon...");
+        setLoadingMsg(t("uploadingIcon"));
         const fd = new FormData();
         fd.append("file", iconFile);
         fd.append("folder", "brand-icons");
@@ -51,20 +53,20 @@ export function AddBrandForm() {
         }
       }
 
-      setLoadingMsg("Creating brand invitation...");
+      setLoadingMsg(t("creatingInvitation"));
       const result = await inviteBrand(formData);
 
       if (result.error) {
         setError(result.error);
       } else {
-        setSuccess("Brand invitation created! The brand can now sign up via Instagram.");
+        setSuccess(t("invitationCreatedSuccess"));
         setOpen(false);
         setIconFile(null);
         setIconPreview(null);
         if (fileRef.current) fileRef.current.value = "";
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : t("somethingWentWrong"));
     }
     setLoading(false);
   };
@@ -93,7 +95,7 @@ export function AddBrandForm() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Invite Brand
+            {t("inviteBrand")}
           </button>
           <BulkInviteBrands />
         </div>
@@ -107,9 +109,9 @@ export function AddBrandForm() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Invite New Brand</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("inviteNewBrand")}</h3>
                 <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                  Create a placeholder — brand will claim it via Instagram login
+                  {t("inviteNewBrandSubtitle")}
                 </p>
               </div>
             </div>
@@ -125,13 +127,13 @@ export function AddBrandForm() {
             <div className="flex items-start gap-6">
               {/* Icon Upload */}
               <div className="shrink-0">
-                <p className="text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-2">Brand Icon</p>
+                <p className="text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-2">{t("brandIcon")}</p>
                 <div
                   onClick={() => fileRef.current?.click()}
                   className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-500 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-gray-50 dark:bg-gray-800"
                 >
                   {iconPreview ? (
-                    <img src={iconPreview} alt="Icon" className="w-full h-full object-cover" />
+                    <img src={iconPreview} alt={t("iconAlt")} className="w-full h-full object-cover" />
                   ) : (
                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -151,19 +153,19 @@ export function AddBrandForm() {
               <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Brand Name <span className="text-red-400">*</span>
+                    {t("brandNameLabel")} <span className="text-red-400">*</span>
                   </label>
                   <input
                     name="brand_name"
                     type="text"
                     required
-                    placeholder="e.g. Nike India"
+                    placeholder={t("brandNamePlaceholder")}
                     className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
                   />
                 </div>
                 <div>
                   <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Instagram Username <span className="text-red-400">*</span>
+                    {t("instagramUsernameLabel")} <span className="text-red-400">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
@@ -171,46 +173,46 @@ export function AddBrandForm() {
                       name="instagram_username"
                       type="text"
                       required
-                      placeholder="nikeindia"
+                      placeholder={t("instagramUsernamePlaceholder")}
                       className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
                     />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Category
+                    {t("categoryLabel")}
                   </label>
                   <select
                     name="category"
                     className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all appearance-none"
                   >
-                    <option value="">Select category</option>
+                    <option value="">{t("selectCategory")}</option>
                     {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Instagram Verified
+                    {t("instagramVerifiedLabel")}
                   </label>
                   <div className="flex items-center gap-4 h-[42px]">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="radio" name="instagram_verified" value="yes" className="text-indigo-600 focus:ring-indigo-500" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Yes</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{t("yes")}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="radio" name="instagram_verified" value="no" defaultChecked className="text-indigo-600 focus:ring-indigo-500" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">No</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{t("no")}</span>
                     </label>
                   </div>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Notes <span className="text-gray-400 font-normal">(optional)</span>
+                    {t("notesLabel")} <span className="text-gray-400 font-normal">{t("optional")}</span>
                   </label>
                   <input
                     name="notes"
                     type="text"
-                    placeholder="e.g. Partnership contact: john@nike.com"
+                    placeholder={t("notesPlaceholder")}
                     className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white dark:focus:bg-gray-800 transition-all"
                   />
                 </div>
@@ -223,12 +225,12 @@ export function AddBrandForm() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="text-[12px] text-blue-700 dark:text-blue-300 leading-relaxed">
-                <p className="font-semibold mb-1">How this works:</p>
+                <p className="font-semibold mb-1">{t("howThisWorks")}</p>
                 <ol className="list-decimal ml-4 space-y-0.5 text-blue-600 dark:text-blue-400">
-                  <li>You create an invitation with the brand&apos;s Instagram handle</li>
-                  <li>Brand opens RecentGossips app and connects their Instagram</li>
-                  <li>If the handle matches, they see a &quot;Complete your profile&quot; screen</li>
-                  <li>Brand fills in GSTIN, phone, and verifies — account becomes active</li>
+                  <li>{t("howStep1")}</li>
+                  <li>{t("howStep2")}</li>
+                  <li>{t("howStep3")}</li>
+                  <li>{t("howStep4")}</li>
                 </ol>
               </div>
             </div>
@@ -240,7 +242,7 @@ export function AddBrandForm() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors cursor-pointer"
               >
                 {loading && <ButtonSpinner />}
-                {loading ? "Creating..." : "Create Invitation"}
+                {loading ? t("creating") : t("createInvitation")}
               </button>
               <button
                 type="button"
@@ -252,7 +254,7 @@ export function AddBrandForm() {
                 }}
                 className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium transition-colors cursor-pointer"
               >
-                Cancel
+                {t("cancel")}
               </button>
             </div>
           </form>

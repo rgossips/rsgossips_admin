@@ -1,0 +1,33 @@
+{
+  "DashboardBrandsAddBrandForm": {
+    "uploadingIcon": "Uploading brand icon...",
+    "creatingInvitation": "Creating brand invitation...",
+    "invitationCreatedSuccess": "Brand invitation created! The brand can now sign up via Instagram.",
+    "somethingWentWrong": "Something went wrong",
+    "inviteBrand": "Invite Brand",
+    "inviteNewBrand": "Invite New Brand",
+    "inviteNewBrandSubtitle": "Create a placeholder — brand will claim it via Instagram login",
+    "brandIcon": "Brand Icon",
+    "iconAlt": "Icon",
+    "brandNameLabel": "Brand Name",
+    "brandNamePlaceholder": "e.g. Nike India",
+    "instagramUsernameLabel": "Instagram Username",
+    "instagramUsernamePlaceholder": "nikeindia",
+    "categoryLabel": "Category",
+    "selectCategory": "Select category",
+    "instagramVerifiedLabel": "Instagram Verified",
+    "yes": "Yes",
+    "no": "No",
+    "notesLabel": "Notes",
+    "optional": "(optional)",
+    "notesPlaceholder": "e.g. Partnership contact: john@nike.com",
+    "howThisWorks": "How this works:",
+    "howStep1": "You create an invitation with the brand's Instagram handle",
+    "howStep2": "Brand opens RecentGossips app and connects their Instagram",
+    "howStep3": "If the handle matches, they see a \"Complete your profile\" screen",
+    "howStep4": "Brand fills in GSTIN, phone, and verifies — account becomes active",
+    "creating": "Creating...",
+    "createInvitation": "Create Invitation",
+    "cancel": "Cancel"
+  }
+}

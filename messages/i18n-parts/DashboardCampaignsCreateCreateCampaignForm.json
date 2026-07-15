@@ -1,0 +1,179 @@
+{
+  "DashboardCampaignsCreateCreateCampaignForm": {
+    "loading": {
+      "savingCampaign": "Saving campaign...",
+      "creatingCampaign": "Creating campaign...",
+      "uploadingBanner": "Uploading banner image...",
+      "uploadingGallery": "Uploading gallery image {current} of {total}..."
+    },
+    "errors": {
+      "addDeliverable": "Add at least 1 deliverable",
+      "selectCategory": "Select at least 1 category",
+      "selectPlatform": "Select at least 1 platform",
+      "somethingWentWrong": "Something went wrong"
+    },
+    "cards": {
+      "basicInfo": "Basic information",
+      "productService": "Product / service",
+      "bannerImage": "Banner image",
+      "gallery": "Gallery",
+      "contentDeliverables": "Content deliverables · {count, plural, one {# piece} other {# pieces}}",
+      "influencerRequirements": "Influencer requirements",
+      "contentGuidelines": "Content guidelines",
+      "termsRights": "Terms & rights",
+      "platforms": "Platforms *",
+      "categories": "Categories · {selected} of {total}",
+      "schedule": "Schedule",
+      "saveChanges": "Save changes",
+      "submit": "Submit"
+    },
+    "fields": {
+      "campaignTitle": "Campaign Title",
+      "description": "Description",
+      "brand": "Brand",
+      "campaignType": "Campaign Type",
+      "status": "Status",
+      "totalSlots": "Total Slots",
+      "totalBudget": "Total Budget",
+      "budgetPerInfluencer": "Budget / Influencer",
+      "productValue": "Product value (approx.)",
+      "whatPromoting": "What are you promoting?",
+      "willBeShipped": "Will product be shipped?",
+      "shippingTimeline": "Shipping timeline (days)",
+      "serviceLocation": "Service location",
+      "compensation": "What does the influencer get? (compensation)",
+      "influencerTier": "Influencer Tier",
+      "minFollowers": "Min. Followers",
+      "maxFollowers": "Max. Followers",
+      "minEngagement": "Min. Engagement Rate (%)",
+      "locations": "Locations",
+      "preferredGender": "Preferred gender",
+      "preferredLanguages": "Preferred languages",
+      "mustInclude": "Must include (Do's)",
+      "mustAvoid": "Must avoid (Don'ts)",
+      "requiredHashtags": "Required hashtags",
+      "brandHandles": "Brand handle(s) to tag",
+      "usageRights": "Content usage rights",
+      "keepupDuration": "Content keep-up duration",
+      "exclusivity": "Exclusivity (no competing brands)",
+      "paymentTimeline": "Payment timeline",
+      "startDate": "Start Date",
+      "applicationDeadline": "Application Deadline",
+      "campaignEndDate": "Campaign End Date"
+    },
+    "placeholders": {
+      "campaignTitle": "e.g. Summer Fashion 2026",
+      "description": "What is this campaign about?\n\nWhat do you want the influencer to highlight?\n\nAny specific messaging or hashtags?",
+      "productNameProduct": "e.g. \"Moisturizing cream — 50ml tube\"",
+      "productNameService": "e.g. \"Weekend stay at our Mussoorie resort\"",
+      "serviceLocation": "e.g. \"Mussoorie, India\" or \"Online / virtual\"",
+      "compensationProduct": "e.g. \"Full skincare kit worth ₹3,500\"",
+      "compensationService": "e.g. \"Free 2-night stay + meals + spa session\"",
+      "contentDos": "\"Show product packaging, mention discount code SAVE20\"",
+      "contentDonts": "\"No competitor products, no copyrighted music\""
+    },
+    "hints": {
+      "description": "A guided template helps creators understand what you need.",
+      "budgetAutoCalc": "Auto-calculated from total ÷ slots",
+      "serviceLocation": "Where the influencer experiences the service.",
+      "applicationDeadline": "Last day for influencers to apply.",
+      "campaignEndDate": "All content must be delivered by this date.",
+      "createdAsDraft": "Campaign will be created as a draft"
+    },
+    "options": {
+      "selectBrand": "Select a brand"
+    },
+    "brandInvitedSuffix": " (Invited)",
+    "campaignType": {
+      "barter": "Barter",
+      "paid": "Paid",
+      "hybrid": "Hybrid"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    },
+    "offering": {
+      "product": "📦 Product",
+      "service": "🛎️ Service / Experience"
+    },
+    "shipping": {
+      "no": "No",
+      "yes": "Yes",
+      "pickup": "Pickup required"
+    },
+    "alt": {
+      "bannerPreview": "Banner preview",
+      "existingBanner": "Existing banner",
+      "gallery": "Gallery {index}"
+    },
+    "actions": {
+      "remove": "Remove",
+      "replace": "Replace",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "creating": "Creating...",
+      "saveChanges": "Save Changes",
+      "createCampaign": "Create Campaign"
+    },
+    "banner": {
+      "uploadPrompt": "Click or drag to upload",
+      "uploadHint": "PNG, JPG, WebP up to 10MB"
+    },
+    "gallery": {
+      "newBadge": "NEW",
+      "addMore": "Add more images",
+      "uploadPrompt": "Click or drag to upload images"
+    },
+    "deliverables": {
+      "reels": "Reels",
+      "posts": "Posts",
+      "stories": "Stories",
+      "videos": "Videos",
+      "blogs": "Blogs",
+      "required": "At least 1 deliverable is required."
+    },
+    "tier": {
+      "all": "All Tiers",
+      "nano": "Nano (1K-10K)",
+      "micro": "Micro (10K-100K)",
+      "macro": "Macro (100K-1M)",
+      "mega": "Mega (1M+)"
+    },
+    "allIndia": "All India",
+    "usageRights": {
+      "creatorOnly": "Influencer's page only",
+      "brandRepost": "Brand can repost",
+      "paidAds": "Brand can use in paid ads",
+      "fullRights": "Full rights transfer"
+    },
+    "keepup": {
+      "24h": "24 hours (stories)",
+      "7d": "7 days",
+      "30d": "30 days",
+      "permanent": "Permanent"
+    },
+    "exclusivity": {
+      "none": "No exclusivity",
+      "7": "7 days",
+      "15": "15 days",
+      "30": "30 days",
+      "60": "60 days",
+      "90": "90 days"
+    },
+    "payment": {
+      "advance": "Advance",
+      "onApproval": "On content approval",
+      "within7days": "Within 7 days of posting",
+      "within30days": "Within 30 days"
+    },
+    "platforms": {
+      "selectAtLeastOne": "Select at least 1 platform."
+    },
+    "categories": {
+      "selectAtLeastOne": "Select at least 1 category."
+    }
+  }
+}

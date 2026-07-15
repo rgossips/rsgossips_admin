@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CreateCampaignForm, type CampaignInitial } from "../../create/create-campaign-form";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function EditCampaignPage({
   params: Promise<{ id: string }>;
 }) {
   if (!(await isAdminOrAbove())) redirect("/dashboard/campaigns");
+  const t = await getTranslations("DashboardCampaignsIdEdit");
   const { id } = await params;
   const supabase = createAdminClient();
 
@@ -117,8 +119,8 @@ export default async function EditCampaignPage({
           </svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Campaign</h1>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{campaign.title || "Untitled campaign"}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("editCampaign")}</h1>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{campaign.title || t("untitledCampaign")}</p>
         </div>
       </div>
 

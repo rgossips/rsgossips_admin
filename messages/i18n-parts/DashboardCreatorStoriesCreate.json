@@ -1,0 +1,8 @@
+{
+  "DashboardCreatorStoriesCreate": {
+    "backToStories": "← Creator Stories",
+    "title": "New story",
+    "subtitle": "Upload a short vertical clip — it appears in the Top Creator Stories carousel on the brand home page.",
+    "submitLabel": "Publish"
+  }
+}

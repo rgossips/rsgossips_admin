@@ -8,6 +8,7 @@ import { DeleteInfluencerButton } from "./delete-influencer";
 import { ReferralLinkCard } from "./referral-link-card";
 import { Avatar } from "@/components/avatar";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
+import { getTranslations } from "next-intl/server";
 
 export default async function InfluencerDetailPage({
   params,
@@ -15,6 +16,7 @@ export default async function InfluencerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const t = await getTranslations("DashboardInfluencersId");
   const supabase = createAdminClient();
 
   const { data: inf, error } = await supabase
@@ -61,16 +63,16 @@ export default async function InfluencerDetailPage({
             <Avatar src={inf.profile_photo_url} name={inf.full_name} size="xl" shape="rounded" className="!border-2 !border-white dark:!border-gray-800 shadow-lg" />
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{inf.full_name || "Unknown"}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{inf.full_name || t("unknown")}</h1>
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${st.bg}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{inf.status || "unknown"}
+                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{inf.status || t("statusUnknown")}
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 {inf.instagram_handle && <span className="text-sm text-gray-500 dark:text-gray-400">@{inf.instagram_handle}</span>}
                 {inf.username && inf.username !== inf.instagram_handle && (<><span className="text-gray-300 dark:text-gray-700">|</span><span className="text-sm text-gray-400 dark:text-gray-500">{inf.username}</span></>)}
                 <span className="text-gray-300 dark:text-gray-700">|</span>
-                <span className="text-sm text-gray-400 dark:text-gray-500">Joined {formatDate(inf.created_at)}</span>
+                <span className="text-sm text-gray-400 dark:text-gray-500">{t("joinedDate", { date: formatDate(inf.created_at) })}</span>
               </div>
             </div>
           </div>
@@ -81,7 +83,7 @@ export default async function InfluencerDetailPage({
           {superAdmin && (
             <DeleteInfluencerButton
               influencerId={inf.influencer_id}
-              displayName={inf.full_name || inf.username || inf.instagram_handle || "Influencer"}
+              displayName={inf.full_name || inf.username || inf.instagram_handle || t("deleteFallbackName")}
               confirmText={inf.instagram_handle || inf.username || inf.full_name || "DELETE"}
             />
           )}
@@ -93,19 +95,19 @@ export default async function InfluencerDetailPage({
         <div className="lg:col-span-2 space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
-            <StatCard label="Followers" value={inf.followers_count?.toLocaleString() || "0"} color="indigo" />
-            <StatCard label="Following" value={inf.follows_count?.toLocaleString() || "0"} color="purple" />
-            <StatCard label="Posts" value={inf.media_count?.toLocaleString() || "0"} color="pink" />
+            <StatCard label={t("stats.followers")} value={inf.followers_count?.toLocaleString() || "0"} color="indigo" />
+            <StatCard label={t("stats.following")} value={inf.follows_count?.toLocaleString() || "0"} color="purple" />
+            <StatCard label={t("stats.posts")} value={inf.media_count?.toLocaleString() || "0"} color="pink" />
           </div>
 
           {inf.bio && (
-            <Card icon="M4 6h16M4 12h16M4 18h7" color="indigo" title="Bio">
+            <Card icon="M4 6h16M4 12h16M4 18h7" color="indigo" title={t("card.bio")}>
               <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{inf.bio}</p>
             </Card>
           )}
 
           {inf.categories && inf.categories.length > 0 && (
-            <Card icon="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" color="amber" title="Categories">
+            <Card icon="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" color="amber" title={t("card.categories")}>
               <div className="flex flex-wrap gap-2">
                 {inf.categories.map((cat: string) => (
                   <span key={cat} className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50">{cat}</span>
@@ -114,43 +116,43 @@ export default async function InfluencerDetailPage({
             </Card>
           )}
 
-          <Card icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" color="emerald" title="Contact & Location">
+          <Card icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" color="emerald" title={t("card.contactLocation")}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InfoItem label="Email" value={inf.email || "—"} />
-              <InfoItem label="Phone" value={phone ? (phone.startsWith("+") ? phone : `+${phone}`) : "—"} />
-              <InfoItem label="City" value={inf.city || "—"} />
-              <InfoItem label="State" value={inf.state || "—"} />
+              <InfoItem label={t("info.email")} value={inf.email || "—"} />
+              <InfoItem label={t("info.phone")} value={phone ? (phone.startsWith("+") ? phone : `+${phone}`) : "—"} />
+              <InfoItem label={t("info.city")} value={inf.city || "—"} />
+              <InfoItem label={t("info.state")} value={inf.state || "—"} />
             </div>
           </Card>
 
           <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <summary className="px-6 py-4 text-sm font-medium text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">Raw Data</summary>
+            <summary className="px-6 py-4 text-sm font-medium text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">{t("rawData")}</summary>
             <div className="px-6 pb-6"><pre className="text-xs text-gray-500 dark:text-gray-400 overflow-auto whitespace-pre-wrap bg-gray-50 dark:bg-gray-800 rounded-xl p-4">{JSON.stringify(inf, null, 2)}</pre></div>
           </details>
         </div>
 
         <div className="space-y-6">
-          <SidebarTable title="Profile Details" rows={[
-            ["Full Name", inf.full_name || "—"],
-            ["Username", inf.username || "—"],
+          <SidebarTable title={t("profileDetails.title")} rows={[
+            [t("profileDetails.fullName"), inf.full_name || "—"],
+            [t("profileDetails.username"), inf.username || "—"],
             ["Instagram", inf.instagram_handle ? `@${inf.instagram_handle}` : "—"],
-            ["Status", inf.status || "—"],
-            ["Verification", inf.verification_status || "—"],
-            ["Plan", inf.subscription_plan ? inf.subscription_plan.charAt(0).toUpperCase() + inf.subscription_plan.slice(1) : "Free"],
-            ["Source", inf.source || "—"],
+            [t("profileDetails.status"), inf.status || "—"],
+            [t("profileDetails.verification"), inf.verification_status || "—"],
+            [t("profileDetails.plan"), inf.subscription_plan ? inf.subscription_plan.charAt(0).toUpperCase() + inf.subscription_plan.slice(1) : t("planFree")],
+            [t("profileDetails.source"), inf.source || "—"],
           ]} />
-          <SidebarTable title="Instagram Stats" rows={[
-            ["Followers", inf.followers_count?.toLocaleString() || "0"],
-            ["Following", inf.follows_count?.toLocaleString() || "0"],
-            ["Media", inf.media_count?.toLocaleString() || "0"],
-            ["Engagement", inf.engagement_rate ? `${inf.engagement_rate}%` : "—"],
+          <SidebarTable title={t("igStats.title")} rows={[
+            [t("igStats.followers"), inf.followers_count?.toLocaleString() || "0"],
+            [t("igStats.following"), inf.follows_count?.toLocaleString() || "0"],
+            [t("igStats.media"), inf.media_count?.toLocaleString() || "0"],
+            [t("igStats.engagement"), inf.engagement_rate ? `${inf.engagement_rate}%` : "—"],
           ]} />
           <ReferralLinkCard referralCode={inf.referral_code} />
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800"><h2 className="text-sm font-semibold text-gray-900 dark:text-white">Timeline</h2></div>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800"><h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("timeline.title")}</h2></div>
             <div className="p-5 space-y-3">
-              <DateItem label="Joined" date={formatDate(inf.created_at)} />
-              <DateItem label="Updated" date={formatDate(inf.updated_at)} />
+              <DateItem label={t("timeline.joined")} date={formatDate(inf.created_at)} />
+              <DateItem label={t("timeline.updated")} date={formatDate(inf.updated_at)} />
             </div>
           </div>
         </div>

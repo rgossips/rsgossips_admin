@@ -1,0 +1,22 @@
+{
+  "DashboardCampaignsCampaignFilters": {
+    "searchPlaceholder": "Search campaigns or brands...",
+    "allFilters": "All Filters",
+    "category": "Category",
+    "all": "All",
+    "moreCount": "{count, plural, one {+# more} other {+# more}}",
+    "resetAll": "Reset all",
+    "filters": "Filters",
+    "reset": "Reset",
+    "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+    "statusLabel": "Status",
+    "applyFilters": "Apply Filters",
+    "status": {
+      "all": "All",
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    }
+  }
+}

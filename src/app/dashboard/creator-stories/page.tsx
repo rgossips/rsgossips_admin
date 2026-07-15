@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
   deleteCreatorStory,
@@ -13,6 +14,7 @@ import { CreatorStoriesSectionTitleEditor } from "./_components/section-title-ed
 export const dynamic = "force-dynamic";
 
 export default async function CreatorStoriesPage() {
+  const t = await getTranslations("DashboardCreatorStories");
   const admin = createAdminClient();
   const { data: stories, error } = await admin
     .from("creator_stories")
@@ -28,9 +30,9 @@ export default async function CreatorStoriesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Creator Stories</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Vertical reels shown in the Top Creator Stories carousel on the brand home page.
+            {t("subtitle")}
           </p>
         </div>
         {canWrite && (
@@ -41,7 +43,7 @@ export default async function CreatorStoriesPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            New story
+            {t("newStory")}
           </Link>
         )}
       </div>
@@ -49,9 +51,9 @@ export default async function CreatorStoriesPage() {
       <CreatorStoriesSectionTitleEditor initialTitle={sectionTitle} canWrite={canWrite} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatPill label="Total" value={(stories || []).length} />
-        <StatPill label="Active" value={activeCount} accent="text-emerald-600" />
-        <StatPill label="Hidden" value={(stories || []).length - activeCount} accent="text-gray-400" />
+        <StatPill label={t("stats.total")} value={(stories || []).length} />
+        <StatPill label={t("stats.active")} value={activeCount} accent="text-emerald-600" />
+        <StatPill label={t("stats.hidden")} value={(stories || []).length - activeCount} accent="text-gray-400" />
       </div>
 
       {error && (
@@ -63,8 +65,10 @@ export default async function CreatorStoriesPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
         {(stories || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            No stories yet. Click <span className="font-semibold text-indigo-500">New story</span> to upload one.
-            <p className="text-[11px] text-gray-300 mt-2">Until you publish at least one, the brand home page falls back to a built-in list.</p>
+            {t.rich("empty.line1", {
+              emph: (c) => <span className="font-semibold text-indigo-500">{c}</span>,
+            })}
+            <p className="text-[11px] text-gray-300 mt-2">{t("empty.line2")}</p>
           </div>
         ) : (
           (stories || []).map((s) => <StoryRow key={s.id} story={s} canWrite={canWrite} />)
@@ -91,7 +95,8 @@ function StatPill({
   );
 }
 
-function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
+async function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
+  const t = await getTranslations("DashboardCreatorStories");
   return (
     <div className="flex items-center gap-4 p-4">
       <span className="shrink-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 w-6 text-center">
@@ -105,7 +110,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
         ) : story.video_url ? (
           <video src={story.video_url} className="w-full h-full object-cover" muted preload="metadata" />
         ) : (
-          <span className="text-[10px] text-gray-400">no preview</span>
+          <span className="text-[10px] text-gray-400">{t("noPreview")}</span>
         )}
       </div>
 
@@ -130,7 +135,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
             }}
           >
             <ActionButton
-              title="Move up"
+              title={t("moveUp")}
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↑
@@ -143,7 +148,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
             }}
           >
             <ActionButton
-              title="Move down"
+              title={t("moveDown")}
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↓
@@ -157,7 +162,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
           story.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
         }`}
       >
-        {story.is_active ? "Active" : "Hidden"}
+        {story.is_active ? t("statusActive") : t("statusHidden")}
       </span>
 
       {canWrite && (
@@ -166,7 +171,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
             href={`/dashboard/creator-stories/${story.id}/edit`}
             className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
-            Edit
+            {t("edit")}
           </Link>
 
           <form
@@ -178,7 +183,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
             <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
-              {story.is_active ? "Hide" : "Show"}
+              {story.is_active ? t("hide") : t("show")}
             </ActionButton>
           </form>
 
@@ -191,7 +196,7 @@ function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
             <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
             >
-              Delete
+              {t("delete")}
             </ActionButton>
           </form>
         </>

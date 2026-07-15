@@ -1,0 +1,33 @@
+{
+  "DashboardBrandsInvitedBrandRow": {
+    "awaitingClaim": "Awaiting Claim",
+    "verified": "Verified",
+    "created": "Created {date}",
+    "sendInvite": "Send invite",
+    "edit": "Edit",
+    "remove": "Remove",
+    "removeInvitationTitle": "Remove invitation for @{username}?",
+    "removeInvitation": "Remove invitation",
+    "bulletCampaigns": "All campaigns created for this invited brand",
+    "bulletApplications": "Every application on those campaigns",
+    "bulletFeaturedListings": "Any Featured Campaigns listings",
+    "bulletInvitationItself": "The invitation itself",
+    "somethingWentWrong": "Something went wrong",
+    "editBrandInvitation": "Edit Brand Invitation",
+    "brandLogo": "Brand Logo",
+    "clickToChangeLogo": "Click the square to change the logo.",
+    "clickToUploadLogo": "Click the square to upload the logo.",
+    "removeLogo": "Remove logo",
+    "brandNameLabel": "Brand Name *",
+    "instagramLabel": "Instagram *",
+    "category": "Category",
+    "none": "None",
+    "instagramVerified": "Instagram Verified",
+    "yes": "Yes",
+    "no": "No",
+    "notes": "Notes",
+    "saving": "Saving...",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}

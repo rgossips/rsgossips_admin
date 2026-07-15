@@ -1,0 +1,47 @@
+{
+  "DashboardInfluencersId": {
+    "unknown": "Unknown",
+    "statusUnknown": "unknown",
+    "joinedDate": "Joined {date}",
+    "deleteFallbackName": "Influencer",
+    "planFree": "Free",
+    "rawData": "Raw Data",
+    "stats": {
+      "followers": "Followers",
+      "following": "Following",
+      "posts": "Posts"
+    },
+    "card": {
+      "bio": "Bio",
+      "categories": "Categories",
+      "contactLocation": "Contact & Location"
+    },
+    "info": {
+      "email": "Email",
+      "phone": "Phone",
+      "city": "City",
+      "state": "State"
+    },
+    "profileDetails": {
+      "title": "Profile Details",
+      "fullName": "Full Name",
+      "username": "Username",
+      "status": "Status",
+      "verification": "Verification",
+      "plan": "Plan",
+      "source": "Source"
+    },
+    "igStats": {
+      "title": "Instagram Stats",
+      "followers": "Followers",
+      "following": "Following",
+      "media": "Media",
+      "engagement": "Engagement"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "joined": "Joined",
+      "updated": "Updated"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { removeAdmin, resendAdminInvite, updateAdminRole } from "./actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { ConfirmDialog, useConfirmDialog } from "@/components/confirm-dialog";
@@ -26,6 +27,7 @@ export function AdminRow({
   lastSignInAt: string | null;
   emailConfirmedAt: string | null;
 }) {
+  const t = useTranslations("DashboardAdminsAdminRow");
   const [removing, setRemoving] = useState(false);
   const [resending, setResending] = useState(false);
   const [roleSaving, setRoleSaving] = useState(false);
@@ -39,9 +41,9 @@ export function AdminRow({
   };
 
   const roleLabels: Record<string, string> = {
-    super_admin: "Super Admin",
-    admin: "Admin",
-    viewer: "Viewer",
+    super_admin: t("roles.superAdmin"),
+    admin: t("roles.admin"),
+    viewer: t("roles.viewer"),
   };
 
   // Acceptance status: signed in at least once = fully active. Email
@@ -59,19 +61,19 @@ export function AdminRow({
         : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400";
 
   const statusLabel =
-    status === "active" ? "Active" : status === "verified" ? "Link verified" : "Pending invite";
+    status === "active" ? t("status.active") : status === "verified" ? t("status.linkVerified") : t("status.pendingInvite");
 
   const handleRevoke = () => {
     const isPending = status === "pending";
     confirmRevoke.ask({
       title: isPending
-        ? `Cancel invitation for ${admin.full_name}?`
-        : `Revoke admin access for ${admin.full_name}?`,
+        ? t("revoke.cancelTitle", { name: admin.full_name })
+        : t("revoke.revokeTitle", { name: admin.full_name }),
       description: isPending
-        ? "Their pending invite will be cancelled and the email will no longer work. They will need a new invitation to join."
-        : "They will lose access immediately and their authentication account will be removed. This cannot be undone — you'll need to invite them again to restore access.",
-      confirmLabel: isPending ? "Cancel invitation" : "Revoke access",
-      cancelLabel: "Keep",
+        ? t("revoke.cancelDescription")
+        : t("revoke.revokeDescription"),
+      confirmLabel: isPending ? t("revoke.cancelConfirm") : t("revoke.revokeConfirm"),
+      cancelLabel: t("revoke.keep"),
       variant: "danger",
       handler: async () => {
         setRemoving(true);
@@ -89,7 +91,7 @@ export function AdminRow({
     setResending(true);
     const result = await resendAdminInvite(admin.id);
     if (result.error) alert(result.error);
-    else alert("Invitation email resent.");
+    else alert(t("resendSuccess"));
     setResending(false);
   };
 
@@ -114,7 +116,7 @@ export function AdminRow({
       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
         {admin.full_name}
         {isCurrentUser && (
-          <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">(you)</span>
+          <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">{t("you")}</span>
         )}
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{admin.email}</td>
@@ -129,9 +131,9 @@ export function AdminRow({
                 roleColors[role] || roleColors.viewer
               }`}
             >
-              <option value="super_admin">Super Admin</option>
-              <option value="admin">Admin</option>
-              <option value="viewer">Viewer</option>
+              <option value="super_admin">{t("roles.superAdmin")}</option>
+              <option value="admin">{t("roles.admin")}</option>
+              <option value="viewer">{t("roles.viewer")}</option>
             </select>
             {roleSaving && <ButtonSpinner />}
           </div>
@@ -172,7 +174,7 @@ export function AdminRow({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   )}
-                  {resending ? "Sending..." : "Resend invite"}
+                  {resending ? t("sending") : t("resendInvite")}
                 </button>
               )}
               <button
@@ -185,7 +187,7 @@ export function AdminRow({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 )}
-                {removing ? "Removing..." : status === "pending" ? "Cancel invite" : "Revoke access"}
+                {removing ? t("removing") : status === "pending" ? t("cancelInvite") : t("revokeAccess")}
               </button>
             </div>
           )}

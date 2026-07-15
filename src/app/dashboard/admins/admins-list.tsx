@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AdminRow } from "./admin-row";
 
 interface AdminWithAuth {
@@ -24,6 +25,7 @@ export function AdminsList({
   admins: AdminWithAuth[];
   currentUserId: string;
 }) {
+  const t = useTranslations("DashboardAdminsAdminsList");
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   // useDeferredValue lets the input stay snappy even on slower devices.
@@ -48,7 +50,7 @@ export function AdminsList({
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <input
           type="text"
-          placeholder="Search by name or email..."
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -58,10 +60,10 @@ export function AdminsList({
           onChange={(e) => setRole(e.target.value)}
           className="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         >
-          <option value="">All Roles</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="viewer">Viewer</option>
+          <option value="">{t("roleAll")}</option>
+          <option value="super_admin">{t("roleSuperAdmin")}</option>
+          <option value="admin">{t("roleAdmin")}</option>
+          <option value="viewer">{t("roleViewer")}</option>
         </select>
         {hasFilters && (
           <button
@@ -71,7 +73,7 @@ export function AdminsList({
             }}
             className="px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
           >
-            Clear filters
+            {t("clearFilters")}
           </button>
         )}
       </div>
@@ -80,12 +82,12 @@ export function AdminsList({
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800">
-              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">Name</th>
-              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">Email</th>
-              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">Role</th>
-              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">Status</th>
-              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">Added</th>
-              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">Actions</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colName")}</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colEmail")}</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colRole")}</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colStatus")}</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colAdded")}</th>
+              <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colActions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -103,7 +105,7 @@ export function AdminsList({
             ) : (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
-                  No admin users match these filters
+                  {t("noResults")}
                 </td>
               </tr>
             )}

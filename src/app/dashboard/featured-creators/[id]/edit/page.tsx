@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { FeaturedCreatorForm } from "../../_form/featured-creator-form";
 import { updateFeaturedCreator } from "../../actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function EditFeaturedCreatorPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations("DashboardFeaturedCreatorsIdEdit");
   if (!(await isAdminOrAbove())) redirect("/dashboard/featured-creators");
   const { id } = await params;
   const admin = createAdminClient();
@@ -36,17 +38,17 @@ export default async function EditFeaturedCreatorPage({
           href="/dashboard/featured-creators"
           className="text-[12px] font-semibold text-indigo-600 hover:underline"
         >
-          ← Featured Creators
+          {t("backToFeaturedCreators")}
         </Link>
       </div>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit featured creator</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Changes go live on the brand home page immediately.
+          {t("subtitle")}
         </p>
       </div>
 
-      <FeaturedCreatorForm action={updateAction} initial={creator} submitLabel="Save changes" />
+      <FeaturedCreatorForm action={updateAction} initial={creator} submitLabel={t("saveChanges")} />
     </div>
   );
 }

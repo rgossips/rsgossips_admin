@@ -10,9 +10,11 @@ import { SectionTitleEditor } from "./_components/section-title-editor";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 import { ActionButton } from "@/components/action-button";
+import { getTranslations } from "next-intl/server";
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedCampaignsPage() {
+  const t = await getTranslations("DashboardFeaturedCampaigns");
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
   const sectionTitle = await getFeaturedSectionTitle();
@@ -59,7 +61,7 @@ export default async function FeaturedCampaignsPage() {
       });
     }
     (campaigns || []).forEach((c: any) => {
-      const brand = brandMap[c.brand_invitation_id] || brandMap[c.brand_id] || { name: "Unknown brand", logo: "" };
+      const brand = brandMap[c.brand_invitation_id] || brandMap[c.brand_id] || { name: t("unknownBrand"), logo: "" };
       campaignsById[c.campaign_id] = { ...c, brand };
     });
   }
@@ -70,15 +72,15 @@ export default async function FeaturedCampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Featured Campaigns</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Hand-picked list shown on the influencer home page at the top
-            (Deal Of The Day stacked carousel). Plan Your Stay With Us
-            is curated separately under{" "}
-            <a href="/dashboard/featured-stay" className="text-indigo-500 hover:underline">
-              Plan Your Stay
-            </a>
-            . Lower position = appears first.
+            {t.rich("description", {
+              link: (c) => (
+                <a href="/dashboard/featured-stay" className="text-indigo-500 hover:underline">
+                  {c}
+                </a>
+              ),
+            })}
           </p>
         </div>
         {canWrite && <AddFeaturedCampaignButton />}
@@ -87,9 +89,9 @@ export default async function FeaturedCampaignsPage() {
       <SectionTitleEditor initialTitle={sectionTitle} canWrite={canWrite} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatPill label="Total" value={(featured || []).length} />
-        <StatPill label="Active" value={activeCount} accent="text-emerald-600" />
-        <StatPill label="Hidden" value={(featured || []).length - activeCount} accent="text-gray-400" />
+        <StatPill label={t("stat.total")} value={(featured || []).length} />
+        <StatPill label={t("stat.active")} value={activeCount} accent="text-emerald-600" />
+        <StatPill label={t("stat.hidden")} value={(featured || []).length - activeCount} accent="text-gray-400" />
       </div>
 
       {error && (
@@ -101,8 +103,10 @@ export default async function FeaturedCampaignsPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
         {(featured || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            No featured campaigns yet. Click <span className="font-semibold text-indigo-500">Feature a campaign</span> to add one.
-            <p className="text-[11px] text-gray-300 mt-2">Until you publish at least one, the influencer home falls back to a built-in placeholder list.</p>
+            {t.rich("emptyState", {
+              feature: (c) => <span className="font-semibold text-indigo-500">{c}</span>,
+            })}
+            <p className="text-[11px] text-gray-300 mt-2">{t("placeholderNote")}</p>
           </div>
         ) : (
           (featured || []).map((f) => {
@@ -132,10 +136,11 @@ function StatPill({
   );
 }
 
-function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; canWrite: boolean }) {
-  const brandName = campaign?.brand?.name || "Unknown brand";
+async function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; canWrite: boolean }) {
+  const t = await getTranslations("DashboardFeaturedCampaigns");
+  const brandName = campaign?.brand?.name || t("unknownBrand");
   const brandLogo = campaign?.brand?.logo || "";
-  const title = campaign?.title || "(missing — campaign deleted)";
+  const title = campaign?.title || t("missingCampaign");
   const deadline = campaign?.application_deadline;
   return (
     <div className="flex items-center gap-4 p-4">
@@ -157,7 +162,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
         <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate">
           {brandName}
           {campaign?.status ? ` · ${campaign.status}` : ""}
-          {deadline ? ` · deadline ${new Date(deadline).toLocaleDateString()}` : ""}
+          {deadline ? ` · ${t("deadline", { date: new Date(deadline).toLocaleDateString() })}` : ""}
         </p>
       </div>
 
@@ -170,7 +175,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
             }}
           >
             <ActionButton
-              title="Move up"
+              title={t("moveUp")}
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↑
@@ -183,7 +188,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
             }}
           >
             <ActionButton
-              title="Move down"
+              title={t("moveDown")}
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↓
@@ -197,7 +202,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
           row.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
         }`}
       >
-        {row.is_active ? "Active" : "Hidden"}
+        {row.is_active ? t("active") : t("hidden")}
       </span>
 
       {canWrite && (
@@ -211,7 +216,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
             <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
-              {row.is_active ? "Hide" : "Show"}
+              {row.is_active ? t("hide") : t("show")}
             </ActionButton>
           </form>
 
@@ -224,7 +229,7 @@ function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; can
             <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
             >
-              Delete
+              {t("delete")}
             </ActionButton>
           </form>
         </>

@@ -1,0 +1,12 @@
+{
+  "DashboardCampaignsIdDetailActions": {
+    "statuses": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    },
+    "confirmComplete": "Mark this campaign as completed? Applications won't change but the campaign will no longer accept new ones.",
+    "campaignStatusLabel": "Campaign status"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "DashboardFeaturedCampaigns": {
+    "title": "Featured Campaigns",
+    "description": "Hand-picked list shown on the influencer home page at the top (Deal Of The Day stacked carousel). Plan Your Stay With Us is curated separately under <link>Plan Your Stay</link>. Lower position = appears first.",
+    "stat": {
+      "total": "Total",
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "emptyState": "No featured campaigns yet. Click <feature>Feature a campaign</feature> to add one.",
+    "placeholderNote": "Until you publish at least one, the influencer home falls back to a built-in placeholder list.",
+    "unknownBrand": "Unknown brand",
+    "missingCampaign": "(missing — campaign deleted)",
+    "deadline": "deadline {date}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "active": "Active",
+    "hidden": "Hidden",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete"
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { addStayCampaign, searchCampaignsForStay } from "../actions";
 
 // Compact "Feature a campaign" button that opens a search dialog. The
@@ -8,6 +9,7 @@ import { addStayCampaign, searchCampaignsForStay } from "../actions";
 // campaigns, and inserts the row when the admin picks one.
 
 export function AddFeaturedCampaignButton() {
+  const t = useTranslations("DashboardFeaturedStayComponentsAddFeaturedCampaign");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
@@ -51,26 +53,26 @@ export function AddFeaturedCampaignButton() {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
-        Feature a campaign
+        {t("featureCampaign")}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 w-[min(600px,95vw)] max-h-[85vh] flex flex-col rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl">
             <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Search campaigns</h3>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">{t("searchCampaigns")}</h3>
               <button
                 onClick={() => { setOpen(false); setQuery(""); setResults([]); }}
                 className="text-[12px] font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
-                Close
+                {t("close")}
               </button>
             </div>
             <div className="p-4 border-b border-gray-100 dark:border-gray-800">
               <input
                 type="text"
                 autoFocus
-                placeholder="Search by campaign title or brand…"
+                placeholder={t("searchPlaceholder")}
                 value={query}
                 onChange={(e) => onChange(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm outline-none focus:border-indigo-400"
@@ -78,10 +80,10 @@ export function AddFeaturedCampaignButton() {
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {searching ? (
-                <div className="text-center text-sm text-gray-400 py-8">Searching…</div>
+                <div className="text-center text-sm text-gray-400 py-8">{t("searching")}</div>
               ) : results.length === 0 ? (
                 <div className="text-center text-sm text-gray-400 py-8">
-                  {query.trim().length < 2 ? "Type at least 2 characters." : "No matches (already-featured campaigns are hidden)."}
+                  {query.trim().length < 2 ? t("typeAtLeast2") : t("noMatches")}
                 </div>
               ) : (
                 results.map((c: any) => (
@@ -101,9 +103,9 @@ export function AddFeaturedCampaignButton() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c.title || "(untitled campaign)"}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c.title || t("untitledCampaign")}</p>
                       <p className="text-[12px] text-gray-500 truncate">
-                        {c.brandName || "Unknown brand"} · {c.status || "—"}
+                        {c.brandName || t("unknownBrand")} · {c.status || "—"}
                       </p>
                     </div>
                   </button>

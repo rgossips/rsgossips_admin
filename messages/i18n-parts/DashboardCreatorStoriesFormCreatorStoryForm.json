@@ -1,0 +1,31 @@
+{
+  "DashboardCreatorStoriesFormCreatorStoryForm": {
+    "attachInfluencerTitle": "Attach an existing influencer",
+    "attachInfluencerSubtitle": "Auto-fills the username and avatar.",
+    "searchCreators": "Search creators",
+    "usernameLabel": "Instagram username",
+    "usernamePlaceholder": "cristiano",
+    "avatarUrlLabel": "Avatar URL",
+    "avatarUrlPlaceholder": "https://…/photo.jpg",
+    "avatarAlt": "avatar",
+    "preview": "preview",
+    "videoLabel": "Video",
+    "videoHint": "MP4, up to 50 MB",
+    "videoUrlPlaceholder": "Paste a hosted video URL",
+    "uploading": "Uploading…",
+    "uploadFromDevice": "Upload from device",
+    "posterLabel": "Poster image URL (optional)",
+    "posterPlaceholder": "https://…/poster.jpg",
+    "posterHint": "Thumbnail shown before the video loads.",
+    "positionLabel": "Position",
+    "positionHint": "Lower numbers appear first.",
+    "activeLabel": "Active (visible to brands)",
+    "saving": "Saving…",
+    "pickerSearchPlaceholder": "Search by handle, name or username…",
+    "searching": "Searching…",
+    "typeAtLeast": "Type at least 2 characters.",
+    "noMatches": "No matches.",
+    "pickerFollowers": "@{handle} · {count} followers",
+    "close": "Close"
+  }
+}

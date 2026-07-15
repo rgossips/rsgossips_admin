@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { inviteInfluencer, uploadInfluencerPhoto } from "./actions";
 import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 import { BulkInviteInfluencers } from "./bulk-invite-influencers";
@@ -17,6 +18,7 @@ const inputClass =
 const labelClass = "block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
 
 function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+  const t = useTranslations("DashboardInfluencersInviteInfluencerForm");
   const [input, setInput] = useState("");
   const add = () => {
     const v = input.trim();
@@ -27,7 +29,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
   };
   return (
     <div>
-      <label className={labelClass}>Tags</label>
+      <label className={labelClass}>{t("tags")}</label>
       <div className={`${inputClass} flex flex-wrap items-center gap-1.5 min-h-[42px] !py-1.5 !px-2.5`}>
         {tags.map((t) => (
           <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-[11px] font-semibold">
@@ -48,7 +50,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
             }
           }}
           onBlur={add}
-          placeholder={tags.length === 0 ? "Type and press Enter" : ""}
+          placeholder={tags.length === 0 ? t("tagsPlaceholder") : ""}
           className="flex-1 min-w-[80px] bg-transparent outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400"
         />
       </div>
@@ -57,6 +59,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
 }
 
 export function InviteInfluencerForm() {
+  const t = useTranslations("DashboardInfluencersInviteInfluencerForm");
   const { isAdmin } = useRole();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
@@ -91,13 +94,13 @@ export function InviteInfluencerForm() {
     // orphans a file in the influencer-photos bucket. The old native
     // <select required> blocked this in-browser; MultiSelectChips can't.
     if (selectedCities.length === 0) {
-      setError("Select at least one city");
+      setError(t("errorSelectCity"));
       return;
     }
     setLoading(true);
     try {
       if (photoFile) {
-        setLoadingMsg("Uploading photo...");
+        setLoadingMsg(t("loadingUploadingPhoto"));
         const fd = new FormData();
         fd.append("file", photoFile);
         fd.append("folder", "influencer-photos");
@@ -116,12 +119,12 @@ export function InviteInfluencerForm() {
       formData.set("city", selectedCities.join(", "));
       tags.forEach((t) => formData.append("tags", t));
 
-      setLoadingMsg("Creating invitation...");
+      setLoadingMsg(t("loadingCreatingInvitation"));
       const result = await inviteInfluencer(formData);
       if (result.error) {
         setError(result.error);
       } else {
-        setSuccess("Influencer invitation created!");
+        setSuccess(t("successCreated"));
         setOpen(false);
         setPhotoFile(null);
         setPhotoPreview(null);
@@ -131,7 +134,7 @@ export function InviteInfluencerForm() {
         setTags([]);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : t("errorGeneric"));
     }
     setLoading(false);
   };
@@ -169,7 +172,7 @@ export function InviteInfluencerForm() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Invite Influencer
+            {t("inviteInfluencer")}
           </button>
           <BulkInviteInfluencers />
         </div>
@@ -183,8 +186,8 @@ export function InviteInfluencerForm() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Invite Influencer</h3>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500">Create a placeholder — influencer will claim it via Instagram login</p>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("inviteInfluencer")}</h3>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{t("formSubtitle")}</p>
               </div>
             </div>
           </div>
@@ -193,7 +196,7 @@ export function InviteInfluencerForm() {
             {/* Row 1: Photo + Name/Username */}
             <div className="flex items-start gap-6">
               <div className="shrink-0">
-                <p className="text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-2">Photo</p>
+                <p className="text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-2">{t("photo")}</p>
                 <div
                   onClick={() => fileRef.current?.click()}
                   className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-gray-50 dark:bg-gray-800"
@@ -211,17 +214,17 @@ export function InviteInfluencerForm() {
               <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>
-                    Full Name <span className="text-red-400">*</span>
+                    {t("fullName")} <span className="text-red-400">*</span>
                   </label>
-                  <input name="full_name" type="text" required placeholder="e.g. Priya Sharma" className={inputClass} />
+                  <input name="full_name" type="text" required placeholder={t("fullNamePlaceholder")} className={inputClass} />
                 </div>
                 <div>
                   <label className={labelClass}>
-                    Instagram Username <span className="text-red-400">*</span>
+                    {t("instagramUsername")} <span className="text-red-400">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
-                    <input name="instagram_username" type="text" required placeholder="priyasharma" className={`${inputClass} !pl-8`} />
+                    <input name="instagram_username" type="text" required placeholder={t("instagramUsernamePlaceholder")} className={`${inputClass} !pl-8`} />
                   </div>
                 </div>
               </div>
@@ -231,7 +234,7 @@ export function InviteInfluencerForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <MultiSelectChips
-                  label="City"
+                  label={t("city")}
                   options={INDIAN_CITIES}
                   selected={selectedCities}
                   onChange={setSelectedCities}
@@ -240,16 +243,16 @@ export function InviteInfluencerForm() {
               </div>
               <div>
                 <label className={labelClass}>
-                  Gender <span className="text-red-400">*</span>
+                  {t("gender")} <span className="text-red-400">*</span>
                 </label>
                 <select name="gender" required defaultValue="" className={`${inputClass} appearance-none`}>
                   <option value="" disabled>
-                    Select gender
+                    {t("selectGender")}
                   </option>
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="prefer_not_to_say">Prefer not to say</option>
+                  <option value="female">{t("genderFemale")}</option>
+                  <option value="male">{t("genderMale")}</option>
+                  <option value="non_binary">{t("genderNonBinary")}</option>
+                  <option value="prefer_not_to_say">{t("genderPreferNotToSay")}</option>
                 </select>
               </div>
             </div>
@@ -259,19 +262,19 @@ export function InviteInfluencerForm() {
                  for regular creators. */}
             <div>
               <label className={labelClass}>
-                Profile Type <span className="text-gray-400 font-normal">(optional)</span>
+                {t("profileType")} <span className="text-gray-400 font-normal">{t("optional")}</span>
               </label>
               <select name="creator_type" defaultValue="" className={`${inputClass} appearance-none`}>
-                <option value="">— Not classified —</option>
-                <option value="meme_page">Meme page</option>
-                <option value="celebrity">Celebrity</option>
+                <option value="">{t("notClassified")}</option>
+                <option value="meme_page">{t("memePage")}</option>
+                <option value="celebrity">{t("celebrity")}</option>
               </select>
             </div>
 
             {/* Row 3: Categories + Languages */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <MultiSelectChips label="Categories" options={CATEGORIES} selected={selectedCategories} onChange={setSelectedCategories} />
-              <MultiSelectChips label="Content Language" options={LANGUAGES} selected={selectedLanguages} onChange={setSelectedLanguages} />
+              <MultiSelectChips label={t("categories")} options={CATEGORIES} selected={selectedCategories} onChange={setSelectedCategories} />
+              <MultiSelectChips label={t("contentLanguage")} options={LANGUAGES} selected={selectedLanguages} onChange={setSelectedLanguages} />
             </div>
 
             {/* Row 3: Tags + Notes */}
@@ -279,9 +282,9 @@ export function InviteInfluencerForm() {
               <TagInput tags={tags} onChange={setTags} />
               <div>
                 <label className={labelClass}>
-                  Notes <span className="text-gray-400 font-normal">(optional)</span>
+                  {t("notes")} <span className="text-gray-400 font-normal">{t("optional")}</span>
                 </label>
-                <input name="notes" type="text" placeholder="e.g. Contacted via DM" className={inputClass} />
+                <input name="notes" type="text" placeholder={t("notesPlaceholder")} className={inputClass} />
               </div>
             </div>
 
@@ -291,12 +294,12 @@ export function InviteInfluencerForm() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="text-[12px] text-blue-700 dark:text-blue-300 leading-relaxed">
-                <p className="font-semibold mb-1">How this works:</p>
+                <p className="font-semibold mb-1">{t("howThisWorks")}</p>
                 <ol className="list-decimal ml-4 space-y-0.5 text-blue-600 dark:text-blue-400">
-                  <li>You create an invitation with the influencer&apos;s Instagram handle</li>
-                  <li>Influencer opens RecentGossips app and connects their Instagram</li>
-                  <li>If the handle matches, they see a &quot;Complete your profile&quot; screen</li>
-                  <li>Influencer verifies their phone and the account becomes active</li>
+                  <li>{t("howStep1")}</li>
+                  <li>{t("howStep2")}</li>
+                  <li>{t("howStep3")}</li>
+                  <li>{t("howStep4")}</li>
                 </ol>
               </div>
             </div>
@@ -308,14 +311,14 @@ export function InviteInfluencerForm() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 text-white text-sm font-semibold transition-colors cursor-pointer"
               >
                 {loading && <ButtonSpinner />}
-                {loading ? "Creating..." : "Create Invitation"}
+                {loading ? t("creating") : t("createInvitation")}
               </button>
               <button
                 type="button"
                 onClick={reset}
                 className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium transition-colors cursor-pointer"
               >
-                Cancel
+                {t("cancel")}
               </button>
             </div>
           </form>

@@ -3,29 +3,30 @@ import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { ActionButton } from "@/components/action-button";
 import { AdjustRcForm } from "./_components/adjust-rc-form";
 import { resolveManualReview } from "./actions";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_PILL: Record<string, { label: string; class: string }> = {
-  PENDING: { label: "Pending", class: "bg-slate-100 text-slate-500" },
-  SIGNED_UP: { label: "Signed up", class: "bg-blue-50 text-blue-700" },
-  QUALIFIED: { label: "Qualified", class: "bg-amber-50 text-amber-700" },
-  REWARDED: { label: "Rewarded", class: "bg-emerald-50 text-emerald-700" },
-  REVERSED: { label: "Reversed", class: "bg-rose-50 text-rose-600" },
-  EXPIRED: { label: "Expired", class: "bg-slate-100 text-slate-400" },
-  MANUAL_REVIEW: { label: "Under review", class: "bg-orange-50 text-orange-700" },
+const STATUS_PILL_CLASS: Record<string, string> = {
+  PENDING: "bg-slate-100 text-slate-500",
+  SIGNED_UP: "bg-blue-50 text-blue-700",
+  QUALIFIED: "bg-amber-50 text-amber-700",
+  REWARDED: "bg-emerald-50 text-emerald-700",
+  REVERSED: "bg-rose-50 text-rose-600",
+  EXPIRED: "bg-slate-100 text-slate-400",
+  MANUAL_REVIEW: "bg-orange-50 text-orange-700",
 };
 
-// Human-readable strings for the anti-fraud flags attribute-referral
-// writes into review_reason. Unknown reasons render verbatim.
+// Known anti-fraud flags attribute-referral writes into review_reason.
+// Unknown reasons render verbatim.
 const REVIEW_REASON_LABEL: Record<string, string> = {
-  duplicate_device_fp: "Same device as another signup under this referrer",
-  duplicate_signup_ip: "≥3 signups from this IP under this referrer",
-  daily_cap_hit: "Referrer hit the 5/day qualifying cap",
+  duplicate_device_fp: "Duplicate device fingerprint",
+  duplicate_signup_ip: "Duplicate signup IP",
+  daily_cap_hit: "Daily cap hit",
 };
 
 const FILTERS = [
-  { id: "review", label: "Manual review" },
+  { id: "review", label: "Needs review" },
   { id: "rewarded", label: "Rewarded" },
   { id: "signed_up", label: "Signed up" },
   { id: "all", label: "All" },
@@ -51,6 +52,7 @@ export default async function ReferralsPage({
   const filter = sp.status || "review";
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
+  const t = await getTranslations("DashboardReferrals");
 
   let q = admin
     .from("referrals")
@@ -185,7 +187,10 @@ export default async function ReferralsPage({
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {(rows || []).map((r: any) => {
-              const pill = STATUS_PILL[r.status] || { label: r.status, class: "bg-slate-100" };
+              const pill = {
+                label: (r.status || "—").replace(/_/g, " "),
+                class: STATUS_PILL_CLASS[r.status] || "bg-slate-100 text-slate-500",
+              };
               const referrer = names.get(r.referrer_id);
               const referee = r.referee_id ? names.get(r.referee_id) : null;
               return (

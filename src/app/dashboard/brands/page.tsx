@@ -6,29 +6,30 @@ import { InvitedBrandRow } from "./invited-brand-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
 import { sanitizeSearchTerm } from "@/lib/validation";
+import { getTranslations } from "next-intl/server";
 
 const INVITES_PER_PAGE = 12;
-
-const filterFields = [
-  { name: "search", label: "Search", type: "text" as const, placeholder: "Search by brand name..." },
-  {
-    name: "verification",
-    label: "Verification",
-    type: "select" as const,
-    options: [
-      { label: "Pending", value: "pending" },
-      { label: "Verified", value: "verified" },
-      { label: "Rejected", value: "rejected" },
-      { label: "Not Applied", value: "not_applied" },
-    ],
-  },
-];
 
 export default async function BrandsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
+  const t = await getTranslations("DashboardBrands");
+  const filterFields = [
+    { name: "search", label: t("filters.search"), type: "text" as const, placeholder: t("filters.searchPlaceholder") },
+    {
+      name: "verification",
+      label: t("filters.verification"),
+      type: "select" as const,
+      options: [
+        { label: t("filters.pending"), value: "pending" },
+        { label: t("filters.verified"), value: "verified" },
+        { label: t("filters.rejected"), value: "rejected" },
+        { label: t("filters.notApplied"), value: "not_applied" },
+      ],
+    },
+  ];
   const params = await searchParams;
   const { search, verification, tab, invite_page } = params;
   const supabase = createAdminClient();
@@ -76,8 +77,8 @@ export default async function BrandsPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Brands</h1>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">Manage registered brands and invitations</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{t("subtitle")}</p>
         </div>
         <RefreshButton />
       </div>
@@ -86,9 +87,9 @@ export default async function BrandsPage({
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-6 w-fit">
-        <TabLink label="All" value="all" active={activeTab} count={allCount} />
-        <TabLink label="Registered" value="registered" active={activeTab} count={brands?.length || 0} />
-        <TabLink label="Invited" value="invited" active={activeTab} count={invitesTotal} />
+        <TabLink label={t("tabs.all")} value="all" active={activeTab} count={allCount} />
+        <TabLink label={t("tabs.registered")} value="registered" active={activeTab} count={brands?.length || 0} />
+        <TabLink label={t("tabs.invited")} value="invited" active={activeTab} count={invitesTotal} />
       </div>
 
       {/* Registered brands table — shown on "all" and "registered" tabs */}
@@ -98,7 +99,7 @@ export default async function BrandsPage({
 
           {brandsError && (
             <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
-              Failed to load brands: {brandsError.message}
+              {t("brandsLoadError", { message: brandsError.message })}
             </div>
           )}
 
@@ -106,11 +107,11 @@ export default async function BrandsPage({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Brand Name</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Contact Number</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Verification</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">GSTIN</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Actions</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.brandName")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.contactNumber")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.verification")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.gstin")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -121,7 +122,7 @@ export default async function BrandsPage({
                 ) : (
                   <tr>
                     <td colSpan={5} className="px-6 py-16 text-center">
-                      <p className="text-sm text-gray-400 dark:text-gray-500">No registered brands found</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500">{t("noRegisteredBrands")}</p>
                     </td>
                   </tr>
                 )}
@@ -135,12 +136,12 @@ export default async function BrandsPage({
       {(activeTab === "all" || activeTab === "invited") && (
         <>
           {activeTab === "all" && pendingInvites && pendingInvites.length > 0 && (
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-8 mb-4">Pending Invitations</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-8 mb-4">{t("pendingInvitations")}</h3>
           )}
 
           {invitesError && (
             <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
-              Failed to load invitations: {invitesError.message}
+              {t("invitesLoadError", { message: invitesError.message })}
             </div>
           )}
 
@@ -167,8 +168,8 @@ export default async function BrandsPage({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">No pending invitations</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Click &quot;Invite Brand&quot; above to create one</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("noPendingInvitations")}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t("inviteHint")}</p>
             </div>
           ) : null}
         </>

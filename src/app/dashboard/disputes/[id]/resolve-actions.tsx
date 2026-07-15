@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/utils/supabase/client";
 
 export function ResolveActions({
@@ -11,6 +12,7 @@ export function ResolveActions({
   applicationId: string;
   amount: number | null;
 }) {
+  const t = useTranslations("DashboardDisputesIdResolveActions");
   const router = useRouter();
   const supabase = createClient();
   const [busy, setBusy] = useState<"refund" | "release" | null>(null);
@@ -27,7 +29,7 @@ export function ResolveActions({
       body: { applicationId, decision, note: note || undefined },
     });
     if (invokeErr || data?.error) {
-      setError(invokeErr?.message || data?.error || "Failed to resolve");
+      setError(invokeErr?.message || data?.error || t("failedToResolve"));
       setBusy(null);
       return;
     }
@@ -40,18 +42,18 @@ export function ResolveActions({
       <div className="space-y-3">
         <p className="text-sm text-gray-900 dark:text-white font-semibold">
           {isRefund
-            ? `Refund ₹${amountInr} back to the brand?`
-            : `Release ₹${amountInr} to the creator?`}
+            ? t("confirmRefundTitle", { amount: amountInr })
+            : t("confirmReleaseTitle", { amount: amountInr })}
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {isRefund
-            ? "Razorpay will refund the original payment to the brand's card/UPI. This usually settles within 5–7 working days."
-            : "The payout will be queued on RazorpayX and fired by the next cron tick (within 15 minutes)."}
+            ? t("refundDescription")
+            : t("releaseDescription")}
         </p>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional internal note"
+          placeholder={t("notePlaceholder")}
           rows={2}
           className="w-full p-2 text-xs rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-violet-200"
         />
@@ -66,7 +68,7 @@ export function ResolveActions({
               isRefund ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"
             }`}
           >
-            {busy === (isRefund ? "refund" : "release") ? "Working…" : "Confirm"}
+            {busy === (isRefund ? "refund" : "release") ? t("working") : t("confirm")}
           </button>
           <button
             disabled={busy !== null}
@@ -77,7 +79,7 @@ export function ResolveActions({
             }}
             className="px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-50"
           >
-            Cancel
+            {t("cancel")}
           </button>
         </div>
       </div>
@@ -90,13 +92,13 @@ export function ResolveActions({
         onClick={() => setConfirmFor("release")}
         className="w-full px-3 py-2 rounded-lg text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700"
       >
-        Release ₹{amountInr} to creator
+        {t("releaseButton", { amount: amountInr })}
       </button>
       <button
         onClick={() => setConfirmFor("refund")}
         className="w-full px-3 py-2 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700"
       >
-        Refund ₹{amountInr} to brand
+        {t("refundButton", { amount: amountInr })}
       </button>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/utils/supabase/client";
 
 /**
@@ -12,6 +13,7 @@ import { createClient } from "@/utils/supabase/client";
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
+  const t = useTranslations("AuthCallback");
   const supabase = createClient();
   const [status, setStatus] = useState<"loading" | "set_password" | "error">("loading");
   const [error, setError] = useState("");
@@ -25,11 +27,11 @@ export default function AuthCallbackPage() {
     const params = new URLSearchParams(hash);
     const accessToken = params.get("access_token");
     const refreshToken = params.get("refresh_token");
-    const t = params.get("type") || "";
-    setType(t);
+    const linkType = params.get("type") || "";
+    setType(linkType);
 
     if (!accessToken || !refreshToken) {
-      setError("Invalid or expired link. Please request a new invitation.");
+      setError(t("invalidLink"));
       setStatus("error");
       return;
     }
@@ -43,7 +45,7 @@ export default function AuthCallbackPage() {
           return;
         }
         // Invites and password recoveries need the user to set a password
-        if (t === "invite" || t === "recovery" || t === "signup") {
+        if (linkType === "invite" || linkType === "recovery" || linkType === "signup") {
           setStatus("set_password");
         } else {
           router.push("/dashboard");
@@ -55,8 +57,8 @@ export default function AuthCallbackPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
-    if (password !== confirmPassword) { setError("Passwords do not match"); return; }
+    if (password.length < 8) { setError(t("passwordTooShort")); return; }
+    if (password !== confirmPassword) { setError(t("passwordsMismatch")); return; }
     setSaving(true);
     const { error: updErr } = await supabase.auth.updateUser({ password });
     setSaving(false);
@@ -73,14 +75,14 @@ export default function AuthCallbackPage() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             {status === "set_password"
               ? type === "recovery"
-                ? "Reset Your Password"
-                : "Welcome — Set Your Password"
+                ? t("resetTitle")
+                : t("welcomeTitle")
               : status === "error"
-                ? "Something went wrong"
-                : "Verifying your link..."}
+                ? t("errorTitle")
+                : t("verifyingTitle")}
           </h1>
           {status === "set_password" && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Choose a password to access the admin panel.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("choosePassword")}</p>
           )}
         </div>
 
@@ -102,7 +104,7 @@ export default function AuthCallbackPage() {
         {status === "set_password" && (
           <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t("newPasswordLabel")}</label>
               <input
                 type="password"
                 value={password}

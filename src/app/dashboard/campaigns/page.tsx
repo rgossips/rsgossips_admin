@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CampaignsTable } from "./campaigns-table";
 import { CampaignFilters } from "./campaign-filters";
@@ -12,6 +13,7 @@ export default async function CampaignsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const { search, status, category } = await searchParams;
+  const t = await getTranslations("DashboardCampaigns");
   const supabase = createAdminClient();
   const canWrite = await isAdminOrAbove();
   const searchTerm = sanitizeSearchTerm(search);
@@ -43,9 +45,9 @@ export default async function CampaignsPage({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Campaigns</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">
-            Track and manage influencer campaigns
+            {t("subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -58,7 +60,7 @@ export default async function CampaignsPage({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-              New Campaign
+              {t("newCampaign")}
             </Link>
           )}
         </div>
@@ -69,14 +71,14 @@ export default async function CampaignsPage({
 
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
-          Failed to load campaigns: {error.message}
+          {t("loadError", { message: error.message })}
         </div>
       )}
 
       {/* Results count */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-          {totalCount} campaign{totalCount !== 1 ? "s" : ""}
+          {t("count", { count: totalCount })}
         </span>
       </div>
 

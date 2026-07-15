@@ -14,7 +14,15 @@
       "Bash(NEXT_PUBLIC_SUPABASE_URL=https://hlfevcdtbehukxrrgykv.supabase.co SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhsZmV2Y2R0YmVodWt4cnJneWt2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDk4MjIxNywiZXhwIjoyMDg2NTU4MjE3fQ.0lcJyMRWQOYnBjvCGAcPOPQCdJHPyh03_vK4KWh0w4o node -e \":*)",
       "Bash(find d:/Development/React/RS_Gossips/src -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js -o -name *.jsx \\\\\\))",
       "Bash(ls -la \"d:/Development/React/RS_Gossips/src/app/\\(auth\\)/\")",
-      "Bash(find d:/Development/React/RS_Gossips -type f -path */functions* -name *.ts -o -path */functions* -name *.js)"
+      "Bash(find d:/Development/React/RS_Gossips -type f -path */functions* -name *.ts -o -path */functions* -name *.js)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(git *)",
+      "Bash(node *)",
+      "Bash(mbt *)",
+      "Bash(cf *)",
+      "Bash(python *)",
+      "Bash"
     ]
   }
 }

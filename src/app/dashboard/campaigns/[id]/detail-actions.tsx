@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { updateCampaignStatus } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 
 const STATUSES = [
-  { value: "draft", label: "Draft" },
-  { value: "active", label: "Active" },
-  { value: "paused", label: "Paused" },
-  { value: "completed", label: "Completed" },
+  { value: "draft" },
+  { value: "active" },
+  { value: "paused" },
+  { value: "completed" },
 ] as const;
 
 // Styling for each status — keep in sync with the badge colors used on
@@ -33,6 +34,7 @@ export function CampaignDetailActions({
   campaignId: string;
   status: string;
 }) {
+  const t = useTranslations("DashboardCampaignsIdDetailActions");
   const router = useRouter();
   const [current, setCurrent] = useState(status);
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,7 @@ export function CampaignDetailActions({
 
     // Soft confirm only for terminal transitions where it matters.
     const isCompleting = next === "completed";
-    if (isCompleting && !confirm("Mark this campaign as completed? Applications won't change but the campaign will no longer accept new ones.")) {
+    if (isCompleting && !confirm(t("confirmComplete"))) {
       return;
     }
 
@@ -61,7 +63,7 @@ export function CampaignDetailActions({
 
   return (
     <div className="inline-flex items-center gap-2 shrink-0">
-      <label className="sr-only" htmlFor="campaign-status-select">Campaign status</label>
+      <label className="sr-only" htmlFor="campaign-status-select">{t("campaignStatusLabel")}</label>
       <div className={`relative inline-flex items-center rounded-xl border ${statusStyle[current] || statusStyle.draft}`}>
         <select
           id="campaign-status-select"
@@ -72,7 +74,7 @@ export function CampaignDetailActions({
         >
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-              {s.label}
+              {t(`statuses.${s.value}`)}
             </option>
           ))}
         </select>

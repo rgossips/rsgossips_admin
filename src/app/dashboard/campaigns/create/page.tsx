@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CreateCampaignForm } from "./create-campaign-form";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 export default async function CreateCampaignPage() {
   if (!(await isAdminOrAbove())) redirect("/dashboard/campaigns");
+  const t = await getTranslations("DashboardCampaignsCreate");
   const supabase = createAdminClient();
 
   // Fetch registered brands
@@ -39,8 +41,8 @@ export default async function CreateCampaignPage() {
           </svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Campaign</h1>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">Fill in the details to launch a new influencer campaign</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{t("subtitle")}</p>
         </div>
       </div>
 

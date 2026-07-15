@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { updateInfluencerPlan } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { SUBSCRIPTION_PLANS, PLAN_BADGE_CLASS } from "@/lib/subscription-plans";
@@ -13,8 +14,9 @@ export function ChangePlanButton({
   influencerId: string;
   currentPlan: string | null;
 }) {
+  const t = useTranslations("DashboardInfluencersIdChangePlan");
   const [open, setOpen] = useState(false);
-  const currentLabel = SUBSCRIPTION_PLANS.find((p) => p.key === currentPlan)?.label || "Free";
+  const currentLabel = SUBSCRIPTION_PLANS.find((p) => p.key === currentPlan)?.label || t("freeLabel");
   const badgeClass = PLAN_BADGE_CLASS[currentPlan || ""] || "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
 
   return (
@@ -26,7 +28,7 @@ export function ChangePlanButton({
         <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
           {currentLabel}
         </span>
-        <span className="text-gray-500 dark:text-gray-400">Change plan</span>
+        <span className="text-gray-500 dark:text-gray-400">{t("changePlan")}</span>
         <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
@@ -45,6 +47,7 @@ function ChangePlanModal({
   currentPlan: string | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("DashboardInfluencersIdChangePlan");
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(currentPlan);
   const [loading, setLoading] = useState(false);
@@ -64,8 +67,8 @@ function ChangePlanModal({
       <div className="fixed z-50 inset-2 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:w-full lg:max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">Change Subscription Plan</h2>
-            <p className="text-[11px] text-gray-400 mt-0.5">Admin override — bypasses Stripe. Use for comps, trials, or fixes.</p>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">{t("title")}</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">{t("subtitle")}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 cursor-pointer">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -99,7 +102,7 @@ function ChangePlanModal({
                     <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${PLAN_BADGE_CLASS[plan.key]}`}>
                       {plan.label}
                     </span>
-                    {isCurrent && <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Current</span>}
+                    {isCurrent && <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">{t("current")}</span>}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{plan.description}</p>
                 </div>
@@ -115,10 +118,10 @@ function ChangePlanModal({
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white text-sm font-semibold cursor-pointer transition-colors"
           >
             {loading && <ButtonSpinner />}
-            {loading ? "Saving..." : "Save plan"}
+            {loading ? t("saving") : t("savePlan")}
           </button>
           <button onClick={onClose} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">
-            Cancel
+            {t("cancel")}
           </button>
         </div>
       </div>

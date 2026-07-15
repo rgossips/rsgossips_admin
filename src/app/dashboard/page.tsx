@@ -1,7 +1,8 @@
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { DashboardCharts } from "./charts";
 
-async function getStats() {
+async function getStats(t: (key: string, values?: Record<string, string | number | Date>) => string) {
   const supabase = createAdminClient();
 
   const [
@@ -82,7 +83,7 @@ async function getStats() {
       const d = new Date(c.created_at);
       return d >= weekStart && d < weekEnd;
     }).length ?? 0;
-    return { week: `Week ${i + 1}`, count };
+    return { week: t("weekLabel", { n: i + 1 }), count };
   });
 
   return {
@@ -100,15 +101,16 @@ async function getStats() {
 }
 
 export default async function DashboardPage() {
+  const t = await getTranslations("Dashboard");
   let stats;
   try {
-    stats = await getStats();
+    stats = await getStats(t);
   } catch (e) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t("title")}</h1>
         <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">
-          Failed to load dashboard: {e instanceof Error ? e.message : "Unknown error"}
+          {t("loadError", { message: e instanceof Error ? e.message : t("unknownError") })}
         </div>
       </div>
     );
@@ -116,7 +118,7 @@ export default async function DashboardPage() {
 
   const statCards = [
     {
-      label: "Total Influencers",
+      label: t("stats.totalInfluencers"),
       value: stats.totalInfluencers,
       icon: "users",
       color: "blue",
@@ -125,7 +127,7 @@ export default async function DashboardPage() {
       textColor: "text-blue-600 dark:text-blue-400",
     },
     {
-      label: "Total Brands",
+      label: t("stats.totalBrands"),
       value: stats.totalBrands,
       icon: "briefcase",
       color: "emerald",
@@ -134,7 +136,7 @@ export default async function DashboardPage() {
       textColor: "text-emerald-600 dark:text-emerald-400",
     },
     {
-      label: "Total Campaigns",
+      label: t("stats.totalCampaigns"),
       value: stats.totalCampaigns,
       icon: "megaphone",
       color: "purple",
@@ -143,7 +145,7 @@ export default async function DashboardPage() {
       textColor: "text-purple-600 dark:text-purple-400",
     },
     {
-      label: "Pending Reviews",
+      label: t("stats.pendingReviews"),
       value: stats.pendingInfluencerVerif + stats.pendingBrandVerif + stats.pendingCampaignApproval,
       icon: "clock",
       color: "amber",
@@ -182,23 +184,22 @@ export default async function DashboardPage() {
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-8 text-white">
         <div className="relative z-10 max-w-xl">
           <img src="/logo.svg" alt="RecentGossips" className="h-7 brightness-200 mb-3 opacity-80" />
-          <h1 className="text-2xl font-bold">Welcome to the Admin Panel</h1>
+          <h1 className="text-2xl font-bold">{t("welcome.title")}</h1>
           <p className="mt-2 text-indigo-100 text-sm leading-relaxed">
-            Manage influencers, brands, and campaigns all in one place.
-            Monitor platform activity and keep things running smoothly.
+            {t("welcome.subtitle")}
           </p>
           <div className="flex gap-3 mt-5">
             <a
               href="/dashboard/campaigns/create"
               className="inline-flex items-center px-4 py-2 rounded-lg bg-white text-indigo-600 text-sm font-semibold hover:bg-indigo-50 transition-colors"
             >
-              New Campaign
+              {t("welcome.newCampaign")}
             </a>
             <a
               href="/dashboard/influencers"
               className="inline-flex items-center px-4 py-2 rounded-lg bg-white/15 text-white text-sm font-semibold hover:bg-white/25 transition-colors backdrop-blur-sm border border-white/20"
             >
-              View Influencers
+              {t("welcome.viewInfluencers")}
             </a>
           </div>
         </div>
@@ -218,11 +219,11 @@ export default async function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0l-7.1 12.25A2 2 0 005 19z" />
               </svg>
               <h3 className="text-sm font-bold text-red-900 dark:text-red-200">
-                {stats.openDisputes.length} open escrow {stats.openDisputes.length === 1 ? "dispute" : "disputes"} — needs review
+                {t("disputes.heading", { count: stats.openDisputes.length })}
               </h3>
             </div>
             <a href="/dashboard/disputes" className="text-xs font-bold text-red-700 dark:text-red-300 hover:underline">
-              View all →
+              {t("disputes.viewAll")}
             </a>
           </div>
           <ul className="divide-y divide-red-100 dark:divide-red-900/40">
@@ -234,10 +235,10 @@ export default async function DashboardPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                      {d.campaign_title || "Campaign"}
+                      {d.campaign_title || t("disputes.campaignFallback")}
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate">
-                      {d.brand_name || "Brand"} ↔ {d.influencer_name || "Creator"}
+                      {d.brand_name || t("disputes.brandFallback")} ↔ {d.influencer_name || t("disputes.creatorFallback")}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -292,9 +293,9 @@ export default async function DashboardPage() {
       {/* Verification breakdown */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {[
-          { label: "Influencer Verifications", value: stats.pendingInfluencerVerif, color: "bg-pink-500", lightBg: "bg-pink-50 dark:bg-pink-900/20", href: "/dashboard/influencers" },
-          { label: "Brand Verifications", value: stats.pendingBrandVerif, color: "bg-yellow-500", lightBg: "bg-yellow-50 dark:bg-yellow-900/20", href: "/dashboard/brands" },
-          { label: "Campaign Approvals", value: stats.pendingCampaignApproval, color: "bg-teal-500", lightBg: "bg-teal-50 dark:bg-teal-900/20", href: "/dashboard/campaigns" },
+          { label: t("verif.influencer"), value: stats.pendingInfluencerVerif, color: "bg-pink-500", lightBg: "bg-pink-50 dark:bg-pink-900/20", href: "/dashboard/influencers" },
+          { label: t("verif.brand"), value: stats.pendingBrandVerif, color: "bg-yellow-500", lightBg: "bg-yellow-50 dark:bg-yellow-900/20", href: "/dashboard/brands" },
+          { label: t("verif.campaign"), value: stats.pendingCampaignApproval, color: "bg-teal-500", lightBg: "bg-teal-50 dark:bg-teal-900/20", href: "/dashboard/campaigns" },
         ].map((item) => (
           <a
             key={item.label}

@@ -1,0 +1,22 @@
+{
+  "DashboardLoadTestComponentsLoadTestRunner": {
+    "errorFailed": "Load test failed",
+    "scenarios": "Scenarios",
+    "virtualUsers": "Virtual users",
+    "iterationsPerUser": "Iterations / user",
+    "maxHint": "(max {max})",
+    "running": "Running…",
+    "runLoadTest": "Run Load Test",
+    "totalRequestsSummary": "{total} total requests ({scenarios, plural, one {# scenario} other {# scenarios}} × {vus} × {iterations}), run sequentially per scenario",
+    "results": "Results",
+    "colScenario": "Scenario",
+    "colOkTotal": "OK / Total",
+    "colErrors": "Errors",
+    "colReqPerSec": "req/s",
+    "colP50": "p50 ms",
+    "colP95": "p95 ms",
+    "colMax": "max ms",
+    "colAvgKb": "avg KB",
+    "baselineNote": "Green dot: zero errors and p95 under 2s. Baseline (2026-07): p50 ≈ 450ms, p95 < 1s at 10 VUs."
+  }
+}

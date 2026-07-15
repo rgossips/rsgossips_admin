@@ -1,0 +1,15 @@
+{
+  "DashboardDisputesIdResolveActions": {
+    "failedToResolve": "Failed to resolve",
+    "confirmRefundTitle": "Refund ₹{amount} back to the brand?",
+    "confirmReleaseTitle": "Release ₹{amount} to the creator?",
+    "refundDescription": "Razorpay will refund the original payment to the brand's card/UPI. This usually settles within 5–7 working days.",
+    "releaseDescription": "The payout will be queued on RazorpayX and fired by the next cron tick (within 15 minutes).",
+    "notePlaceholder": "Optional internal note",
+    "working": "Working…",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "releaseButton": "Release ₹{amount} to creator",
+    "refundButton": "Refund ₹{amount} to brand"
+  }
+}

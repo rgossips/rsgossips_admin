@@ -1,36 +1,32 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { AutoRefresh } from "@/components/auto-refresh";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL: Record<string, { label: string; class: string }> = {
-  pending_quote: { label: "Awaiting quote", class: "bg-amber-50 text-amber-700" },
-  quoted: { label: "Quote sent", class: "bg-indigo-50 text-indigo-700" },
-  counter_offered: { label: "Counter offer", class: "bg-orange-50 text-orange-700" },
-  declined: { label: "Declined", class: "bg-gray-100 text-gray-500" },
-  expired: { label: "Expired", class: "bg-gray-100 text-gray-500" },
-  paid_advance: { label: "Advance paid", class: "bg-emerald-50 text-emerald-700" },
-  in_progress: { label: "In progress", class: "bg-violet-50 text-violet-700" },
-  draft_ready: { label: "Draft ready", class: "bg-cyan-50 text-cyan-700" },
-  revision_requested: { label: "Revision requested", class: "bg-orange-50 text-orange-700" },
-  paid_final: { label: "Final paid", class: "bg-emerald-50 text-emerald-700" },
-  completed: { label: "Completed", class: "bg-blue-50 text-blue-700" },
+const STATUS_CLASS: Record<string, string> = {
+  pending_quote: "bg-amber-50 text-amber-700",
+  quoted: "bg-indigo-50 text-indigo-700",
+  counter_offered: "bg-orange-50 text-orange-700",
+  declined: "bg-gray-100 text-gray-500",
+  expired: "bg-gray-100 text-gray-500",
+  paid_advance: "bg-emerald-50 text-emerald-700",
+  in_progress: "bg-violet-50 text-violet-700",
+  draft_ready: "bg-cyan-50 text-cyan-700",
+  revision_requested: "bg-orange-50 text-orange-700",
+  paid_final: "bg-emerald-50 text-emerald-700",
+  completed: "bg-blue-50 text-blue-700",
 };
 
-const FILTERS = [
-  { id: "pending_quote", label: "Awaiting quote" },
-  { id: "active", label: "Active" },
-  { id: "completed", label: "Completed" },
-  { id: "declined", label: "Declined" },
-  { id: "all", label: "All" },
-];
+const FILTERS = ["pending_quote", "active", "completed", "declined", "all"];
 
 export default async function QuoteRequestsPage({
   searchParams,
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
+  const t = await getTranslations("DashboardQuoteRequests");
   const sp = (await searchParams) || {};
   const filter = sp.status || "pending_quote";
 
@@ -65,12 +61,12 @@ export default async function QuoteRequestsPage({
     ]);
     for (const i of inf || []) {
       usersById[i.influencer_id] = {
-        name: i.full_name || i.username || (i.instagram_handle ? `@${i.instagram_handle}` : "Influencer"),
-        role: "Influencer",
+        name: i.full_name || i.username || (i.instagram_handle ? `@${i.instagram_handle}` : t("role.influencer")),
+        role: t("role.influencer"),
       };
     }
     for (const b of br || []) {
-      usersById[b.brand_id] = { name: b.brand_name || "Brand", role: "Brand" };
+      usersById[b.brand_id] = { name: b.brand_name || t("role.brand"), role: t("role.brand") };
     }
   }
 
@@ -102,30 +98,30 @@ export default async function QuoteRequestsPage({
     <div className="space-y-6">
       <AutoRefresh intervalMs={15000} />
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quote requests</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Influencer-submitted briefs. Open one to send a quote, decline, or follow the order through delivery.
+          {t("description")}
         </p>
       </div>
 
       <div className="flex gap-2 flex-wrap">
         {FILTERS.map((f) => (
           <Link
-            key={f.id}
-            href={`/dashboard/quote-requests?status=${f.id}`}
+            key={f}
+            href={`/dashboard/quote-requests?status=${f}`}
             className={`text-[12px] font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 ${
-              filter === f.id
+              filter === f
                 ? "bg-indigo-600 text-white"
                 : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800"
             }`}
           >
-            {f.label}
+            {t(`filters.${f}`)}
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                filter === f.id ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                filter === f ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
               }`}
             >
-              {countFor(f.id)}
+              {countFor(f)}
             </span>
           </Link>
         ))}
@@ -140,12 +136,13 @@ export default async function QuoteRequestsPage({
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
         {(orders || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            Nothing in this view yet.
+            {t("empty")}
           </div>
         ) : (
           (orders || []).map((o) => {
-            const u = usersById[o.user_id] || { name: "Unknown", role: "" };
-            const st = STATUS_LABEL[o.status] || { label: o.status, class: "bg-gray-100 text-gray-500" };
+            const u = usersById[o.user_id] || { name: t("unknownName"), role: "" };
+            const stClass = STATUS_CLASS[o.status] || "bg-gray-100 text-gray-500";
+            const stLabel = STATUS_CLASS[o.status] ? t(`status.${o.status}`) : o.status;
             const dt = new Date(o.created_at);
             return (
               <Link
@@ -170,9 +167,9 @@ export default async function QuoteRequestsPage({
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${st.class}`}
+                  className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${stClass}`}
                 >
-                  {st.label}
+                  {stLabel}
                 </span>
               </Link>
             );

@@ -1,10 +1,12 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { InviteForm } from "./invite-form";
 import { AdminsList } from "./admins-list";
 
 export default async function AdminsPage() {
+  const t = await getTranslations("DashboardAdmins");
   const supabase = await createClient();
   const {
     data: { user },
@@ -61,9 +63,9 @@ export default async function AdminsPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Users</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-          Manage who can access this admin panel
+          {t("subtitle")}
         </p>
       </div>
 
@@ -71,7 +73,7 @@ export default async function AdminsPage() {
 
       {error && (
         <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
-          Failed to load admins: {error.message}
+          {t("loadError", { message: error.message })}
         </div>
       )}
 

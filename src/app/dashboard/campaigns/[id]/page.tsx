@@ -6,6 +6,7 @@ import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { getTranslations } from "next-intl/server";
 
 export default async function CampaignDetailPage({
   params,
@@ -15,6 +16,7 @@ export default async function CampaignDetailPage({
   const { id } = await params;
   const supabase = createAdminClient();
   const canWrite = await isAdminOrAbove();
+  const t = await getTranslations("DashboardCampaignsId");
 
   const { data: campaign, error } = await supabase
     .from("campaigns")
@@ -44,10 +46,10 @@ export default async function CampaignDetailPage({
   const availableSlots = Math.max(0, totalSlots - filledSlots);
 
   const statusConfig: Record<string, { bg: string; dot: string; label: string }> = {
-    draft: { bg: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400", dot: "bg-gray-400", label: "Draft" },
-    active: { bg: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", label: "Active" },
-    paused: { bg: "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400", dot: "bg-yellow-500", label: "Paused" },
-    completed: { bg: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400", dot: "bg-blue-500", label: "Completed" },
+    draft: { bg: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400", dot: "bg-gray-400", label: t("status.draft") },
+    active: { bg: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500", label: t("status.active") },
+    paused: { bg: "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400", dot: "bg-yellow-500", label: t("status.paused") },
+    completed: { bg: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400", dot: "bg-blue-500", label: t("status.completed") },
   };
 
   const statusInfo = statusConfig[campaign.status] || statusConfig.draft;
@@ -100,17 +102,17 @@ export default async function CampaignDetailPage({
   };
 
   const tierLabels: Record<string, string> = {
-    nano: "Nano (1K-10K)",
-    micro: "Micro (10K-100K)",
-    macro: "Macro (100K-1M)",
-    mega: "Mega (1M+)",
-    all: "All Tiers",
+    nano: t("tier.nano"),
+    micro: t("tier.micro"),
+    macro: t("tier.macro"),
+    mega: t("tier.mega"),
+    all: t("tier.all"),
   };
 
   const typeLabels: Record<string, string> = {
-    barter: "Barter",
-    paid: "Paid",
-    hybrid: "Hybrid",
+    barter: t("type.barter"),
+    paid: t("type.paid"),
+    hybrid: t("type.hybrid"),
   };
 
   // Days remaining
@@ -132,7 +134,7 @@ export default async function CampaignDetailPage({
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.title || "Campaign"}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{campaign.title || t("campaignFallbackTitle")}</h1>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.bg}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
                 {statusInfo.label}
@@ -148,15 +150,15 @@ export default async function CampaignDetailPage({
               )}
               <span className="text-sm text-gray-500 dark:text-gray-400">{brandName}</span>
               {isInvitedBrand && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 font-semibold">Invited</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 font-semibold">{t("invited")}</span>
               )}
               {campaign.created_by_admin && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold">By Admin</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold">{t("byAdmin")}</span>
               )}
               <span className="text-gray-300 dark:text-gray-700">|</span>
               <span className="text-sm text-gray-400 dark:text-gray-500">{typeLabels[campaign.campaign_type] || campaign.campaign_type}</span>
               <span className="text-gray-300 dark:text-gray-700">|</span>
-              <span className="text-sm text-gray-400 dark:text-gray-500">Created {formatDate(campaign.created_at)}</span>
+              <span className="text-sm text-gray-400 dark:text-gray-500">{t("created", { date: formatDate(campaign.created_at) })}</span>
             </div>
           </div>
         </div>
@@ -170,7 +172,7 @@ export default async function CampaignDetailPage({
       {/* Banner Image */}
       {bannerUrl && (
         <div className="mb-6 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800">
-          <img src={bannerUrl} alt="Campaign Banner" className="w-full h-56 object-cover" />
+          <img src={bannerUrl} alt={t("campaignBannerAlt")} className="w-full h-56 object-cover" />
         </div>
       )}
 
@@ -187,7 +189,7 @@ export default async function CampaignDetailPage({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
                     </svg>
                   </div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Description</h2>
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("description")}</h2>
                 </div>
               </div>
               <div className="p-6">
@@ -209,7 +211,7 @@ export default async function CampaignDetailPage({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Content Deliverables</h2>
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("contentDeliverables")}</h2>
                 </div>
               </div>
               <div className="p-6">
@@ -242,17 +244,17 @@ export default async function CampaignDetailPage({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                 </div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Influencer Requirements</h2>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("influencerRequirements")}</h2>
               </div>
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <InfoItem icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" label="Follower Range" value={`${(campaign.target_follower_min || 0).toLocaleString()} — ${(campaign.target_follower_max || 0).toLocaleString()}`} />
-                <InfoItem icon="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" label="Influencer Tier" value={tierLabels[campaign.target_influencer_tier] || campaign.target_influencer_tier || "—"} />
+                <InfoItem icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" label={t("followerRange")} value={`${(campaign.target_follower_min || 0).toLocaleString()} — ${(campaign.target_follower_max || 0).toLocaleString()}`} />
+                <InfoItem icon="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" label={t("influencerTier")} value={tierLabels[campaign.target_influencer_tier] || campaign.target_influencer_tier || "—"} />
                 {engagementRate && (
-                  <InfoItem icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" label="Min. Engagement Rate" value={`${engagementRate}%`} />
+                  <InfoItem icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" label={t("minEngagementRate")} value={`${engagementRate}%`} />
                 )}
-                <InfoItem icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" label="Target Cities" value={campaign.target_cities?.join(", ") || "—"} />
+                <InfoItem icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" label={t("targetCities")} value={campaign.target_cities?.join(", ") || "—"} />
               </div>
             </div>
           </div>
@@ -267,15 +269,15 @@ export default async function CampaignDetailPage({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Gallery</h2>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{galleryUrls.length} images</span>
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("gallery")}</h2>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{t("galleryImages", { count: galleryUrls.length })}</span>
                 </div>
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {galleryUrls.map((url, i) => (
                     <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
-                      <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={url} alt={t("galleryImageAlt", { index: i + 1 })} className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300" />
                     </a>
                   ))}
                 </div>
@@ -286,7 +288,7 @@ export default async function CampaignDetailPage({
           {/* Raw data */}
           <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <summary className="px-6 py-4 text-sm font-medium text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              Raw Campaign Data
+              {t("rawCampaignData")}
             </summary>
             <div className="px-6 pb-6">
               <pre className="text-xs text-gray-500 dark:text-gray-400 overflow-auto whitespace-pre-wrap bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
@@ -301,13 +303,13 @@ export default async function CampaignDetailPage({
           {/* Quick Stats */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Overview</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("overview")}</h2>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              <StatRow label="Slots" value={totalSlots > 0 ? `${availableSlots} / ${totalSlots} available` : "—"} />
-              <StatRow label="Campaign Type" value={typeLabels[campaign.campaign_type] || campaign.campaign_type || "—"} />
-              <StatRow label="Budget Total" value={campaign.budget_total ? `₹${campaign.budget_total.toLocaleString()}` : "—"} />
-              <StatRow label="Per Influencer" value={campaign.budget_per_influencer ? `₹${campaign.budget_per_influencer.toLocaleString()}` : "—"} />
+              <StatRow label={t("slots")} value={totalSlots > 0 ? t("slotsValue", { available: availableSlots, total: totalSlots }) : "—"} />
+              <StatRow label={t("campaignType")} value={typeLabels[campaign.campaign_type] || campaign.campaign_type || "—"} />
+              <StatRow label={t("budgetTotal")} value={campaign.budget_total ? `₹${campaign.budget_total.toLocaleString()}` : "—"} />
+              <StatRow label={t("perInfluencer")} value={campaign.budget_per_influencer ? `₹${campaign.budget_per_influencer.toLocaleString()}` : "—"} />
             </div>
           </div>
 
@@ -320,13 +322,13 @@ export default async function CampaignDetailPage({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Schedule</h2>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("schedule")}</h2>
               </div>
             </div>
             <div className="p-5 space-y-4">
-              <DateItem label="Start Date" date={formatDate(campaign.campaign_start_date)} />
-              <DateItem label="Application Deadline" date={formatDate(campaign.application_deadline)} />
-              <DateItem label="Campaign End Date" date={formatDate(campaign.campaign_end_date)} />
+              <DateItem label={t("startDate")} date={formatDate(campaign.campaign_start_date)} />
+              <DateItem label={t("applicationDeadline")} date={formatDate(campaign.application_deadline)} />
+              <DateItem label={t("campaignEndDate")} date={formatDate(campaign.campaign_end_date)} />
               {daysRemaining !== null && (
                 <div className={`mt-2 px-4 py-3 rounded-xl text-center ${
                   daysRemaining > 7
@@ -345,7 +347,7 @@ export default async function CampaignDetailPage({
                     {daysRemaining > 0 ? daysRemaining : 0}
                   </p>
                   <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-0.5">
-                    {daysRemaining > 0 ? "Days Remaining" : "Campaign Ended"}
+                    {daysRemaining > 0 ? t("daysRemaining") : t("campaignEnded")}
                   </p>
                 </div>
               )}
@@ -362,7 +364,7 @@ export default async function CampaignDetailPage({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Categories</h2>
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("categories")}</h2>
                 </div>
               </div>
               <div className="p-5 flex flex-wrap gap-2">

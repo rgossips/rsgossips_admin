@@ -1,19 +1,21 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 import { CATEGORIES } from "@/lib/categories";
 
 const STATUS_OPTIONS = [
-  { label: "All", value: "" },
-  { label: "Draft", value: "draft" },
-  { label: "Active", value: "active" },
-  { label: "Paused", value: "paused" },
-  { label: "Completed", value: "completed" },
+  { key: "all", value: "" },
+  { key: "draft", value: "draft" },
+  { key: "active", value: "active" },
+  { key: "paused", value: "paused" },
+  { key: "completed", value: "completed" },
 ];
 
 export function CampaignFilters() {
+  const t = useTranslations("DashboardCampaignsCampaignFilters");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -89,7 +91,7 @@ export function CampaignFilters() {
             </svg>
             <input
               type="text"
-              placeholder="Search campaigns or brands..."
+              placeholder={t("searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm"
@@ -105,7 +107,7 @@ export function CampaignFilters() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
-            All Filters
+            {t("allFilters")}
             {activeFilterCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
@@ -127,7 +129,7 @@ export function CampaignFilters() {
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                 }`}
               >
-                {opt.label}
+                {t(`status.${opt.key}`)}
               </button>
             ))}
           </div>
@@ -136,7 +138,7 @@ export function CampaignFilters() {
         {/* Row 3: Category chips */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mr-1">
-            Category
+            {t("category")}
           </span>
           <button
             onClick={() => updateParams({ category: "" })}
@@ -146,7 +148,7 @@ export function CampaignFilters() {
                 : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
             }`}
           >
-            All
+            {t("all")}
           </button>
           {quickCategories.map((cat) => {
             const isActive = currentCategories.includes(cat);
@@ -166,7 +168,9 @@ export function CampaignFilters() {
           })}
           {currentCategories.filter((c) => !quickCategories.includes(c)).length > 0 && (
             <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
-              +{currentCategories.filter((c) => !quickCategories.includes(c)).length} more
+              {t("moreCount", {
+                count: currentCategories.filter((c) => !quickCategories.includes(c)).length,
+              })}
             </span>
           )}
           {activeFilterCount > 0 && (
@@ -177,7 +181,7 @@ export function CampaignFilters() {
               }}
               className="ml-auto text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer font-medium"
             >
-              Reset all
+              {t("resetAll")}
             </button>
           )}
         </div>
@@ -224,6 +228,7 @@ function FilterModal({
   onApply: (categories: string[], status: string) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("DashboardCampaignsCampaignFilters");
   const [status, setStatus] = useState(currentStatus);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -265,12 +270,12 @@ function FilterModal({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Filters</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t("filters")}</h2>
           <button
             onClick={handleReset}
             className="text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
           >
-            Reset
+            {t("reset")}
           </button>
         </div>
 
@@ -279,10 +284,10 @@ function FilterModal({
           {/* Category */}
           <section className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Category</h3>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">{t("category")}</h3>
               {categories.length > 0 && (
                 <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
-                  {categories.length} selected
+                  {t("selectedCount", { count: categories.length })}
                 </span>
               )}
             </div>
@@ -295,7 +300,7 @@ function FilterModal({
                     : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
-                All
+                {t("all")}
               </button>
               {CATEGORIES.map((cat) => {
                 const isActive = categories.includes(cat);
@@ -318,7 +323,7 @@ function FilterModal({
 
           {/* Status */}
           <section className="space-y-3">
-            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Status</h3>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">{t("statusLabel")}</h3>
             <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
               {STATUS_OPTIONS.map((opt) => (
                 <button
@@ -330,7 +335,7 @@ function FilterModal({
                       : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   }`}
                 >
-                  {opt.label}
+                  {t(`status.${opt.key}`)}
                 </button>
               ))}
             </div>
@@ -343,13 +348,13 @@ function FilterModal({
             onClick={handleReset}
             className="flex-1 py-3.5 rounded-2xl font-bold text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm transition-all cursor-pointer"
           >
-            Reset
+            {t("reset")}
           </button>
           <button
             onClick={() => onApply(categories, status)}
             className="flex-1 py-3.5 rounded-2xl font-bold text-white text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-200/50 dark:shadow-indigo-900/30 transition-all cursor-pointer"
           >
-            Apply Filters
+            {t("applyFilters")}
           </button>
         </div>
       </div>

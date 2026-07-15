@@ -8,9 +8,11 @@ import { AddFeaturedBrandButton } from "./_components/add-featured-brand";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 import { ActionButton } from "@/components/action-button";
+import { getTranslations } from "next-intl/server";
 export const dynamic = "force-dynamic";
 
 export default async function FeaturedBrandsPage() {
+  const t = await getTranslations("DashboardFeaturedBrands");
   const admin = createAdminClient();
   const { data: brands, error } = await admin
     .from("featured_brands")
@@ -25,18 +27,18 @@ export default async function FeaturedBrandsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Featured Brands</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Hand-picked "Brands You'll Love" carousel on the influencer home page. Lower position = appears first.
+            {t("description")}
           </p>
         </div>
         {canWrite && <AddFeaturedBrandButton />}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatPill label="Total" value={(brands || []).length} />
-        <StatPill label="Active" value={activeCount} accent="text-emerald-600" />
-        <StatPill label="Hidden" value={(brands || []).length - activeCount} accent="text-gray-400" />
+        <StatPill label={t("stats.total")} value={(brands || []).length} />
+        <StatPill label={t("stats.active")} value={activeCount} accent="text-emerald-600" />
+        <StatPill label={t("stats.hidden")} value={(brands || []).length - activeCount} accent="text-gray-400" />
       </div>
 
       {error && (
@@ -48,8 +50,10 @@ export default async function FeaturedBrandsPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
         {(brands || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            No featured brands yet. Click <span className="font-semibold text-indigo-500">Feature a brand</span> to add one.
-            <p className="text-[11px] text-gray-300 mt-2">Until you publish at least one, the influencer home falls back to the full brand directory.</p>
+            {t.rich("empty.text", {
+              highlight: (c) => <span className="font-semibold text-indigo-500">{c}</span>,
+            })}
+            <p className="text-[11px] text-gray-300 mt-2">{t("empty.fallback")}</p>
           </div>
         ) : (
           (brands || []).map((b) => <BrandRow key={b.id} brand={b} canWrite={canWrite} />)
@@ -76,7 +80,8 @@ function StatPill({
   );
 }
 
-function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
+async function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
+  const t = await getTranslations("DashboardFeaturedBrands");
   return (
     <div className="flex items-center gap-4 p-4">
       <span className="shrink-0 text-[11px] font-bold text-gray-500 dark:text-gray-400 w-6 text-center">
@@ -104,7 +109,7 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
             {brand.instagram_url}
           </a>
         ) : (
-          <p className="text-[11px] text-gray-400">No Instagram link</p>
+          <p className="text-[11px] text-gray-400">{t("noInstagram")}</p>
         )}
       </div>
 
@@ -117,7 +122,7 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
             }}
           >
             <ActionButton
-              title="Move up"
+              title={t("moveUp")}
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↑
@@ -130,7 +135,7 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
             }}
           >
             <ActionButton
-              title="Move down"
+              title={t("moveDown")}
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
               ↓
@@ -144,7 +149,7 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
           brand.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
         }`}
       >
-        {brand.is_active ? "Active" : "Hidden"}
+        {brand.is_active ? t("status.active") : t("status.hidden")}
       </span>
 
       {canWrite && (
@@ -158,7 +163,7 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
             <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
-              {brand.is_active ? "Hide" : "Show"}
+              {brand.is_active ? t("hide") : t("show")}
             </ActionButton>
           </form>
 
@@ -171,7 +176,7 @@ function BrandRow({ brand, canWrite }: { brand: any; canWrite: boolean }) {
             <ActionButton
               className="shrink-0 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-[12px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
             >
-              Delete
+              {t("delete")}
             </ActionButton>
           </form>
         </>

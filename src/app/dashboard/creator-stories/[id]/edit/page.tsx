@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CreatorStoryForm } from "../../_form/creator-story-form";
 import { updateCreatorStory } from "../../actions";
@@ -13,6 +14,7 @@ export default async function EditCreatorStoryPage({
   params: Promise<{ id: string }>;
 }) {
   if (!(await isAdminOrAbove())) redirect("/dashboard/creator-stories");
+  const t = await getTranslations("DashboardCreatorStoriesIdEdit");
   const { id } = await params;
   const admin = createAdminClient();
   const { data: story } = await admin
@@ -35,17 +37,17 @@ export default async function EditCreatorStoryPage({
           href="/dashboard/creator-stories"
           className="text-[12px] font-semibold text-indigo-600 hover:underline"
         >
-          ← Creator Stories
+          {t("backToCreatorStories")}
         </Link>
       </div>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit story</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Changes go live on the brand home page immediately.
+          {t("subtitle")}
         </p>
       </div>
 
-      <CreatorStoryForm action={updateAction} initial={story} submitLabel="Save changes" />
+      <CreatorStoryForm action={updateAction} initial={story} submitLabel={t("saveChanges")} />
     </div>
   );
 }

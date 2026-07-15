@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { MarkPaidForm } from "./_components/mark-paid-form";
@@ -21,20 +22,20 @@ const formatDate = (iso: string | null | undefined) =>
       })
     : "—";
 
-const STATUS_LABEL: Record<string, { label: string; class: string }> = {
-  scheduled: { label: "Ready to pay", class: "bg-amber-50 text-amber-700" },
+const STATUS_LABEL: Record<string, { key: string; class: string }> = {
+  scheduled: { key: "status.scheduled", class: "bg-amber-50 text-amber-700" },
   pending_creator_info: {
-    label: "Awaiting creator info",
+    key: "status.pendingCreatorInfo",
     class: "bg-slate-100 text-slate-500",
   },
-  processed: { label: "Paid", class: "bg-emerald-50 text-emerald-700" },
+  processed: { key: "status.paid", class: "bg-emerald-50 text-emerald-700" },
 };
 
 const FILTERS = [
-  { id: "scheduled", label: "Ready to pay" },
-  { id: "pending_creator_info", label: "Awaiting info" },
-  { id: "processed", label: "Recently paid" },
-  { id: "all", label: "All" },
+  { id: "scheduled", labelKey: "filters.scheduled" },
+  { id: "pending_creator_info", labelKey: "filters.pendingCreatorInfo" },
+  { id: "processed", labelKey: "filters.processed" },
+  { id: "all", labelKey: "filters.all" },
 ];
 
 export default async function PayoutsPage({
@@ -45,6 +46,7 @@ export default async function PayoutsPage({
   const sp = (await searchParams) || {};
   const filter = sp.status || "scheduled";
 
+  const t = await getTranslations("DashboardPayouts");
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
 
@@ -118,11 +120,9 @@ export default async function PayoutsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Creator payouts</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Manual payout queue. Transfer funds from your bank to the
-          creator's UPI/account, then paste the UTR here to mark the
-          payout complete.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -140,7 +140,7 @@ export default async function PayoutsPage({
                   : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
             >
-              {f.label}
+              {t(f.labelKey)}
               <span className={`ml-2 text-[10px] font-bold ${active ? "text-white/80" : "text-gray-400"}`}>
                 {counts[f.id] ?? 0}
               </span>
@@ -158,7 +158,7 @@ export default async function PayoutsPage({
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         {(apps || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            No payouts in this state.
+            {t("emptyState")}
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -166,10 +166,13 @@ export default async function PayoutsPage({
               const creator = creators.get(app.influencer_id);
               const campaign = campaigns.get(app.campaign_id);
               const pm = paymentMethods.get(app.influencer_id);
-              const statusInfo = STATUS_LABEL[app.payout_status] || {
-                label: app.payout_status || "—",
-                class: "bg-slate-100 text-slate-500",
-              };
+              const statusBase = STATUS_LABEL[app.payout_status];
+              const statusInfo = statusBase
+                ? { label: t(statusBase.key), class: statusBase.class }
+                : {
+                    label: app.payout_status || "—",
+                    class: "bg-slate-100 text-slate-500",
+                  };
               return (
                 <PayoutRow
                   key={app.id}
@@ -189,7 +192,7 @@ export default async function PayoutsPage({
   );
 }
 
-function PayoutRow({
+async function PayoutRow({
   app,
   creator,
   campaign,
@@ -204,7 +207,8 @@ function PayoutRow({
   statusInfo: { label: string; class: string };
   canWrite: boolean;
 }) {
-  const creatorName = creator?.full_name || creator?.username || "Unknown creator";
+  const t = await getTranslations("DashboardPayouts");
+  const creatorName = creator?.full_name || creator?.username || t("unknownCreator");
   const handle = creator?.instagram_handle ? `@${creator.instagram_handle}` : "";
 
   // Render the primary payment method in a compact form so the admin can
@@ -219,11 +223,11 @@ function PayoutRow({
       const last4 = paymentMethod.account_number
         ? `••${String(paymentMethod.account_number).slice(-4)}`
         : "";
-      methodLine = `${paymentMethod.bank_name || "Bank"} ${last4} · IFSC ${paymentMethod.ifsc || "—"}`;
+      methodLine = `${paymentMethod.bank_name || t("bankFallback")} ${last4} · IFSC ${paymentMethod.ifsc || "—"}`;
       methodHint = paymentMethod.account_holder_name || "";
     }
   } else if (app.payout_status === "pending_creator_info") {
-    methodLine = "Waiting for creator to add a payout method";
+    methodLine = t("waitingForMethod");
   }
 
   const isPaid = app.payout_status === "processed";
@@ -272,7 +276,7 @@ function PayoutRow({
       {/* Payment method */}
       <div className="col-span-4 min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
-          {paymentMethod?.type === "bank" ? "Bank account" : paymentMethod?.type === "upi" ? "UPI" : "Payment method"}
+          {paymentMethod?.type === "bank" ? t("methodLabel.bank") : paymentMethod?.type === "upi" ? t("methodLabel.upi") : t("methodLabel.default")}
         </p>
         <p className="text-[12px] font-mono text-gray-800 dark:text-gray-200 truncate" title={methodLine}>
           {methodLine}
@@ -280,7 +284,7 @@ function PayoutRow({
         {methodHint && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{methodHint}</p>}
         {paymentMethod?.validation_status === "manual" && (
           <p className="text-[10px] text-amber-600 font-semibold mt-1">
-            ⚠ Bank not auto-verified — confirm details before sending.
+            {t("notAutoVerified")}
           </p>
         )}
       </div>
@@ -289,7 +293,7 @@ function PayoutRow({
       <div className="col-span-1 text-[11px] text-gray-500 dark:text-gray-400">
         {isPaid ? (
           <>
-            <p className="font-semibold text-emerald-600">Paid</p>
+            <p className="font-semibold text-emerald-600">{t("paid")}</p>
             <p>{formatDate(app.payout_processed_at)}</p>
             {app.payout_utr && (
               <p className="mt-1 font-mono text-[10px] text-gray-400 break-all">{app.payout_utr}</p>
@@ -297,7 +301,7 @@ function PayoutRow({
           </>
         ) : (
           <>
-            <p className="font-semibold">Released</p>
+            <p className="font-semibold">{t("released")}</p>
             <p>{formatDate(app.payout_release_at || app.payout_scheduled_at)}</p>
           </>
         )}

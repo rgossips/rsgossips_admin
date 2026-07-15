@@ -1,0 +1,8 @@
+{
+  "DashboardFeaturedCreatorsCreate": {
+    "backLink": "← Featured Creators",
+    "title": "Feature a creator",
+    "subtitle": "Curated row appears in the brand-side Top Creators carousel as soon as you publish.",
+    "submitLabel": "Publish"
+  }
+}

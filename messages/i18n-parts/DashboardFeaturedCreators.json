@@ -1,0 +1,23 @@
+{
+  "DashboardFeaturedCreators": {
+    "title": "Featured Creators",
+    "description": "Hand-curated Top Creators carousel on the brand home page. Lower position = appears first.",
+    "featureCreator": "Feature a creator",
+    "stats.total": "Total",
+    "stats.active": "Active",
+    "stats.hidden": "Hidden",
+    "emptyState": "No featured creators yet. Click <strong>Feature a creator</strong> to add one.",
+    "emptyFallbackNote": "Until you publish at least one, the brand home page falls back to a built-in list.",
+    "verified": "Verified",
+    "followersLine": "@{username} · {followers} followers",
+    "ratingSuffix": " · ★ {rating}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "statusActive": "Active",
+    "statusHidden": "Hidden",
+    "edit": "Edit",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete"
+  }
+}

@@ -1,12 +1,14 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { FilterBar } from "@/components/filter-bar";
 import { RefreshButton } from "@/components/refresh-button";
+import { getTranslations } from "next-intl/server";
 
 export default async function LeadsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
+  const t = await getTranslations("DashboardLeads");
   const { search, role, source } = await searchParams;
   const supabase = createAdminClient();
 
@@ -28,16 +30,16 @@ export default async function LeadsPage({
   });
 
   const filterFields = [
-    { name: "search", label: "Search phone", type: "text" as const, placeholder: "Search by phone number..." },
+    { name: "search", label: t("filters.searchPhone"), type: "text" as const, placeholder: t("filters.searchPhonePlaceholder") },
     {
       name: "role",
-      label: "All Roles",
+      label: t("filters.allRoles"),
       type: "select" as const,
       options: Array.from(roleSet).sort().map((r) => ({ label: r.charAt(0).toUpperCase() + r.slice(1), value: r })),
     },
     {
       name: "source",
-      label: "All Sources",
+      label: t("filters.allSources"),
       type: "select" as const,
       options: Array.from(sourceSet).sort().map((s) => ({ label: s.replace(/_/g, " "), value: s })),
     },
@@ -64,8 +66,8 @@ export default async function LeadsPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Leads</h1>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">Phone numbers from sign-in attempts</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{t("subtitle")}</p>
         </div>
         <RefreshButton />
       </div>
@@ -74,24 +76,24 @@ export default async function LeadsPage({
 
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
-          Failed to load leads: {error.message}
+          {t("loadError", { message: error.message })}
         </div>
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">{leads?.length ?? 0} lead{(leads?.length ?? 0) !== 1 ? "s" : ""}</span>
+        <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">{t("leadCount", { count: leads?.length ?? 0 })}</span>
       </div>
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Phone</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Role Attempted</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Source</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Attempts</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">Last Attempt</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">First Seen</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.phone")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.roleAttempted")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.source")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.attempts")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.lastAttempt")}</th>
+              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.firstSeen")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -142,7 +144,7 @@ export default async function LeadsPage({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No leads found</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{t("empty")}</p>
                   </div>
                 </td>
               </tr>

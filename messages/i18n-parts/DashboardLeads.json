@@ -1,0 +1,23 @@
+{
+  "DashboardLeads": {
+    "title": "Leads",
+    "subtitle": "Phone numbers from sign-in attempts",
+    "loadError": "Failed to load leads: {message}",
+    "leadCount": "{count, plural, one {# lead} other {# leads}}",
+    "empty": "No leads found",
+    "filters": {
+      "searchPhone": "Search phone",
+      "searchPhonePlaceholder": "Search by phone number...",
+      "allRoles": "All Roles",
+      "allSources": "All Sources"
+    },
+    "columns": {
+      "phone": "Phone",
+      "roleAttempted": "Role Attempted",
+      "source": "Source",
+      "attempts": "Attempts",
+      "lastAttempt": "Last Attempt",
+      "firstSeen": "First Seen"
+    }
+  }
+}

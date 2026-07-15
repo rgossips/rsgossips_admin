@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { ServiceForm } from "../../_form/service-form";
 import { updateService } from "../../actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function EditServicePage({
   params: Promise<{ id: string }>;
 }) {
   if (!(await isAdminOrAbove())) redirect("/dashboard/services");
+  const t = await getTranslations("DashboardServicesIdEdit");
   const { id } = await params;
   const admin = createAdminClient();
   const { data: service } = await admin.from("services").select("*").eq("id", id).maybeSingle();
@@ -28,17 +30,17 @@ export default async function EditServicePage({
           href="/dashboard/services"
           className="text-[12px] font-semibold text-indigo-600 hover:underline"
         >
-          ← Services
+          {t("backToServices")}
         </Link>
       </div>
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit service</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Changes go live immediately. The influencer catalogue picks them up on next page load.
+          {t("subtitle")}
         </p>
       </div>
 
-      <ServiceForm initial={service} action={action} submitLabel="Save Changes" />
+      <ServiceForm initial={service} action={action} submitLabel={t("saveChanges")} />
     </div>
   );
 }

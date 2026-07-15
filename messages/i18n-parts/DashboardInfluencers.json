@@ -1,0 +1,40 @@
+{
+  "DashboardInfluencers": {
+    "title": "Influencers",
+    "subtitle": "Manage influencer profiles and invitations",
+    "tabs": {
+      "all": "All",
+      "registered": "Registered",
+      "invited": "Invited"
+    },
+    "filter": {
+      "search": "Search",
+      "searchPlaceholder": "Search by name or username...",
+      "allStatuses": "All Statuses",
+      "active": "Active",
+      "suspended": "Suspended",
+      "pending": "Pending",
+      "followers": "Followers",
+      "followersUnder1k": "< 1K",
+      "followers1kTo10k": "1K - 10K",
+      "followers10kTo100k": "10K - 100K",
+      "followers100kPlus": "100K+",
+      "allCategories": "All Categories"
+    },
+    "table": {
+      "name": "Name",
+      "username": "Username",
+      "contactNumber": "Contact Number",
+      "followers": "Followers",
+      "categories": "Categories",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "failedToLoadInfluencers": "Failed to load influencers: {message}",
+    "noRegisteredInfluencers": "No registered influencers found",
+    "pendingInvitations": "Pending Invitations",
+    "failedToLoadInvitations": "Failed to load invitations: {message}",
+    "noPendingInvitations": "No pending invitations",
+    "clickInviteToCreate": "Click \"Invite Influencer\" above to create one"
+  }
+}

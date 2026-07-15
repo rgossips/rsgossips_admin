@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 // Shows the creator's Refer & Earn share link (mirrors the consumer app:
 // influencer/refer builds https://rgossips.com/login?ref=<referral_code>)
@@ -8,6 +9,7 @@ import { useState } from "react";
 // sign-up flow with the referral code prefilled. The referral_code lives on
 // influencer_profiles and is what the creator shares to earn reward credits.
 export function ReferralLinkCard({ referralCode }: { referralCode: string | null | undefined }) {
+  const t = useTranslations("DashboardInfluencersIdReferralLinkCard");
   const [copied, setCopied] = useState(false);
   const code = (referralCode || "").trim();
   const shareUrl = code ? `https://rgossips.com/login?ref=${code}` : "";
@@ -31,17 +33,17 @@ export function ReferralLinkCard({ referralCode }: { referralCode: string | null
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
           </svg>
         </div>
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Referral link</h2>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("title")}</h2>
       </div>
       <div className="p-5 space-y-3">
         {code ? (
           <>
             <div>
-              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Code</p>
+              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{t("codeLabel")}</p>
               <p className="text-sm font-mono font-semibold text-gray-900 dark:text-white mt-0.5">{code}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Share link</p>
+              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{t("shareLinkLabel")}</p>
               <div className="flex items-stretch gap-2">
                 <input
                   readOnly
@@ -58,14 +60,14 @@ export function ReferralLinkCard({ referralCode }: { referralCode: string | null
                       : "bg-indigo-600 hover:bg-indigo-500 text-white"
                   }`}
                 >
-                  {copied ? "Copied!" : "Copy"}
+                  {copied ? t("copied") : t("copy")}
                 </button>
               </div>
             </div>
           </>
         ) : (
           <p className="text-[12px] text-gray-400 dark:text-gray-500">
-            No referral code yet — it's generated when the creator first opens the Refer &amp; Earn page.
+            {t("noCode")}
           </p>
         )}
       </div>

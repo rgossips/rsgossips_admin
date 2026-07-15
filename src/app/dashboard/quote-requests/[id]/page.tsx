@@ -10,6 +10,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 import { ActionButton } from "@/components/action-button";
+import { getTranslations } from "next-intl/server";
 export const dynamic = "force-dynamic";
 
 export default async function QuoteRequestDetailPage({
@@ -18,6 +19,7 @@ export default async function QuoteRequestDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const t = await getTranslations("DashboardQuoteRequestsId");
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
   const { data: order } = await admin
@@ -28,15 +30,15 @@ export default async function QuoteRequestDetailPage({
   if (!order) notFound();
 
   // Requester display info
-  let userLabel = "Unknown";
+  let userLabel = t("userUnknown");
   const [{ data: inf }, { data: br }] = await Promise.all([
     admin.from("influencer_profiles").select("full_name, username, instagram_handle, contact_phone, email").eq("influencer_id", order.user_id).maybeSingle(),
     admin.from("brand_profiles").select("brand_name, contact_phone, contact_email").eq("brand_id", order.user_id).maybeSingle(),
   ]);
   const userPhone = (inf as any)?.contact_phone || (br as any)?.contact_phone || "";
   const userEmail = (inf as any)?.email || (br as any)?.contact_email || "";
-  if (inf) userLabel = inf.full_name || inf.username || (inf.instagram_handle ? `@${inf.instagram_handle}` : "Influencer");
-  else if (br) userLabel = br.brand_name || "Brand";
+  if (inf) userLabel = inf.full_name || inf.username || (inf.instagram_handle ? `@${inf.instagram_handle}` : t("userInfluencer"));
+  else if (br) userLabel = br.brand_name || t("userBrand");
 
   // Timeline
   const { data: events } = await admin
@@ -52,7 +54,7 @@ export default async function QuoteRequestDetailPage({
         href="/dashboard/quote-requests"
         className="text-[12px] font-semibold text-indigo-600 hover:underline"
       >
-        ← Quote requests
+        {t("backToList")}
       </Link>
 
       <div className="flex items-start justify-between gap-4">
@@ -62,7 +64,7 @@ export default async function QuoteRequestDetailPage({
             {order.service_title}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            From <span className="font-semibold text-gray-700 dark:text-gray-200">{userLabel}</span>
+            {t("from")} <span className="font-semibold text-gray-700 dark:text-gray-200">{userLabel}</span>
             {userPhone && <> · {userPhone}</>}
             {userEmail && <> · {userEmail}</>}
           </p>
@@ -78,14 +80,14 @@ export default async function QuoteRequestDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — brief */}
         <div className="lg:col-span-2 space-y-4">
-          <Card title="Project description">
+          <Card title={t("cardProjectDescription")}>
             <p className="text-[13px] text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
               {order.description}
             </p>
           </Card>
 
           {order.asset_url && (
-            <Card title="Asset link">
+            <Card title={t("cardAssetLink")}>
               <a
                 href={order.asset_url}
                 target="_blank"
@@ -98,11 +100,11 @@ export default async function QuoteRequestDetailPage({
           )}
 
           {(order.style_references || order.notes) && (
-            <Card title="Extras">
+            <Card title={t("cardExtras")}>
               {order.style_references && (
                 <div className="mb-3">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    Style references
+                    {t("styleReferences")}
                   </p>
                   <p className="text-[13px] text-gray-700 dark:text-gray-200">{order.style_references}</p>
                 </div>
@@ -110,7 +112,7 @@ export default async function QuoteRequestDetailPage({
               {order.notes && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    Additional notes
+                    {t("additionalNotes")}
                   </p>
                   <p className="text-[13px] text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
                     {order.notes}
@@ -120,7 +122,7 @@ export default async function QuoteRequestDetailPage({
             </Card>
           )}
 
-          <Card title="Timeline">
+          <Card title={t("cardTimeline")}>
             <ul className="space-y-3">
               {(events || []).map((e) => (
                 <li key={e.id} className="flex gap-3 text-[12px]">
@@ -134,7 +136,7 @@ export default async function QuoteRequestDetailPage({
                 </li>
               ))}
               {(events || []).length === 0 && (
-                <li className="text-[12px] text-gray-400">No events yet.</li>
+                <li className="text-[12px] text-gray-400">{t("noEventsYet")}</li>
               )}
             </ul>
           </Card>
@@ -142,12 +144,12 @@ export default async function QuoteRequestDetailPage({
 
         {/* Right — summary */}
         <div className="space-y-4">
-          <Card title="Order summary">
-            <Field label="Status" value={order.status.replace(/_/g, " ")} />
-            <Field label="Scope" value={order.scope || "—"} />
-            <Field label="Budget range" value={order.budget_range || "—"} />
+          <Card title={t("cardOrderSummary")}>
+            <Field label={t("fieldStatus")} value={order.status.replace(/_/g, " ")} />
+            <Field label={t("fieldScope")} value={order.scope || "—"} />
+            <Field label={t("fieldBudgetRange")} value={order.budget_range || "—"} />
             <Field
-              label="Desired delivery"
+              label={t("fieldDesiredDelivery")}
               value={
                 order.desired_delivery_date
                   ? new Date(order.desired_delivery_date).toLocaleDateString("en-IN", {
@@ -159,7 +161,7 @@ export default async function QuoteRequestDetailPage({
               }
             />
             <Field
-              label="Submitted"
+              label={t("fieldSubmitted")}
               value={new Date(order.created_at).toLocaleString("en-IN")}
             />
           </Card>
@@ -179,7 +181,7 @@ export default async function QuoteRequestDetailPage({
             <div className="space-y-3">
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
                 <p className="text-[11px] font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wider">
-                  Counter offer received
+                  {t("counterOfferReceived")}
                 </p>
                 <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">
                   ₹{Number(order.counter_amount || 0).toLocaleString("en-IN")}
@@ -199,7 +201,7 @@ export default async function QuoteRequestDetailPage({
                   <ActionButton
                     className="w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold cursor-pointer"
                   >
-                    Accept counter — ₹{Number(order.counter_amount || 0).toLocaleString("en-IN")}
+                    {t("acceptCounter", { amount: Number(order.counter_amount || 0).toLocaleString("en-IN") })}
                   </ActionButton>
                 </form>
               </div>
@@ -224,7 +226,7 @@ export default async function QuoteRequestDetailPage({
           {canWrite && order.status === "paid_final" && <DeliverFinalForm orderId={order.id} />}
 
           {order.status === "completed" && Array.isArray(order.final_files) && order.final_files.length > 0 && (
-            <Card title="Delivered files">
+            <Card title={t("cardDeliveredFiles")}>
               <ul className="space-y-1.5">
                 {order.final_files.map((f: any, i: number) => (
                   <li key={i} className="flex items-center justify-between gap-2 text-[12px]">
@@ -236,7 +238,7 @@ export default async function QuoteRequestDetailPage({
                       rel="noopener noreferrer"
                       className="text-indigo-600 hover:underline font-semibold whitespace-nowrap"
                     >
-                      Open ↗
+                      {t("open")}
                     </a>
                   </li>
                 ))}

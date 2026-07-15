@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { updateBrand, uploadBrandIcon } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 
@@ -9,6 +10,7 @@ const inputClass = "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 bo
 const labelClass = "block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
 
 export function EditBrandButton({ brand }: { brand: any }) {
+  const t = useTranslations("DashboardBrandsIdEditBrand");
   const [open, setOpen] = useState(false);
 
   return (
@@ -20,7 +22,7 @@ export function EditBrandButton({ brand }: { brand: any }) {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
-        Edit
+        {t("edit")}
       </button>
       {open && <EditBrandModal brand={brand} onClose={() => setOpen(false)} />}
     </>
@@ -28,6 +30,7 @@ export function EditBrandButton({ brand }: { brand: any }) {
 }
 
 function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void }) {
+  const t = useTranslations("DashboardBrandsIdEditBrand");
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +71,7 @@ function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void })
       <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed z-50 inset-4 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:w-full lg:max-w-2xl lg:max-h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Edit Brand</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t("title")}</h2>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 cursor-pointer">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -84,7 +87,7 @@ function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void })
               className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-500 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-gray-50 dark:bg-gray-800 shrink-0"
             >
               {logoPreview ? (
-                <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                <img src={logoPreview} alt={t("logoAlt")} className="w-full h-full object-cover" />
               ) : (
                 <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -93,101 +96,101 @@ function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void })
             </div>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoSelect(e.target.files)} />
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Brand Logo</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Click to change. JPG, PNG, WebP.</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("brandLogo")}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("clickToChange")}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Brand Name</label>
+              <label className={labelClass}>{t("brandName")}</label>
               <input name="brand_name" type="text" defaultValue={brand.brand_name || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Instagram Username</label>
+              <label className={labelClass}>{t("instagramUsername")}</label>
               <input name="instagram_username" type="text" defaultValue={brand.instagram_username || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Contact Name</label>
+              <label className={labelClass}>{t("contactName")}</label>
               <input name="contact_name" type="text" defaultValue={brand.contact_name || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Contact Role</label>
+              <label className={labelClass}>{t("contactRole")}</label>
               <input name="contact_role" type="text" defaultValue={brand.contact_role || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Contact Email</label>
+              <label className={labelClass}>{t("contactEmail")}</label>
               <input name="contact_email" type="email" defaultValue={brand.contact_email || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Contact Phone</label>
+              <label className={labelClass}>{t("contactPhone")}</label>
               <input name="contact_phone" type="tel" defaultValue={brand.contact_phone || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Website</label>
+              <label className={labelClass}>{t("website")}</label>
               <input name="website_url" type="text" defaultValue={brand.website_url || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>GSTIN</label>
+              <label className={labelClass}>{t("gstin")}</label>
               <input name="gstin" type="text" defaultValue={brand.gstin || ""} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Status</label>
+              <label className={labelClass}>{t("status")}</label>
               <select name="status" defaultValue={brand.status || "active"} className={inputClass}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
+                <option value="active">{t("statusActive")}</option>
+                <option value="inactive">{t("statusInactive")}</option>
+                <option value="suspended">{t("statusSuspended")}</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Verification</label>
+              <label className={labelClass}>{t("verification")}</label>
               <select name="verification_status" defaultValue={brand.verification_status || "not_applied"} className={inputClass}>
-                <option value="not_applied">Not Applied</option>
-                <option value="pending">Pending</option>
-                <option value="verified">Verified</option>
-                <option value="rejected">Rejected</option>
+                <option value="not_applied">{t("verifNotApplied")}</option>
+                <option value="pending">{t("verifPending")}</option>
+                <option value="verified">{t("verifVerified")}</option>
+                <option value="rejected">{t("verifRejected")}</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Tier</label>
+              <label className={labelClass}>{t("tier")}</label>
               <select name="tier" defaultValue={brand.tier || ""} className={inputClass}>
-                <option value="">None</option>
-                <option value="bronze">Bronze</option>
-                <option value="silver">Silver</option>
-                <option value="gold">Gold</option>
-                <option value="platinum">Platinum</option>
+                <option value="">{t("tierNone")}</option>
+                <option value="bronze">{t("tierBronze")}</option>
+                <option value="silver">{t("tierSilver")}</option>
+                <option value="gold">{t("tierGold")}</option>
+                <option value="platinum">{t("tierPlatinum")}</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Listing Type</label>
+              <label className={labelClass}>{t("listingType")}</label>
               <select name="listing_type" defaultValue={brand.listing_type || "free"} className={inputClass}>
-                <option value="free">Free</option>
-                <option value="premium">Premium</option>
+                <option value="free">{t("listingFree")}</option>
+                <option value="premium">{t("listingPremium")}</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Monthly Budget Range</label>
-              <input name="monthly_budget_range" type="text" defaultValue={brand.monthly_budget_range || ""} placeholder="e.g. 50K - 1L" className={inputClass} />
+              <label className={labelClass}>{t("monthlyBudgetRange")}</label>
+              <input name="monthly_budget_range" type="text" defaultValue={brand.monthly_budget_range || ""} placeholder={t("monthlyBudgetPlaceholder")} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Preferred Influencer Tier</label>
-              <input name="preferred_influencer_tier" type="text" defaultValue={brand.preferred_influencer_tier || ""} placeholder="e.g. micro, macro" className={inputClass} />
+              <label className={labelClass}>{t("preferredInfluencerTier")}</label>
+              <input name="preferred_influencer_tier" type="text" defaultValue={brand.preferred_influencer_tier || ""} placeholder={t("preferredTierPlaceholder")} className={inputClass} />
             </div>
           </div>
           <div>
-            <label className={labelClass}>Short Description</label>
+            <label className={labelClass}>{t("shortDescription")}</label>
             <input name="short_description" type="text" defaultValue={brand.short_description || ""} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>Full Description</label>
+            <label className={labelClass}>{t("fullDescription")}</label>
             <textarea name="full_description" rows={3} defaultValue={brand.full_description || ""} className={`${inputClass} resize-none`} />
           </div>
 
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 text-white text-sm font-semibold transition-colors cursor-pointer">
-              {loading && <ButtonSpinner />}{loading ? "Saving..." : "Save Changes"}
+              {loading && <ButtonSpinner />}{loading ? t("saving") : t("saveChanges")}
             </button>
-            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">Cancel</button>
+            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">{t("cancel")}</button>
           </div>
         </form>
       </div>

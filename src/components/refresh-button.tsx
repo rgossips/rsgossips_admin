@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 export function RefreshButton() {
   const router = useRouter();
+  const t = useTranslations("RefreshButton");
   const [spinning, setSpinning] = useState(false);
 
   const handleRefresh = () => {

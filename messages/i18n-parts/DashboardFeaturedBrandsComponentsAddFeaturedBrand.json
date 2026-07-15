@@ -1,0 +1,13 @@
+{
+  "DashboardFeaturedBrandsComponentsAddFeaturedBrand": {
+    "featureABrand": "Feature a brand",
+    "searchBrands": "Search brands",
+    "close": "Close",
+    "searchPlaceholder": "Search by brand name or Instagram handle…",
+    "searching": "Searching…",
+    "typeAtLeast2": "Type at least 2 characters.",
+    "noMatches": "No matches (already-featured brands are hidden).",
+    "registeredBrand": "Registered brand",
+    "invitedBrand": "Invited brand"
+  }
+}

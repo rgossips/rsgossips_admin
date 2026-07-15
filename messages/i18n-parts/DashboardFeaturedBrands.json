@@ -1,0 +1,25 @@
+{
+  "DashboardFeaturedBrands": {
+    "title": "Featured Brands",
+    "description": "Hand-picked \"Brands You'll Love\" carousel on the influencer home page. Lower position = appears first.",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "empty": {
+      "text": "No featured brands yet. Click <highlight>Feature a brand</highlight> to add one.",
+      "fallback": "Until you publish at least one, the influencer home falls back to the full brand directory."
+    },
+    "status": {
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete",
+    "noInstagram": "No Instagram link"
+  }
+}
