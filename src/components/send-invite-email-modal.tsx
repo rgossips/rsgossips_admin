@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
 
 interface SendInviteEmailModalProps {
@@ -17,6 +18,7 @@ interface SendInviteEmailModalProps {
 // — the parent decides when to open it, and `send` is the gated server
 // action that touches SMTP.
 export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: SendInviteEmailModalProps) {
+  const t = useTranslations("SendInviteEmailModal");
   const [email, setEmail] = useState("");
   const [customMessage, setCustomMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -61,7 +63,7 @@ export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: Se
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900 dark:text-white">Send invite email</h2>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">{t("title")}</h2>
               <p className="text-[11px] text-gray-400">{recipientLabel}</p>
             </div>
           </div>
@@ -72,13 +74,13 @@ export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: Se
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email address</label>
+            <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t("emailLabel")}</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
+              placeholder={t("emailPlaceholder")}
               disabled={loading || success}
               className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-60"
             />
@@ -86,13 +88,13 @@ export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: Se
 
           <div>
             <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Personal note <span className="text-gray-400 font-normal">(optional)</span>
+              {t("noteLabel")} <span className="text-gray-400 font-normal">{t("optional")}</span>
             </label>
             <textarea
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
               rows={3}
-              placeholder="Add a short message to the invitation…"
+              placeholder={t("notePlaceholder")}
               disabled={loading || success}
               className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-60 resize-none"
             />
@@ -107,7 +109,7 @@ export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: Se
           {success && (
             <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Invitation sent.
+              {t("sentConfirmation")}
             </div>
           )}
 
@@ -122,7 +124,7 @@ export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: Se
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               )}
-              {loading ? "Sending…" : "Send invite"}
+              {loading ? t("sending") : t("sendInvite")}
             </button>
             <button
               type="button"
@@ -130,7 +132,7 @@ export function SendInviteEmailModal({ open, onClose, recipientLabel, send }: Se
               disabled={loading}
               className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer disabled:opacity-50"
             >
-              Cancel
+              {t("cancel")}
             </button>
           </div>
         </form>

@@ -18,7 +18,7 @@ export function RefreshButton() {
   return (
     <button
       onClick={handleRefresh}
-      title="Refresh data"
+      title={t("refreshData")}
       className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
     >
       <svg

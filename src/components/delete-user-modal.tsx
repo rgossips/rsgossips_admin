@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
 
 type StepStatus = "queued" | "running" | "done" | "failed";
@@ -43,6 +44,8 @@ export function DeleteUserModal({
   runStep,
   redirectTo,
 }: DeleteUserModalProps) {
+  const t = useTranslations("DeleteUserModal");
+  const kindLabel = kind === "influencer" ? t("kindInfluencer") : t("kindBrand");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<"confirm" | "running" | "done" | "failed">("confirm");
@@ -78,7 +81,7 @@ export function DeleteUserModal({
         if (res.detail) setDetails((prev) => ({ ...prev, [step.key]: res.detail! }));
       } else {
         setStatuses((prev) => ({ ...prev, [step.key]: "failed" }));
-        setErrors((prev) => ({ ...prev, [step.key]: res.error || "Failed" }));
+        setErrors((prev) => ({ ...prev, [step.key]: res.error || t("failedFallback") }));
         failed = true;
         break;
       }
@@ -103,7 +106,7 @@ export function DeleteUserModal({
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-        Delete {kind}
+        {t("deleteKind", { kind: kindLabel })}
       </button>
 
       {open && (
@@ -122,7 +125,7 @@ export function DeleteUserModal({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                    {phase === "done" ? "Deleted" : phase === "failed" ? "Stopped" : `Delete ${kind}`}
+                    {phase === "done" ? t("titleDeleted") : phase === "failed" ? t("titleStopped") : t("deleteKind", { kind: kindLabel })}
                   </h2>
                   <p className="text-[11px] text-gray-400">{displayName}</p>
                 </div>
@@ -138,21 +141,24 @@ export function DeleteUserModal({
             {phase === "confirm" && (
               <div className="p-6 space-y-4">
                 <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300 space-y-1.5">
-                  <p className="font-semibold">This will permanently delete:</p>
+                  <p className="font-semibold">{t("permanentlyDelete")}</p>
                   <ul className="text-[12px] space-y-0.5 ml-5 list-disc">
-                    <li>All campaign applications &amp; activity</li>
-                    {kind === "brand" && <li>All campaigns owned by this brand</li>}
-                    <li>All service orders &amp; their history</li>
-                    {kind === "influencer" && <li>Featured-creator &amp; story listings</li>}
-                    <li>The {kind} profile row</li>
-                    <li>The authentication account (phone &amp; Instagram tokens)</li>
+                    <li>{t("bulletApplications")}</li>
+                    {kind === "brand" && <li>{t("bulletCampaigns")}</li>}
+                    <li>{t("bulletServiceOrders")}</li>
+                    {kind === "influencer" && <li>{t("bulletFeatured")}</li>}
+                    <li>{t("bulletProfile", { kind: kindLabel })}</li>
+                    <li>{t("bulletAuth")}</li>
                   </ul>
-                  <p className="text-[11px] text-red-600 dark:text-red-400 pt-1.5">This cannot be undone.</p>
+                  <p className="text-[11px] text-red-600 dark:text-red-400 pt-1.5">{t("cannotUndo")}</p>
                 </div>
 
                 <div>
                   <label className="block text-[13px] font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Type <span className="font-mono font-bold text-red-600 dark:text-red-400">{confirmText}</span> to confirm
+                    {t.rich("typeToConfirm", {
+                      confirmText,
+                      code: (chunks) => <span className="font-mono font-bold text-red-600 dark:text-red-400">{chunks}</span>,
+                    })}
                   </label>
                   <input
                     type="text"
@@ -169,10 +175,10 @@ export function DeleteUserModal({
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-red-300 disabled:cursor-not-allowed text-white text-sm font-semibold cursor-pointer transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    Delete permanently
+                    {t("deletePermanently")}
                   </button>
                   <button onClick={reset} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">
-                    Cancel
+                    {t("cancel")}
                   </button>
                 </div>
               </div>
@@ -245,23 +251,23 @@ export function DeleteUserModal({
                       <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <p className="text-sm text-emerald-700 dark:text-emerald-300">All steps completed. Redirecting…</p>
+                      <p className="text-sm text-emerald-700 dark:text-emerald-300">{t("allStepsCompleted")}</p>
                     </div>
                   )}
 
                   {phase === "failed" && (
                     <div className="mt-4 p-3.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                      <p className="text-sm text-red-700 dark:text-red-300">Deletion stopped at the failed step. Earlier steps already completed cannot be undone.</p>
+                      <p className="text-sm text-red-700 dark:text-red-300">{t("deletionStopped")}</p>
                     </div>
                   )}
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-end">
                   {phase === "running" ? (
-                    <span className="text-xs text-gray-400">Please wait — do not close this window.</span>
+                    <span className="text-xs text-gray-400">{t("pleaseWait")}</span>
                   ) : (
                     <button onClick={reset} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">
-                      Close
+                      {t("close")}
                     </button>
                   )}
                 </div>

@@ -1,8 +1,0 @@
-{
-  "DashboardServicesIdEdit": {
-    "backToServices": "← Services",
-    "title": "Edit service",
-    "subtitle": "Changes go live immediately. The influencer catalogue picks them up on next page load.",
-    "saveChanges": "Save Changes"
-  }
-}

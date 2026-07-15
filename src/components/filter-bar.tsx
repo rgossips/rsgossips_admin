@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface FilterOption {
   label: string;
@@ -70,6 +71,7 @@ function MultiSelectDropdown({
   selected: string[];
   onChange: (values: string[]) => void;
 }) {
+  const t = useTranslations("FilterBar");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -125,7 +127,7 @@ function MultiSelectDropdown({
               onClick={() => onChange([])}
               className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border-t border-gray-100 dark:border-gray-700 cursor-pointer"
             >
-              Clear selection
+              {t("clearSelection")}
             </button>
           )}
         </div>
@@ -135,6 +137,7 @@ function MultiSelectDropdown({
 }
 
 export function FilterBar({ fields }: { fields: FilterField[] }) {
+  const t = useTranslations("FilterBar");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -210,7 +213,7 @@ export function FilterBar({ fields }: { fields: FilterField[] }) {
           onClick={clearAll}
           className="px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
         >
-          Clear filters
+          {t("clearFilters")}
         </button>
       )}
     </div>

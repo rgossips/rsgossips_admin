@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { updateBrandVerification } from "./actions";
+import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
 import { useRole } from "@/components/role-context";
 
@@ -17,6 +18,7 @@ interface Brand {
 }
 
 export function BrandRow({ brand }: { brand: Brand }) {
+  const t = useTranslations("DashboardBrandsBrandRow");
   const router = useRouter();
   const { isAdmin } = useRole();
   const [loading, setLoading] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function BrandRow({ brand }: { brand: Brand }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
-              {loading === "verified" ? "..." : "Verify"}
+              {loading === "verified" ? "..." : t("verify")}
             </button>
             <button
               onClick={() => handleVerification("rejected")}
@@ -100,7 +102,7 @@ export function BrandRow({ brand }: { brand: Brand }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
-              {loading === "rejected" ? "..." : "Reject"}
+              {loading === "rejected" ? "..." : t("reject")}
             </button>
           </div>
         ) : (
@@ -114,7 +116,7 @@ export function BrandRow({ brand }: { brand: Brand }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             )}
-            {loading ? "..." : "Reset"}
+            {loading ? "..." : t("reset")}
           </button>
         )}
       </td>

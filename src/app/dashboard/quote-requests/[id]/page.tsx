@@ -247,20 +247,20 @@ export default async function QuoteRequestDetailPage({
           )}
 
           {!["pending_quote", "counter_offered"].includes(order.status) && (
-            <Card title="Quote summary">
+            <Card title={t("cardQuoteSummary")}>
               {order.quoted_amount ? (
                 <>
-                  <Field label="Quoted" value={`₹${Number(order.quoted_amount).toLocaleString("en-IN")}`} />
-                  <Field label="Total" value={`₹${Number(order.total_amount || 0).toLocaleString("en-IN")}`} />
-                  <Field label="Advance" value={`${order.advance_pct}%`} />
+                  <Field label={t("fieldQuoted")} value={`₹${Number(order.quoted_amount).toLocaleString("en-IN")}`} />
+                  <Field label={t("fieldTotal")} value={`₹${Number(order.total_amount || 0).toLocaleString("en-IN")}`} />
+                  <Field label={t("fieldAdvance")} value={`${order.advance_pct}%`} />
                   <Field
-                    label="Valid until"
+                    label={t("fieldValidUntil")}
                     value={order.quote_valid_until ? new Date(order.quote_valid_until).toLocaleDateString("en-IN") : "—"}
                   />
                 </>
               ) : (
                 <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                  No quote was sent on this order.
+                  {t("noQuoteSent")}
                 </p>
               )}
             </Card>

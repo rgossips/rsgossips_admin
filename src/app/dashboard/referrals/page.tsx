@@ -18,19 +18,10 @@ const STATUS_PILL_CLASS: Record<string, string> = {
 };
 
 // Known anti-fraud flags attribute-referral writes into review_reason.
-// Unknown reasons render verbatim.
-const REVIEW_REASON_LABEL: Record<string, string> = {
-  duplicate_device_fp: "Duplicate device fingerprint",
-  duplicate_signup_ip: "Duplicate signup IP",
-  daily_cap_hit: "Daily cap hit",
-};
+// Unknown reasons render verbatim. Labels resolved via t(`reviewReason.<id>`).
+const KNOWN_REVIEW_REASONS = new Set(["duplicate_device_fp", "duplicate_signup_ip", "daily_cap_hit"]);
 
-const FILTERS = [
-  { id: "review", label: "Needs review" },
-  { id: "rewarded", label: "Rewarded" },
-  { id: "signed_up", label: "Signed up" },
-  { id: "all", label: "All" },
-];
+const FILTER_IDS = ["review", "rewarded", "signed_up", "all"];
 
 const formatDate = (iso: string | null | undefined) =>
   iso
@@ -79,7 +70,7 @@ export default async function ReferralsPage({
       .in("influencer_id", [...userIds]);
     (infs || []).forEach((i: any) => {
       names.set(i.influencer_id, {
-        name: i.full_name || i.username || "Unknown",
+        name: i.full_name || i.username || t("unknownName"),
         handle: i.instagram_handle,
       });
     });
@@ -119,57 +110,57 @@ export default async function ReferralsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Refer & Earn</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Influencer referrals + Reward Credits wallet. Manual reviews land here when a referrer hits the daily cap or an anti-fraud rule fires.
+          {t("subtitle")}
         </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatPill label="Total" value={counts.total} />
-        <StatPill label="Rewarded" value={counts.rewarded} accent="text-emerald-600" />
-        <StatPill label="In-flight" value={counts.signed_up} accent="text-blue-600" />
-        <StatPill label="Under review" value={counts.review} accent="text-orange-600" />
+        <StatPill label={t("kpi.total")} value={counts.total} />
+        <StatPill label={t("kpi.rewarded")} value={counts.rewarded} accent="text-emerald-600" />
+        <StatPill label={t("kpi.inFlight")} value={counts.signed_up} accent="text-blue-600" />
+        <StatPill label={t("kpi.underReview")} value={counts.review} accent="text-orange-600" />
       </div>
 
       {/* Funnel — signup → rewarded conversion and 7d clawback rate. If
           conversion drops or clawback climbs, the program's health is
           suffering and it's worth investigating. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatPill label="Signup → rewarded" value={`${conversionPct}%`} accent="text-indigo-600" />
-        <StatPill label="Clawback rate" value={`${clawbackPct}%`} accent={clawbackPct >= 10 ? "text-rose-600" : "text-slate-700"} />
-        <StatPill label="Reversed (all-time)" value={reversedCount} accent="text-rose-600" />
-        <StatPill label="Signups (all-time)" value={signed} />
+        <StatPill label={t("kpi.signupToRewarded")} value={`${conversionPct}%`} accent="text-indigo-600" />
+        <StatPill label={t("kpi.clawbackRate")} value={`${clawbackPct}%`} accent={clawbackPct >= 10 ? "text-rose-600" : "text-slate-700"} />
+        <StatPill label={t("kpi.reversedAllTime")} value={reversedCount} accent="text-rose-600" />
+        <StatPill label={t("kpi.signupsAllTime")} value={signed} />
       </div>
 
       {/* RC cost lens — what's been given, what's been spent, what's
           still outstanding on wallets. Outstanding is what we'd owe if
           every user redeemed today. */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <StatPill label="RC earned (referrals)" value={ledgerSums.earned} accent="text-emerald-600" />
-        <StatPill label="RC granted (welcome)" value={ledgerSums.welcome} accent="text-emerald-600" />
-        <StatPill label="RC granted (admin)" value={ledgerSums.admin} accent="text-emerald-600" />
-        <StatPill label="RC redeemed" value={ledgerSums.redeemed} accent="text-blue-600" />
-        <StatPill label="RC clawed back" value={ledgerSums.clawback} accent="text-rose-600" />
-        <StatPill label="RC outstanding" value={rcOutstanding} accent="text-slate-900 dark:text-white" />
+        <StatPill label={t("kpi.rcEarned")} value={ledgerSums.earned} accent="text-emerald-600" />
+        <StatPill label={t("kpi.rcWelcome")} value={ledgerSums.welcome} accent="text-emerald-600" />
+        <StatPill label={t("kpi.rcAdmin")} value={ledgerSums.admin} accent="text-emerald-600" />
+        <StatPill label={t("kpi.rcRedeemed")} value={ledgerSums.redeemed} accent="text-blue-600" />
+        <StatPill label={t("kpi.rcClawedBack")} value={ledgerSums.clawback} accent="text-rose-600" />
+        <StatPill label={t("kpi.rcOutstanding")} value={rcOutstanding} accent="text-slate-900 dark:text-white" />
       </div>
 
       <AdjustRcForm canWrite={canWrite} />
 
       <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => {
-          const active = filter === f.id;
+        {FILTER_IDS.map((id) => {
+          const active = filter === id;
           return (
             <a
-              key={f.id}
-              href={`?status=${f.id}`}
+              key={id}
+              href={`?status=${id}`}
               className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-colors ${
                 active
                   ? "bg-indigo-600 border-indigo-600 text-white"
                   : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
             >
-              {f.label}
+              {t(`filters.${id}`)}
             </a>
           );
         })}
@@ -183,7 +174,7 @@ export default async function ReferralsPage({
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         {(rows || []).length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-400">No referrals in this state.</div>
+          <div className="p-10 text-center text-sm text-gray-400">{t("empty")}</div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {(rows || []).map((r: any) => {
@@ -196,24 +187,24 @@ export default async function ReferralsPage({
               return (
                 <div key={r.id} className="p-4 grid grid-cols-12 gap-3 items-start">
                   <div className="col-span-4">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Referrer</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{t("referrer")}</p>
                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{referrer?.name || "—"}</p>
                     <p className="text-[11px] text-gray-400 truncate">
                       {referrer?.handle ? `@${referrer.handle}` : "—"}
                     </p>
-                    <p className="text-[11px] text-gray-400 font-mono truncate">Code: {r.referral_code}</p>
+                    <p className="text-[11px] text-gray-400 font-mono truncate">{t("code", { code: r.referral_code })}</p>
                   </div>
 
                   <div className="col-span-4">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Referee</p>
+                    <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{t("referee")}</p>
                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                      {referee?.name || "(not signed up)"}
+                      {referee?.name || t("notSignedUp")}
                     </p>
                     <p className="text-[11px] text-gray-400 truncate">
                       {referee?.handle ? `@${referee.handle}` : "—"}
                     </p>
                     <p className="text-[11px] text-gray-400">
-                      {r.referee_first_plan ? `First plan: ${r.referee_first_plan}` : "No plan yet"}
+                      {r.referee_first_plan ? t("firstPlan", { plan: r.referee_first_plan }) : t("noPlanYet")}
                     </p>
                   </div>
 
@@ -241,7 +232,7 @@ export default async function ReferralsPage({
                           <ActionButton
                             className="w-full px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold cursor-pointer"
                           >
-                            Approve
+                            {t("approve")}
                           </ActionButton>
                         </form>
                         <form
@@ -253,7 +244,7 @@ export default async function ReferralsPage({
                           <ActionButton
                             className="w-full px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-600 text-[12px] font-bold cursor-pointer"
                           >
-                            Reject
+                            {t("reject")}
                           </ActionButton>
                         </form>
                       </>
@@ -264,13 +255,13 @@ export default async function ReferralsPage({
                     <div className="col-span-12 mt-2 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/40 px-3 py-2 space-y-1">
                       {r.review_reason && (
                         <p className="text-[11px] text-orange-800 dark:text-orange-300">
-                          <span className="font-black uppercase tracking-wider">Flag:</span>{" "}
-                          {REVIEW_REASON_LABEL[r.review_reason] || r.review_reason}
+                          <span className="font-black uppercase tracking-wider">{t("flag")}</span>{" "}
+                          {KNOWN_REVIEW_REASONS.has(r.review_reason) ? t(`reviewReason.${r.review_reason}`) : r.review_reason}
                         </p>
                       )}
                       <div className="flex flex-wrap gap-4 text-[11px] text-orange-700 dark:text-orange-400 font-mono">
-                        {r.signup_ip && <span>IP: {r.signup_ip}</span>}
-                        {r.device_fingerprint && <span>Device: {r.device_fingerprint}</span>}
+                        {r.signup_ip && <span>{t("ip", { ip: r.signup_ip })}</span>}
+                        {r.device_fingerprint && <span>{t("device", { fp: r.device_fingerprint })}</span>}
                       </div>
                     </div>
                   )}

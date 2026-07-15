@@ -7,6 +7,7 @@
 // awkward search bar they don't need.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const inputClass =
   "w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
@@ -26,6 +27,7 @@ export function MultiSelectChips({
   onChange: (v: string[]) => void;
   required?: boolean;
 }) {
+  const t = useTranslations("MultiSelectChips");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -57,8 +59,8 @@ export function MultiSelectChips({
       >
         <span className={selected.length > 0 ? "text-gray-900 dark:text-white" : "text-gray-400"}>
           {selected.length > 0
-            ? `${selected.length} selected`
-            : `Select ${label.toLowerCase()}`}
+            ? t("selectedCount", { count: selected.length })
+            : t("selectPlaceholder", { label: label.toLowerCase() })}
         </span>
         <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -91,7 +93,7 @@ export function MultiSelectChips({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search ${label.toLowerCase()}...`}
+                placeholder={t("searchPlaceholder", { label: label.toLowerCase() })}
                 className="w-full px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-indigo-400"
                 onClick={(e) => e.stopPropagation()}
               />
@@ -100,7 +102,7 @@ export function MultiSelectChips({
           <div className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 ? (
               <p className="text-center text-[12px] text-gray-400 py-6">
-                No matches for &quot;{search}&quot;
+                {t("noMatches", { search })}
               </p>
             ) : (
               filtered.map((opt) => (

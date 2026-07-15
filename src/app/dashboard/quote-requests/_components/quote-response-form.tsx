@@ -155,10 +155,10 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
         <FieldL label={t("revisionsAllowedLabel")}>
           <input name="revisions_allowed" defaultValue="2" type="number" min={0} max={10} className="input" />
         </FieldL>
-        <FieldL label="Quote validity (days)" hint="After this, the order auto-expires">
+        <FieldL label={t("quoteValidityDaysLabel")} hint={t("quoteValidityDaysHint")}>
           <input name="quote_validity_days" defaultValue="7" type="number" min={1} max={60} className="input" />
         </FieldL>
-        <FieldL label="Final formats" hint="What they'll receive">
+        <FieldL label={t("finalFormatsLabel")} hint={t("finalFormatsHint")}>
           <input
             name="final_formats"
             defaultValue="4K + 1080p"
@@ -171,12 +171,12 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
 
       <div>
         <label className="block text-[12px] font-semibold text-gray-700 dark:text-gray-200 mb-1">
-          Note from our team
+          {t("teamNoteLabel")}
         </label>
         <textarea
           name="quote_message"
           rows={3}
-          placeholder="Optional — short note that shows on the user's quote screen"
+          placeholder={t("teamNotePlaceholder")}
           className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
         />
       </div>
@@ -184,7 +184,7 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
       {/* Live total preview */}
       <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-lg p-3 text-[12px]">
         <Row
-          label="Total user pays"
+          label={t("totalUserPaysLabel")}
           value={amount ? `₹${total.toLocaleString("en-IN")}` : "—"}
           bold
         />
@@ -199,14 +199,14 @@ export function QuoteResponseForm({ orderId, serviceTitle, desiredDeliveryDate }
           disabled={pending}
           className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer disabled:opacity-50"
         >
-          Cancel
+          {t("cancel")}
         </button>
         <button
           type="submit"
           disabled={pending}
           className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-60"
         >
-          {pending ? "Sending…" : "Send quote"}
+          {pending ? t("sending") : t("sendQuote")}
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -21,13 +22,14 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   variant = "primary",
   onConfirm,
   onCancel,
   busy = false,
 }: ConfirmDialogProps) {
+  const t = useTranslations("ConfirmDialog");
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -75,7 +77,7 @@ export function ConfirmDialog({
             disabled={busy}
             className="px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer disabled:opacity-50"
           >
-            {cancelLabel}
+            {cancelLabel ?? t("cancel")}
           </button>
           <button
             type="button"
@@ -89,7 +91,7 @@ export function ConfirmDialog({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
-            {busy ? "Working…" : confirmLabel}
+            {busy ? t("working") : (confirmLabel ?? t("confirm"))}
           </button>
         </div>
       </div>

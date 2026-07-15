@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as XLSX from "xlsx";
 import { ButtonSpinner, FullPageLoader } from "@/components/spinner";
 
@@ -28,6 +29,7 @@ const CHUNK_SIZE = 200;
 const MAX_ROWS = 5000;
 
 export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps) {
+  const t = useTranslations("BulkInvite");
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -57,7 +59,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
     setParseError("");
     setResult(null);
     if (!file.name.endsWith(".xlsx")) {
-      setParseError("Only .xlsx files are allowed.");
+      setParseError(t("errOnlyXlsx"));
       return;
     }
 
@@ -70,7 +72,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
         const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
 
         if (rawRows.length === 0) {
-          setParseError("Sheet is empty. Use the template and add at least one row.");
+          setParseError(t("errEmptySheet"));
           return;
         }
 
@@ -103,18 +105,18 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
         }
 
         if (mapped.length === 0) {
-          setParseError("No data rows found. Make sure you've added rows below the header.");
+          setParseError(t("errNoRows"));
           return;
         }
         if (mapped.length > MAX_ROWS) {
-          setParseError(`Too many rows (${mapped.length.toLocaleString()}). Split the file into batches of ${MAX_ROWS.toLocaleString()} or fewer and upload them separately.`);
+          setParseError(t("errTooMany", { count: mapped.length.toLocaleString(), max: MAX_ROWS.toLocaleString() }));
           return;
         }
 
         setParsedRows(mapped);
         setFileName(file.name);
       } catch (err) {
-        setParseError(err instanceof Error ? err.message : "Failed to parse file");
+        setParseError(err instanceof Error ? err.message : t("errParseFailed"));
       }
     };
     reader.readAsArrayBuffer(file);
@@ -123,7 +125,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
   const handleSubmit = async () => {
     if (parsedRows.length === 0) return;
     setLoading(true);
-    const noun = type === "influencer" ? "influencers" : "brands";
+    const noun = type === "influencer" ? t("nounInfluencers") : t("nounBrands");
     // Hoisted out of try so the catch can still report/keep partial progress
     // if a chunk call rejects mid-run (network/timeout).
     const aggregate: BulkResult = { success: 0, failed: [] };
@@ -138,10 +140,10 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
         const chunk = parsedRows.slice(offset, offset + CHUNK_SIZE);
         // +2: row 1 is the header in the spreadsheet, so data starts at 2.
         const startRow = offset + 2;
-        setLoadingMsg(`Importing ${Math.min(offset + chunk.length, total)} of ${total} ${noun}...`);
+        setLoadingMsg(t("loadingImporting", { done: Math.min(offset + chunk.length, total), total, noun }));
         const res = await onSubmit(chunk, startRow);
         if (res && "error" in res && res.error) {
-          setParseError(`${res.error} (stopped after ${aggregate.success} imported)`);
+          setParseError(t("errStoppedAfter", { error: res.error, count: aggregate.success }));
           setLoading(false);
           if (aggregate.success > 0) router.refresh();
           return;
@@ -155,10 +157,10 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
       if (aggregate.success > 0) router.refresh();
     } catch (e) {
       // A chunk threw (network/timeout). Don't lose what already imported.
-      const base = e instanceof Error ? e.message : "Bulk import failed";
+      const base = e instanceof Error ? e.message : t("errBulkFailed");
       setParseError(
         aggregate.success > 0
-          ? `${base}. ${aggregate.success} row(s) imported before the error — re-upload only the remaining rows.`
+          ? t("errPartial", { base, count: aggregate.success })
           : base,
       );
       if (aggregate.success > 0) router.refresh();
@@ -186,7 +188,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        Bulk Invite
+        {t("inviteButton")}
       </button>
 
       {open && (
@@ -195,8 +197,8 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
           <div className="fixed z-50 inset-2 lg:inset-auto lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:w-full lg:max-w-2xl lg:max-h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800 shrink-0">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Bulk Invite {type === "influencer" ? "Influencers" : "Brands"}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Upload an .xlsx file to invite multiple {type === "influencer" ? "influencers" : "brands"} at once</p>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t("modalTitle", { entity: type === "influencer" ? t("entityInfluencers") : t("entityBrands") })}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{t("modalSubtitle", { noun: type === "influencer" ? t("nounInfluencers") : t("nounBrands") })}</p>
               </div>
               <button onClick={reset} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 cursor-pointer">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -208,31 +210,31 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
               <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-1">Step 1 — Download the template</p>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400">Use this template to make sure your data is in the right format.</p>
+                    <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-1">{t("step1Title")}</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400">{t("step1Desc")}</p>
                   </div>
                   <button onClick={downloadTemplate} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shrink-0">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    Download Template
+                    {t("downloadTemplate")}
                   </button>
                 </div>
               </div>
 
               {/* Step 2: Upload */}
               <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Step 2 — Upload filled file</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{t("step2Title")}</p>
                 <input ref={fileRef} type="file" accept=".xlsx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) parseFile(f); }} />
                 <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer transition-colors">
                   <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                   {fileName ? (
                     <div>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">{fileName}</p>
-                      <p className="text-xs text-gray-400 mt-1">{parsedRows.length} rows parsed — click to choose another file</p>
+                      <p className="text-xs text-gray-400 mt-1">{t("fileParsed", { count: parsedRows.length })}</p>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Click to upload .xlsx file</p>
-                      <p className="text-xs text-gray-400 mt-1">Only .xlsx files supported</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("uploadPrompt")}</p>
+                      <p className="text-xs text-gray-400 mt-1">{t("uploadHint")}</p>
                     </div>
                   )}
                 </div>
@@ -244,7 +246,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
               {/* Preview */}
               {parsedRows.length > 0 && !result && (
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Preview ({parsedRows.length} {parsedRows.length === 1 ? "row" : "rows"})</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{t("previewTitle", { count: parsedRows.length })}</p>
                   <div className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden max-h-48 overflow-y-auto">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
@@ -265,7 +267,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
                       </tbody>
                     </table>
                   </div>
-                  {parsedRows.length > 10 && <p className="text-[11px] text-gray-400 mt-1.5">Showing first 10 rows. {parsedRows.length - 10} more not shown.</p>}
+                  {parsedRows.length > 10 && <p className="text-[11px] text-gray-400 mt-1.5">{t("previewMore", { count: parsedRows.length - 10 })}</p>}
                 </div>
               )}
 
@@ -275,11 +277,11 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
                       <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{result.success}</p>
-                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider mt-1">Imported</p>
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider mt-1">{t("imported")}</p>
                     </div>
                     <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                       <p className="text-2xl font-bold text-red-600 dark:text-red-400">{result.failed.length}</p>
-                      <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wider mt-1">Failed</p>
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wider mt-1">{t("failed")}</p>
                     </div>
                   </div>
                   {result.failed.length > 0 && (
@@ -287,8 +289,8 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
                       <table className="w-full text-xs">
                         <thead className="bg-red-50 dark:bg-red-900/20 sticky top-0">
                           <tr>
-                            <th className="text-left px-3 py-2 font-semibold text-red-700 dark:text-red-300">Row</th>
-                            <th className="text-left px-3 py-2 font-semibold text-red-700 dark:text-red-300">Reason</th>
+                            <th className="text-left px-3 py-2 font-semibold text-red-700 dark:text-red-300">{t("colRow")}</th>
+                            <th className="text-left px-3 py-2 font-semibold text-red-700 dark:text-red-300">{t("colReason")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-red-100 dark:divide-red-900/40">
@@ -308,7 +310,7 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
 
             <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex gap-3 shrink-0">
               {result ? (
-                <button onClick={reset} className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold cursor-pointer">Done</button>
+                <button onClick={reset} className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold cursor-pointer">{t("done")}</button>
               ) : (
                 <>
                   <button
@@ -317,10 +319,10 @@ export function BulkInvite({ type, templateColumns, onSubmit }: BulkInviteProps)
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white text-sm font-semibold cursor-pointer"
                   >
                     {loading && <ButtonSpinner />}
-                    {loading ? "Importing..." : `Import ${parsedRows.length || ""} ${parsedRows.length === 1 ? "row" : "rows"}`}
+                    {loading ? t("importing") : t("importButton", { count: parsedRows.length })}
                   </button>
                   <button onClick={reset} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">
-                    Cancel
+                    {t("cancel")}
                   </button>
                 </>
               )}

@@ -49,9 +49,9 @@ export default function LoginPage() {
           {/* Logo / Header */}
           <div className="text-center mb-8">
             <img src="/logo.svg" alt="RecentGossips" className="h-9 mx-auto mb-4" />
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t("heading")}</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-              Sign in to manage the platform
+              {t("subtitle")}
             </p>
           </div>
 
@@ -69,7 +69,7 @@ export default function LoginPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
               >
-                Email
+                {t("emailLabel")}
               </label>
               <input
                 id="email"
@@ -77,7 +77,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="admin@rgossips.com"
+                placeholder={t("emailPlaceholder")}
                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               />
             </div>
@@ -87,7 +87,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5"
               >
-                Password
+                {t("passwordLabel")}
               </label>
               <div className="relative">
                 <input
@@ -123,13 +123,13 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-all cursor-pointer shadow-lg"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? t("signingIn") : t("signIn")}
             </button>
           </form>
         </div>
 
         <p className="text-center text-white/60 dark:text-gray-600 text-xs mt-6">
-          RGossips Admin Panel &mdash; Authorized access only
+          {t("footer")}
         </p>
       </div>
     </div>

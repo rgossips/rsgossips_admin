@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 
 // Generic inline editor for an admin-editable string (used for the
 // influencer-home section titles backed by public.homepage_settings).
@@ -23,6 +24,7 @@ export function SectionTitleEditor({
   maxLength?: number;
   onSave: (value: string) => Promise<{ error?: string; ok?: boolean }>;
 }) {
+  const t = useTranslations("SectionTitleEditor");
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initialTitle);
   const [savedTitle, setSavedTitle] = useState(initialTitle);
@@ -59,7 +61,7 @@ export function SectionTitleEditor({
               }}
               className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
             >
-              Edit
+              {t("edit")}
             </button>
           )}
         </div>
@@ -85,7 +87,7 @@ export function SectionTitleEditor({
                 }}
                 className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -93,7 +95,7 @@ export function SectionTitleEditor({
                 disabled={saving || !value.trim()}
                 className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold disabled:opacity-50 cursor-pointer"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving ? t("saving") : t("save")}
               </button>
             </div>
           </div>

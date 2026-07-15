@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 // Builds a URL preserving the existing query params with one key overridden.
 // `currentParams` should be the awaited searchParams from the route.
@@ -53,6 +54,7 @@ export function Pagination({
   perPage: number;
   total: number;
 }) {
+  const t = useTranslations("Pagination");
   if (total <= perPage) return null;
   const totalPages = Math.max(1, Math.ceil(total / perPage));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -74,13 +76,19 @@ export function Pagination({
   return (
     <div className="flex items-center justify-between mt-6 flex-wrap gap-3">
       <p className="text-[12px] text-gray-500 dark:text-gray-400">
-        Showing <span className="font-semibold text-gray-700 dark:text-gray-200">{from}–{to}</span> of <span className="font-semibold text-gray-700 dark:text-gray-200">{total}</span>
+        {t.rich("showing", {
+          range: `${from}–${to}`,
+          count: total,
+          b: (chunks) => (
+            <span className="font-semibold text-gray-700 dark:text-gray-200">{chunks}</span>
+          ),
+        })}
       </p>
       <div className="flex items-center gap-1.5">
         {safePage > 1 ? (
-          <Link href={pageLink(safePage - 1)} className={`${btn} ${enabled}`}>‹ Prev</Link>
+          <Link href={pageLink(safePage - 1)} className={`${btn} ${enabled}`}>‹ {t("prev")}</Link>
         ) : (
-          <span className={`${btn} ${disabled}`} aria-disabled>‹ Prev</span>
+          <span className={`${btn} ${disabled}`} aria-disabled>‹ {t("prev")}</span>
         )}
         {pages.map((p, i) =>
           p === "…" ? (
@@ -92,9 +100,9 @@ export function Pagination({
           ),
         )}
         {safePage < totalPages ? (
-          <Link href={pageLink(safePage + 1)} className={`${btn} ${enabled}`}>Next ›</Link>
+          <Link href={pageLink(safePage + 1)} className={`${btn} ${enabled}`}>{t("next")} ›</Link>
         ) : (
-          <span className={`${btn} ${disabled}`} aria-disabled>Next ›</span>
+          <span className={`${btn} ${disabled}`} aria-disabled>{t("next")} ›</span>
         )}
       </div>
     </div>

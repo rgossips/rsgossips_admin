@@ -1,9 +1,0 @@
-{
-  "DashboardCampaigns": {
-    "title": "Campaigns",
-    "subtitle": "Track and manage influencer campaigns",
-    "newCampaign": "New Campaign",
-    "loadError": "Failed to load campaigns: {message}",
-    "count": "{count, plural, one {# campaign} other {# campaigns}}"
-  }
-}

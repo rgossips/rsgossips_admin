@@ -1,6 +1,0 @@
-{
-  "DashboardLoadTest": {
-    "title": "Load Test",
-    "description": "Fires read-only requests at the live edge functions and reports latency percentiles. Runs from the admin server (service key never leaves it). Concurrency is hard-capped at 20 virtual users × 20 iterations per scenario — this is a smoke-level check against production, not a stress rig."
-  }
-}

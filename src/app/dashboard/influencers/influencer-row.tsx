@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { toggleInfluencerStatus } from "./actions";
 import { Avatar } from "@/components/avatar";
 import { useRole } from "@/components/role-context";
@@ -17,13 +18,18 @@ interface Influencer {
 }
 
 export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string | null }) {
+  const t = useTranslations("DashboardInfluencersInfluencerRow");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(inf.status);
   const { isAdmin } = useRole();
 
   const handleToggle = async () => {
-    const action = status === "active" ? "suspend" : "reactivate";
-    if (!confirm(`Are you sure you want to ${action} ${inf.full_name || inf.username}?`)) return;
+    const name = inf.full_name || inf.username || "";
+    const confirmMsg =
+      status === "active"
+        ? t("confirmSuspend", { name })
+        : t("confirmReactivate", { name });
+    if (!confirm(confirmMsg)) return;
 
     setLoading(true);
     const result = await toggleInfluencerStatus(inf.influencer_id, status || "");
@@ -92,7 +98,7 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
               : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
           }`}
         >
-          {status || "unknown"}
+          {status || t("unknown")}
         </span>
       </td>
       <td className="px-6 py-4">
@@ -121,10 +127,10 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
             </svg>
           )}
           {loading
-            ? "Processing..."
+            ? t("processing")
             : status === "active"
-            ? "Suspend"
-            : "Reactivate"}
+            ? t("suspend")
+            : t("reactivate")}
         </button>
         ) : (
           <span className="text-xs text-gray-400 dark:text-gray-600">—</span>

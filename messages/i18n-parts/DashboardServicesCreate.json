@@ -1,8 +1,0 @@
-{
-  "DashboardServicesCreate": {
-    "backToServices": "← Services",
-    "title": "New service",
-    "subtitle": "Once published, this service appears in the influencer-side catalogue immediately.",
-    "submitLabel": "Publish Service"
-  }
-}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/utils/supabase/client";
 
 interface Notification {
@@ -14,6 +15,7 @@ interface Notification {
 }
 
 export function NotificationBell() {
+  const t = useTranslations("NotificationBell");
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,9 +55,9 @@ export function NotificationBell() {
 
         for (const q of quotesRes.data || []) {
           const labelByStatus: Record<string, string> = {
-            pending_quote: "Awaiting quote",
-            counter_offered: "Counter offer received",
-            revision_requested: "Revision requested",
+            pending_quote: t("status.pending_quote"),
+            counter_offered: t("status.counter_offered"),
+            revision_requested: t("status.revision_requested"),
           };
           items.push({
             id: `quote-${q.id}`,
@@ -69,11 +71,11 @@ export function NotificationBell() {
 
         for (const a of appsRes.data || []) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const campaignTitle = (a as any).campaigns?.title || "Campaign";
+          const campaignTitle = (a as any).campaigns?.title || t("campaignFallback");
           items.push({
             id: `app-${a.id}`,
             type: "submission",
-            title: "Deliverables submitted",
+            title: t("deliverablesSubmitted"),
             subtitle: campaignTitle,
             href: `/dashboard/campaigns/${a.campaign_id}`,
             time: a.updated_at || a.created_at,
@@ -92,10 +94,10 @@ export function NotificationBell() {
     };
 
     load();
-    const t = setInterval(load, 20_000);
+    const interval = setInterval(load, 20_000);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearInterval(interval);
     };
   }, []);
 
@@ -104,12 +106,12 @@ export function NotificationBell() {
     const now = Date.now();
     const diff = now - d.getTime();
     const mins = Math.floor(diff / 60_000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t("time.justNow");
+    if (mins < 60) return t("time.minutesAgo", { count: mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t("time.hoursAgo", { count: hours });
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
+    if (days < 7) return t("time.daysAgo", { count: days });
     return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
@@ -132,19 +134,19 @@ export function NotificationBell() {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden z-50">
           <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Notifications</h3>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">{t("title")}</h3>
             <span className="text-[10px] font-semibold text-gray-400">{notifications.length}</span>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
-              <div className="p-6 text-center text-xs text-gray-400">Loading...</div>
+              <div className="p-6 text-center text-xs text-gray-400">{t("loading")}</div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center">
                 <svg className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
-                <p className="text-sm text-gray-500 dark:text-gray-400">You're all caught up</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">No items awaiting action</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("empty.title")}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t("empty.subtitle")}</p>
               </div>
             ) : (
               notifications.map((n) => (

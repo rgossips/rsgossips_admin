@@ -17,5 +17,1847 @@
       "operations": "Operations",
       "adminPanel": "Admin Panel"
     }
+  },
+  "AuthCallback": {
+    "invalidLink": "Invalid or expired link. Please request a new invitation.",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "passwordsMismatch": "Passwords do not match",
+    "resetTitle": "Reset Your Password",
+    "welcomeTitle": "Welcome — Set Your Password",
+    "errorTitle": "Something went wrong",
+    "verifyingTitle": "Verifying your link...",
+    "choosePassword": "Choose a password to access the admin panel.",
+    "newPasswordLabel": "New Password",
+    "passwordPlaceholder": "At least 8 characters",
+    "confirmPasswordLabel": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter the password",
+    "saving": "Saving...",
+    "setPasswordCta": "Set password and continue",
+    "backToLogin": "Back to login"
+  },
+  "BulkInvite": {
+    "inviteButton": "Bulk Invite",
+    "modalTitle": "Bulk Invite {entity}",
+    "modalSubtitle": "Upload an .xlsx file to invite multiple {noun} at once",
+    "entityInfluencers": "Influencers",
+    "entityBrands": "Brands",
+    "nounInfluencers": "influencers",
+    "nounBrands": "brands",
+    "step1Title": "Step 1 — Download the template",
+    "step1Desc": "Use this template to make sure your data is in the right format.",
+    "downloadTemplate": "Download Template",
+    "step2Title": "Step 2 — Upload filled file",
+    "fileParsed": "{count, plural, one {# row parsed} other {# rows parsed}} — click to choose another file",
+    "uploadPrompt": "Click to upload .xlsx file",
+    "uploadHint": "Only .xlsx files supported",
+    "previewTitle": "Preview ({count, plural, one {# row} other {# rows}})",
+    "previewMore": "Showing first 10 rows. {count} more not shown.",
+    "imported": "Imported",
+    "failed": "Failed",
+    "colRow": "Row",
+    "colReason": "Reason",
+    "done": "Done",
+    "importButton": "{count, plural, one {Import # row} other {Import # rows}}",
+    "importing": "Importing...",
+    "cancel": "Cancel",
+    "loadingImporting": "Importing {done} of {total} {noun}...",
+    "errOnlyXlsx": "Only .xlsx files are allowed.",
+    "errEmptySheet": "Sheet is empty. Use the template and add at least one row.",
+    "errNoRows": "No data rows found. Make sure you've added rows below the header.",
+    "errTooMany": "Too many rows ({count}). Split the file into batches of {max} or fewer and upload them separately.",
+    "errParseFailed": "Failed to parse file",
+    "errStoppedAfter": "{error} (stopped after {count} imported)",
+    "errBulkFailed": "Bulk import failed",
+    "errPartial": "{base}. {count} row(s) imported before the error — re-upload only the remaining rows."
+  },
+  "ConfirmDialog": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "working": "Working…"
+  },
+  "Dashboard": {
+    "title": "Dashboard",
+    "loadError": "Failed to load dashboard: {message}",
+    "unknownError": "Unknown error",
+    "weekLabel": "Week {n}",
+    "stats": {
+      "totalInfluencers": "Total Influencers",
+      "totalBrands": "Total Brands",
+      "totalCampaigns": "Total Campaigns",
+      "pendingReviews": "Pending Reviews"
+    },
+    "welcome": {
+      "title": "Welcome to the Admin Panel",
+      "subtitle": "Manage influencers, brands, and campaigns all in one place. Monitor platform activity and keep things running smoothly.",
+      "newCampaign": "New Campaign",
+      "viewInfluencers": "View Influencers"
+    },
+    "disputes": {
+      "heading": "{count, plural, one {# open escrow dispute — needs review} other {# open escrow disputes — needs review}}",
+      "viewAll": "View all →",
+      "campaignFallback": "Campaign",
+      "brandFallback": "Brand",
+      "creatorFallback": "Creator"
+    },
+    "verif": {
+      "influencer": "Influencer Verifications",
+      "brand": "Brand Verifications",
+      "campaign": "Campaign Approvals"
+    },
+    "charts": {
+      "fulfilment": {
+        "title": "Fulfilment Stats",
+        "subtitle": "Campaigns Completed vs Ongoing",
+        "completed": "Completed",
+        "ongoing": "Ongoing"
+      },
+      "signups": {
+        "title": "Monthly Signups",
+        "subtitle": "Influencer & Brand Registrations",
+        "influencer": "Influencer",
+        "business": "Business"
+      },
+      "weekly": {
+        "title": "Weekly New Campaigns",
+        "subtitle": "Campaign creation over the last 4 weeks"
+      }
+    }
+  },
+  "DashboardAdmins": {
+    "title": "Admin Users",
+    "subtitle": "Manage who can access this admin panel",
+    "loadError": "Failed to load admins: {message}"
+  },
+  "DashboardAdminsAdminRow": {
+    "roles": {
+      "superAdmin": "Super Admin",
+      "admin": "Admin",
+      "viewer": "Viewer"
+    },
+    "status": {
+      "active": "Active",
+      "linkVerified": "Link verified",
+      "pendingInvite": "Pending invite"
+    },
+    "revoke": {
+      "cancelTitle": "Cancel invitation for {name}?",
+      "revokeTitle": "Revoke admin access for {name}?",
+      "cancelDescription": "Their pending invite will be cancelled and the email will no longer work. They will need a new invitation to join.",
+      "revokeDescription": "They will lose access immediately and their authentication account will be removed. This cannot be undone — you'll need to invite them again to restore access.",
+      "cancelConfirm": "Cancel invitation",
+      "revokeConfirm": "Revoke access",
+      "keep": "Keep"
+    },
+    "you": "(you)",
+    "resendSuccess": "Invitation email resent.",
+    "sending": "Sending...",
+    "resendInvite": "Resend invite",
+    "removing": "Removing...",
+    "cancelInvite": "Cancel invite",
+    "revokeAccess": "Revoke access"
+  },
+  "DashboardAdminsAdminsList": {
+    "searchPlaceholder": "Search by name or email...",
+    "roleAll": "All Roles",
+    "roleSuperAdmin": "Super Admin",
+    "roleAdmin": "Admin",
+    "roleViewer": "Viewer",
+    "clearFilters": "Clear filters",
+    "colName": "Name",
+    "colEmail": "Email",
+    "colRole": "Role",
+    "colStatus": "Status",
+    "colAdded": "Added",
+    "colActions": "Actions",
+    "noResults": "No admin users match these filters"
+  },
+  "DashboardAdminsInviteForm": {
+    "progress": {
+      "preparing": "Preparing invitation…",
+      "generatingLink": "Generating secure link…",
+      "sendingEmail": "Sending email…",
+      "sendingInvitation": "Sending invitation…"
+    },
+    "successMessage": "Invite sent successfully!",
+    "inviteAdmin": "Invite Admin",
+    "inviteNewAdmin": "Invite New Admin",
+    "fullNameLabel": "Full Name",
+    "fullNamePlaceholder": "John Doe",
+    "emailLabel": "Email",
+    "emailPlaceholder": "user@example.com",
+    "roleLabel": "Role",
+    "roleAdmin": "Admin",
+    "roleViewer": "Viewer",
+    "roleSuperAdmin": "Super Admin",
+    "sending": "Sending...",
+    "sendInvite": "Send Invite",
+    "cancel": "Cancel"
+  },
+  "DashboardBrands": {
+    "title": "Brands",
+    "subtitle": "Manage registered brands and invitations",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Search by brand name...",
+      "verification": "Verification",
+      "pending": "Pending",
+      "verified": "Verified",
+      "rejected": "Rejected",
+      "notApplied": "Not Applied"
+    },
+    "tabs": {
+      "all": "All",
+      "registered": "Registered",
+      "invited": "Invited"
+    },
+    "brandsLoadError": "Failed to load brands: {message}",
+    "invitesLoadError": "Failed to load invitations: {message}",
+    "columns": {
+      "brandName": "Brand Name",
+      "contactNumber": "Contact Number",
+      "verification": "Verification",
+      "gstin": "GSTIN",
+      "actions": "Actions"
+    },
+    "noRegisteredBrands": "No registered brands found",
+    "pendingInvitations": "Pending Invitations",
+    "noPendingInvitations": "No pending invitations",
+    "inviteHint": "Click \"Invite Brand\" above to create one"
+  },
+  "DashboardBrandsAddBrandForm": {
+    "uploadingIcon": "Uploading brand icon...",
+    "creatingInvitation": "Creating brand invitation...",
+    "invitationCreatedSuccess": "Brand invitation created! The brand can now sign up via Instagram.",
+    "somethingWentWrong": "Something went wrong",
+    "inviteBrand": "Invite Brand",
+    "inviteNewBrand": "Invite New Brand",
+    "inviteNewBrandSubtitle": "Create a placeholder — brand will claim it via Instagram login",
+    "brandIcon": "Brand Icon",
+    "iconAlt": "Icon",
+    "brandNameLabel": "Brand Name",
+    "brandNamePlaceholder": "e.g. Nike India",
+    "instagramUsernameLabel": "Instagram Username",
+    "instagramUsernamePlaceholder": "nikeindia",
+    "categoryLabel": "Category",
+    "selectCategory": "Select category",
+    "instagramVerifiedLabel": "Instagram Verified",
+    "yes": "Yes",
+    "no": "No",
+    "notesLabel": "Notes",
+    "optional": "(optional)",
+    "notesPlaceholder": "e.g. Partnership contact: john@nike.com",
+    "howThisWorks": "How this works:",
+    "howStep1": "You create an invitation with the brand's Instagram handle",
+    "howStep2": "Brand opens RecentGossips app and connects their Instagram",
+    "howStep3": "If the handle matches, they see a \"Complete your profile\" screen",
+    "howStep4": "Brand fills in GSTIN, phone, and verifies — account becomes active",
+    "creating": "Creating...",
+    "createInvitation": "Create Invitation",
+    "cancel": "Cancel"
+  },
+  "DashboardBrandsBrandRow": {
+    "verify": "Verify",
+    "reject": "Reject",
+    "reset": "Reset"
+  },
+  "DashboardBrandsBulkInviteBrands": {
+    "brandName": {
+      "label": "Brand Name",
+      "example": "Nike India",
+      "helper": "Required"
+    },
+    "instagramUsername": {
+      "label": "Instagram Username",
+      "example": "nikeindia",
+      "helper": "Required (without @)"
+    },
+    "category": {
+      "label": "Category",
+      "example": "Fashion & Lifestyle",
+      "helper": "Optional"
+    },
+    "instagramVerified": {
+      "label": "Instagram Verified",
+      "example": "yes",
+      "helper": "Optional (yes/no)"
+    },
+    "notes": {
+      "label": "Notes",
+      "example": "Partnership contact: john@nike.com",
+      "helper": "Optional"
+    }
+  },
+  "DashboardBrandsId": {
+    "unknown": "Unknown",
+    "invited": "Invited",
+    "brand": "Brand",
+    "all": "All",
+    "draft": "Draft",
+    "active": "Active",
+    "completed": "Completed",
+    "campaigns": "Campaigns",
+    "newCampaign": "+ New Campaign",
+    "admin": "Admin",
+    "noCampaignsFound": "No campaigns found",
+    "createFromCampaignsPage": "Create one from the Campaigns page",
+    "overview": "Overview",
+    "statusLabel": "Status",
+    "verification": "Verification",
+    "awaitingClaim": "Awaiting Claim",
+    "tier": "Tier",
+    "listing": "Listing",
+    "source": "Source",
+    "completion": "Completion",
+    "category": "Category",
+    "igVerified": "IG Verified",
+    "yes": "Yes",
+    "contact": "Contact",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "website": "Website",
+    "gstin": "GSTIN",
+    "legalName": "Legal Name",
+    "tradeName": "Trade Name",
+    "state": "State",
+    "timeline": "Timeline",
+    "created": "Created",
+    "updated": "Updated",
+    "rawData": "Raw Data"
+  },
+  "DashboardBrandsIdEditBrand": {
+    "edit": "Edit",
+    "title": "Edit Brand",
+    "logoAlt": "Logo",
+    "brandLogo": "Brand Logo",
+    "clickToChange": "Click to change. JPG, PNG, WebP.",
+    "brandName": "Brand Name",
+    "instagramUsername": "Instagram Username",
+    "contactName": "Contact Name",
+    "contactRole": "Contact Role",
+    "contactEmail": "Contact Email",
+    "contactPhone": "Contact Phone",
+    "website": "Website",
+    "gstin": "GSTIN",
+    "status": "Status",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "statusSuspended": "Suspended",
+    "verification": "Verification",
+    "verifNotApplied": "Not Applied",
+    "verifPending": "Pending",
+    "verifVerified": "Verified",
+    "verifRejected": "Rejected",
+    "tier": "Tier",
+    "tierNone": "None",
+    "tierBronze": "Bronze",
+    "tierSilver": "Silver",
+    "tierGold": "Gold",
+    "tierPlatinum": "Platinum",
+    "listingType": "Listing Type",
+    "listingFree": "Free",
+    "listingPremium": "Premium",
+    "monthlyBudgetRange": "Monthly Budget Range",
+    "monthlyBudgetPlaceholder": "e.g. 50K - 1L",
+    "preferredInfluencerTier": "Preferred Influencer Tier",
+    "preferredTierPlaceholder": "e.g. micro, macro",
+    "shortDescription": "Short Description",
+    "fullDescription": "Full Description",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel"
+  },
+  "DashboardBrandsInvitedBrandRow": {
+    "awaitingClaim": "Awaiting Claim",
+    "verified": "Verified",
+    "created": "Created {date}",
+    "sendInvite": "Send invite",
+    "edit": "Edit",
+    "remove": "Remove",
+    "removeInvitationTitle": "Remove invitation for @{username}?",
+    "removeInvitation": "Remove invitation",
+    "bulletCampaigns": "All campaigns created for this invited brand",
+    "bulletApplications": "Every application on those campaigns",
+    "bulletFeaturedListings": "Any Featured Campaigns listings",
+    "bulletInvitationItself": "The invitation itself",
+    "somethingWentWrong": "Something went wrong",
+    "editBrandInvitation": "Edit Brand Invitation",
+    "brandLogo": "Brand Logo",
+    "clickToChangeLogo": "Click the square to change the logo.",
+    "clickToUploadLogo": "Click the square to upload the logo.",
+    "removeLogo": "Remove logo",
+    "brandNameLabel": "Brand Name *",
+    "instagramLabel": "Instagram *",
+    "category": "Category",
+    "none": "None",
+    "instagramVerified": "Instagram Verified",
+    "yes": "Yes",
+    "no": "No",
+    "notes": "Notes",
+    "saving": "Saving...",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "DashboardCampaigns": {
+    "title": "Campaigns",
+    "subtitle": "Track and manage influencer campaigns",
+    "newCampaign": "New Campaign",
+    "loadError": "Failed to load campaigns: {message}",
+    "count": "{count, plural, one {# campaign} other {# campaigns}}"
+  },
+  "DashboardCampaignsCampaignFilters": {
+    "searchPlaceholder": "Search campaigns or brands...",
+    "allFilters": "All Filters",
+    "category": "Category",
+    "all": "All",
+    "moreCount": "{count, plural, one {+# more} other {+# more}}",
+    "resetAll": "Reset all",
+    "filters": "Filters",
+    "reset": "Reset",
+    "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+    "statusLabel": "Status",
+    "applyFilters": "Apply Filters",
+    "status": {
+      "all": "All",
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    }
+  },
+  "DashboardCampaignsCampaignsTable": {
+    "bulkDelete": {
+      "title": "Delete {count, plural, one {# campaign} other {# campaigns}}?",
+      "description": "This permanently removes the selected campaigns, all of their applications, and any featured-campaign listings. This cannot be undone.",
+      "confirmLabel": "Delete {count}"
+    },
+    "cancel": "Cancel",
+    "selectedCount": "{count} selected",
+    "clear": "Clear",
+    "deleting": "Deleting…",
+    "deleteCount": "Delete {count}",
+    "selectAll": "Select all",
+    "columns": {
+      "title": "Title",
+      "brand": "Brand",
+      "status": "Status",
+      "slots": "Slots",
+      "dates": "Dates"
+    },
+    "empty": {
+      "title": "No campaigns found",
+      "subtitle": "Try adjusting your filters or create a new campaign"
+    },
+    "selectRow": "Select {title}",
+    "campaignFallback": "campaign",
+    "invited": "Invited",
+    "dateRangeTo": "to {date}"
+  },
+  "DashboardCampaignsCreate": {
+    "title": "Create Campaign",
+    "subtitle": "Fill in the details to launch a new influencer campaign"
+  },
+  "DashboardCampaignsCreateCreateCampaignForm": {
+    "loading": {
+      "savingCampaign": "Saving campaign...",
+      "creatingCampaign": "Creating campaign...",
+      "uploadingBanner": "Uploading banner image...",
+      "uploadingGallery": "Uploading gallery image {current} of {total}..."
+    },
+    "errors": {
+      "addDeliverable": "Add at least 1 deliverable",
+      "selectCategory": "Select at least 1 category",
+      "selectPlatform": "Select at least 1 platform",
+      "somethingWentWrong": "Something went wrong"
+    },
+    "cards": {
+      "basicInfo": "Basic information",
+      "productService": "Product / service",
+      "bannerImage": "Banner image",
+      "gallery": "Gallery",
+      "contentDeliverables": "Content deliverables · {count, plural, one {# piece} other {# pieces}}",
+      "influencerRequirements": "Influencer requirements",
+      "contentGuidelines": "Content guidelines",
+      "termsRights": "Terms & rights",
+      "platforms": "Platforms *",
+      "categories": "Categories · {selected} of {total}",
+      "schedule": "Schedule",
+      "saveChanges": "Save changes",
+      "submit": "Submit"
+    },
+    "fields": {
+      "campaignTitle": "Campaign Title",
+      "description": "Description",
+      "brand": "Brand",
+      "campaignType": "Campaign Type",
+      "status": "Status",
+      "totalSlots": "Total Slots",
+      "totalBudget": "Total Budget",
+      "budgetPerInfluencer": "Budget / Influencer",
+      "productValue": "Product value (approx.)",
+      "whatPromoting": "What are you promoting?",
+      "willBeShipped": "Will product be shipped?",
+      "shippingTimeline": "Shipping timeline (days)",
+      "serviceLocation": "Service location",
+      "compensation": "What does the influencer get? (compensation)",
+      "influencerTier": "Influencer Tier",
+      "minFollowers": "Min. Followers",
+      "maxFollowers": "Max. Followers",
+      "minEngagement": "Min. Engagement Rate (%)",
+      "locations": "Locations",
+      "preferredGender": "Preferred gender",
+      "preferredLanguages": "Preferred languages",
+      "mustInclude": "Must include (Do's)",
+      "mustAvoid": "Must avoid (Don'ts)",
+      "requiredHashtags": "Required hashtags",
+      "brandHandles": "Brand handle(s) to tag",
+      "usageRights": "Content usage rights",
+      "keepupDuration": "Content keep-up duration",
+      "exclusivity": "Exclusivity (no competing brands)",
+      "paymentTimeline": "Payment timeline",
+      "startDate": "Start Date",
+      "applicationDeadline": "Application Deadline",
+      "campaignEndDate": "Campaign End Date"
+    },
+    "placeholders": {
+      "campaignTitle": "e.g. Summer Fashion 2026",
+      "description": "What is this campaign about?\n\nWhat do you want the influencer to highlight?\n\nAny specific messaging or hashtags?",
+      "productNameProduct": "e.g. \"Moisturizing cream — 50ml tube\"",
+      "productNameService": "e.g. \"Weekend stay at our Mussoorie resort\"",
+      "serviceLocation": "e.g. \"Mussoorie, India\" or \"Online / virtual\"",
+      "compensationProduct": "e.g. \"Full skincare kit worth ₹3,500\"",
+      "compensationService": "e.g. \"Free 2-night stay + meals + spa session\"",
+      "contentDos": "\"Show product packaging, mention discount code SAVE20\"",
+      "contentDonts": "\"No competitor products, no copyrighted music\""
+    },
+    "hints": {
+      "description": "A guided template helps creators understand what you need.",
+      "budgetAutoCalc": "Auto-calculated from total ÷ slots",
+      "serviceLocation": "Where the influencer experiences the service.",
+      "applicationDeadline": "Last day for influencers to apply.",
+      "campaignEndDate": "All content must be delivered by this date.",
+      "createdAsDraft": "Campaign will be created as a draft"
+    },
+    "options": {
+      "selectBrand": "Select a brand"
+    },
+    "brandInvitedSuffix": " (Invited)",
+    "campaignType": {
+      "barter": "Barter",
+      "paid": "Paid",
+      "hybrid": "Hybrid"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    },
+    "offering": {
+      "product": "📦 Product",
+      "service": "🛎️ Service / Experience"
+    },
+    "shipping": {
+      "no": "No",
+      "yes": "Yes",
+      "pickup": "Pickup required"
+    },
+    "alt": {
+      "bannerPreview": "Banner preview",
+      "existingBanner": "Existing banner",
+      "gallery": "Gallery {index}"
+    },
+    "actions": {
+      "remove": "Remove",
+      "replace": "Replace",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "creating": "Creating...",
+      "saveChanges": "Save Changes",
+      "createCampaign": "Create Campaign"
+    },
+    "banner": {
+      "uploadPrompt": "Click or drag to upload",
+      "uploadHint": "PNG, JPG, WebP up to 10MB"
+    },
+    "gallery": {
+      "newBadge": "NEW",
+      "addMore": "Add more images",
+      "uploadPrompt": "Click or drag to upload images"
+    },
+    "deliverables": {
+      "reels": "Reels",
+      "posts": "Posts",
+      "stories": "Stories",
+      "videos": "Videos",
+      "blogs": "Blogs",
+      "required": "At least 1 deliverable is required."
+    },
+    "tier": {
+      "all": "All Tiers",
+      "nano": "Nano (1K-10K)",
+      "micro": "Micro (10K-100K)",
+      "macro": "Macro (100K-1M)",
+      "mega": "Mega (1M+)"
+    },
+    "allIndia": "All India",
+    "usageRights": {
+      "creatorOnly": "Influencer's page only",
+      "brandRepost": "Brand can repost",
+      "paidAds": "Brand can use in paid ads",
+      "fullRights": "Full rights transfer"
+    },
+    "keepup": {
+      "24h": "24 hours (stories)",
+      "7d": "7 days",
+      "30d": "30 days",
+      "permanent": "Permanent"
+    },
+    "exclusivity": {
+      "7": "7 days",
+      "15": "15 days",
+      "30": "30 days",
+      "60": "60 days",
+      "90": "90 days",
+      "none": "No exclusivity"
+    },
+    "payment": {
+      "advance": "Advance",
+      "onApproval": "On content approval",
+      "within7days": "Within 7 days of posting",
+      "within30days": "Within 30 days"
+    },
+    "platforms": {
+      "selectAtLeastOne": "Select at least 1 platform."
+    },
+    "categories": {
+      "selectAtLeastOne": "Select at least 1 category."
+    }
+  },
+  "DashboardCampaignsId": {
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    },
+    "tier": {
+      "nano": "Nano (1K-10K)",
+      "micro": "Micro (10K-100K)",
+      "macro": "Macro (100K-1M)",
+      "mega": "Mega (1M+)",
+      "all": "All Tiers"
+    },
+    "type": {
+      "barter": "Barter",
+      "paid": "Paid",
+      "hybrid": "Hybrid"
+    },
+    "campaignFallbackTitle": "Campaign",
+    "invited": "Invited",
+    "byAdmin": "By Admin",
+    "created": "Created {date}",
+    "campaignBannerAlt": "Campaign Banner",
+    "description": "Description",
+    "contentDeliverables": "Content Deliverables",
+    "influencerRequirements": "Influencer Requirements",
+    "followerRange": "Follower Range",
+    "influencerTier": "Influencer Tier",
+    "minEngagementRate": "Min. Engagement Rate",
+    "targetCities": "Target Cities",
+    "gallery": "Gallery",
+    "galleryImages": "{count, plural, one {# image} other {# images}}",
+    "galleryImageAlt": "Gallery {index}",
+    "rawCampaignData": "Raw Campaign Data",
+    "overview": "Overview",
+    "slots": "Slots",
+    "slotsValue": "{available} / {total} available",
+    "campaignType": "Campaign Type",
+    "budgetTotal": "Budget Total",
+    "perInfluencer": "Per Influencer",
+    "schedule": "Schedule",
+    "startDate": "Start Date",
+    "applicationDeadline": "Application Deadline",
+    "campaignEndDate": "Campaign End Date",
+    "daysRemaining": "Days Remaining",
+    "campaignEnded": "Campaign Ended",
+    "categories": "Categories"
+  },
+  "DashboardCampaignsIdApplications": {
+    "applications": "Applications",
+    "pendingCount": "{count} pending",
+    "approvedCount": "{count} approved",
+    "status": {
+      "pending": "Pending Review",
+      "approved": "Waiting for Submission",
+      "submitted": "Submitted — Review Deliverables",
+      "revision_needed": "Revision Needed",
+      "accepted": "Accepted",
+      "live_submitted": "Live Links Submitted",
+      "payment": "Payment Processing",
+      "completed": "Completed",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn"
+    },
+    "overrideConfirm": "Change status from \"{from}\" to \"{to}\"?",
+    "selectAtLeastOneDeliverable": "Please select at least one deliverable that needs revision.",
+    "unknown": "Unknown",
+    "followersMeta": "{count} followers",
+    "engagementRateMeta": "{rate}% ER",
+    "proposedRate": "Proposed ₹{amount}",
+    "clickToOverrideStatus": "Click to override status",
+    "reviewAndApprove": "Review & Approve",
+    "reject": "Reject",
+    "submittedProfile": "Submitted Profile",
+    "autoFilledFromInfluencer": "Auto-filled from influencer",
+    "fullName": "Full Name",
+    "notSet": "Not set",
+    "email": "Email",
+    "phone": "Phone",
+    "fromAuth": "(from auth)",
+    "instagram": "Instagram",
+    "notConnected": "Not connected",
+    "followers": "Followers",
+    "engagementRate": "Engagement Rate",
+    "viewMediaKit": "View Media Kit",
+    "published": "Published",
+    "categories": "Categories",
+    "bio": "Bio",
+    "influencersProposedRate": "Influencer's Proposed Rate",
+    "notSpecified": "Not specified",
+    "campaignBudgetPerInfluencer": "Campaign budget per influencer: ₹{amount}",
+    "yourPaymentDecision": "Your Payment Decision",
+    "approvedAmount": "Approved Amount (₹)",
+    "noteOptional": "Note (optional)",
+    "notePlaceholder": "e.g. Great profile, approved for Reels",
+    "escrowPayment": "Escrow Payment",
+    "escrowHeldNote": "This amount will be held by RecentGossips as escrow.",
+    "escrowTransferNote": "Payment will only be transferred to the influencer once the deliverables are completed to satisfaction.",
+    "escrowRefundNote": "If the application is rejected at any stage, the full amount will be refunded.",
+    "processing": "Processing...",
+    "approveAndHold": "Approve & Hold ₹{amount}",
+    "cancel": "Cancel",
+    "liveLinksForReview": "Live Links for Review",
+    "deliverableLinks": "Deliverable Links",
+    "linksPostedLive": "{count, plural, one {# link} other {# links}} posted live by influencer",
+    "linksSubmitted": "{count, plural, one {# link} other {# links}} submitted by influencer",
+    "deliverableN": "Deliverable {n}",
+    "acceptDeliverables": "Accept Deliverables",
+    "needRevision": "Need Revision",
+    "releasePayment": "Release Payment",
+    "markAsCompleted": "Mark as Completed",
+    "selectDeliverablesRevision": "Select deliverables that need revision:",
+    "revisionNote": "Revision Note",
+    "revisionNotePlaceholder": "Explain what needs to be changed...",
+    "sendForRevision": "Send for Revision ({count} selected)",
+    "rejectionReasonPlaceholder": "Reason for rejection (optional)",
+    "confirmReject": "Confirm Reject",
+    "revisionRequested": "Revision Requested",
+    "linksToRevise": "Links to revise:",
+    "link": "Link",
+    "heldInEscrow": "<b>₹{amount}</b> held in escrow — will be released on acceptance",
+    "deliverablesAcceptedWaiting": "Deliverables accepted. Waiting for influencer to post live and submit links.",
+    "liveLinksSubmittedVerify": "Live links submitted. Verify posts are published and release payment.",
+    "paymentReleasedWithAmount": "Payment released — ₹{amount}. Mark as completed after payment is transferred.",
+    "paymentReleased": "Payment released. Mark as completed after payment is transferred.",
+    "rejectedReason": "Rejected: {reason}",
+    "appliedDate": "Applied {date}"
+  },
+  "DashboardCampaignsIdDetailActions": {
+    "statuses": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "completed": "Completed"
+    },
+    "confirmComplete": "Mark this campaign as completed? Applications won't change but the campaign will no longer accept new ones.",
+    "campaignStatusLabel": "Campaign status"
+  },
+  "DashboardCampaignsIdEdit": {
+    "editCampaign": "Edit Campaign",
+    "untitledCampaign": "Untitled campaign"
+  },
+  "DashboardCampaignsIdEditCampaign": {
+    "edit": "Edit"
+  },
+  "DashboardCreatorStories": {
+    "title": "Creator Stories",
+    "subtitle": "Vertical reels shown in the Top Creator Stories carousel on the brand home page.",
+    "newStory": "New story",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "empty": {
+      "line1": "No stories yet. Click <emph>New story</emph> to upload one.",
+      "line2": "Until you publish at least one, the brand home page falls back to a built-in list."
+    },
+    "noPreview": "no preview",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "statusActive": "Active",
+    "statusHidden": "Hidden",
+    "edit": "Edit",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete"
+  },
+  "DashboardCreatorStoriesComponentsSectionTitleEditor": {
+    "label": "Section title (marketing home)",
+    "placeholder": "TOP CREATOR STORIES"
+  },
+  "DashboardCreatorStoriesCreate": {
+    "backToStories": "← Creator Stories",
+    "title": "New story",
+    "subtitle": "Upload a short vertical clip — it appears in the Top Creator Stories carousel on the brand home page.",
+    "submitLabel": "Publish"
+  },
+  "DashboardCreatorStoriesFormCreatorStoryForm": {
+    "attachInfluencerTitle": "Attach an existing influencer",
+    "attachInfluencerSubtitle": "Auto-fills the username and avatar.",
+    "searchCreators": "Search creators",
+    "usernameLabel": "Instagram username",
+    "usernamePlaceholder": "cristiano",
+    "avatarUrlLabel": "Avatar URL",
+    "avatarUrlPlaceholder": "https://…/photo.jpg",
+    "avatarAlt": "avatar",
+    "preview": "preview",
+    "videoLabel": "Video",
+    "videoHint": "MP4, up to 50 MB",
+    "videoUrlPlaceholder": "Paste a hosted video URL",
+    "uploading": "Uploading…",
+    "uploadFromDevice": "Upload from device",
+    "posterLabel": "Poster image URL (optional)",
+    "posterPlaceholder": "https://…/poster.jpg",
+    "posterHint": "Thumbnail shown before the video loads.",
+    "positionLabel": "Position",
+    "positionHint": "Lower numbers appear first.",
+    "activeLabel": "Active (visible to brands)",
+    "saving": "Saving…",
+    "pickerSearchPlaceholder": "Search by handle, name or username…",
+    "searching": "Searching…",
+    "typeAtLeast": "Type at least 2 characters.",
+    "noMatches": "No matches.",
+    "pickerFollowers": "@{handle} · {count} followers",
+    "close": "Close"
+  },
+  "DashboardCreatorStoriesIdEdit": {
+    "backToCreatorStories": "← Creator Stories",
+    "title": "Edit story",
+    "subtitle": "Changes go live on the brand home page immediately.",
+    "saveChanges": "Save changes"
+  },
+  "DashboardDisputes": {
+    "title": "Escrow Disputes",
+    "subtitle": "Resolve held escrow funds by refunding the brand or releasing them to the creator.",
+    "filters": {
+      "disputed": "Open",
+      "resolved": "Resolved",
+      "all": "All"
+    },
+    "loadError": "Failed to load disputes: {message}",
+    "empty": "No disputes here.",
+    "columns": {
+      "campaign": "Campaign",
+      "brand": "Brand",
+      "creator": "Creator",
+      "amount": "Amount",
+      "opened": "Opened",
+      "status": "Status"
+    },
+    "status": {
+      "disputed": "Open",
+      "refunded": "Refunded to brand",
+      "released": "Released to creator"
+    },
+    "review": "Review →"
+  },
+  "DashboardDisputesId": {
+    "backToDisputes": "← Back to disputes",
+    "notFound": "Dispute not found.",
+    "campaign": "Campaign",
+    "disputeOnApplication": "Dispute on application <code>{id}</code>",
+    "escrow": "Escrow",
+    "amountHeld": "Amount held",
+    "fundedAt": "Funded at",
+    "razorpayPayment": "Razorpay payment",
+    "currentStatus": "Current status",
+    "dispute": "Dispute",
+    "openedAt": "Opened at",
+    "resolution": "Resolution",
+    "resolvedAt": "Resolved at",
+    "applicationStatus": "Application status",
+    "brandsReason": "Brand's reason",
+    "deliverablesSubmitted": "Deliverables submitted ({count})",
+    "deliverableN": "Deliverable {n}",
+    "parties": "Parties",
+    "brand": "Brand",
+    "creator": "Creator",
+    "agreedRate": "Agreed: ₹{rate}",
+    "resolve": "Resolve",
+    "resolved": "Resolved",
+    "resolvedVia": "This dispute was resolved via <strong>{resolution}</strong> on {date}."
+  },
+  "DashboardDisputesIdResolveActions": {
+    "failedToResolve": "Failed to resolve",
+    "confirmRefundTitle": "Refund ₹{amount} back to the brand?",
+    "confirmReleaseTitle": "Release ₹{amount} to the creator?",
+    "refundDescription": "Razorpay will refund the original payment to the brand's card/UPI. This usually settles within 5–7 working days.",
+    "releaseDescription": "The payout will be queued on RazorpayX and fired by the next cron tick (within 15 minutes).",
+    "notePlaceholder": "Optional internal note",
+    "working": "Working…",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "releaseButton": "Release ₹{amount} to creator",
+    "refundButton": "Refund ₹{amount} to brand"
+  },
+  "DashboardFeaturedBrands": {
+    "title": "Featured Brands",
+    "description": "Hand-picked \"Brands You'll Love\" carousel on the influencer home page. Lower position = appears first.",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "empty": {
+      "text": "No featured brands yet. Click <highlight>Feature a brand</highlight> to add one.",
+      "fallback": "Until you publish at least one, the influencer home falls back to the full brand directory."
+    },
+    "status": {
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete",
+    "noInstagram": "No Instagram link"
+  },
+  "DashboardFeaturedBrandsComponentsAddFeaturedBrand": {
+    "featureABrand": "Feature a brand",
+    "searchBrands": "Search brands",
+    "close": "Close",
+    "searchPlaceholder": "Search by brand name or Instagram handle…",
+    "searching": "Searching…",
+    "typeAtLeast2": "Type at least 2 characters.",
+    "noMatches": "No matches (already-featured brands are hidden).",
+    "registeredBrand": "Registered brand",
+    "invitedBrand": "Invited brand"
+  },
+  "DashboardFeaturedCampaigns": {
+    "title": "Featured Campaigns",
+    "description": "Hand-picked list shown on the influencer home page at the top (Deal Of The Day stacked carousel). Plan Your Stay With Us is curated separately under <link>Plan Your Stay</link>. Lower position = appears first.",
+    "stat": {
+      "total": "Total",
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "emptyState": "No featured campaigns yet. Click <feature>Feature a campaign</feature> to add one.",
+    "placeholderNote": "Until you publish at least one, the influencer home falls back to a built-in placeholder list.",
+    "unknownBrand": "Unknown brand",
+    "missingCampaign": "(missing — campaign deleted)",
+    "deadline": "deadline {date}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "active": "Active",
+    "hidden": "Hidden",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete"
+  },
+  "DashboardFeaturedCampaignsComponentsAddFeaturedCampaign": {
+    "featureCampaign": "Feature a campaign",
+    "searchCampaigns": "Search campaigns",
+    "close": "Close",
+    "searchPlaceholder": "Search by campaign title or brand…",
+    "searching": "Searching…",
+    "typeAtLeast2": "Type at least 2 characters.",
+    "noMatches": "No matches (already-featured campaigns are hidden).",
+    "untitledCampaign": "(untitled campaign)",
+    "unknownBrand": "Unknown brand"
+  },
+  "DashboardFeaturedCampaignsComponentsSectionTitleEditor": {
+    "label": "Section title (influencer home)",
+    "placeholder": "Plan your stay with us"
+  },
+  "DashboardFeaturedCreators": {
+    "title": "Featured Creators",
+    "description": "Hand-curated Top Creators carousel on the brand home page. Lower position = appears first.",
+    "featureCreator": "Feature a creator",
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "hidden": "Hidden"
+    },
+    "emptyState": "No featured creators yet. Click <strong>Feature a creator</strong> to add one.",
+    "emptyFallbackNote": "Until you publish at least one, the brand home page falls back to a built-in list.",
+    "verified": "Verified",
+    "followersLine": "@{username} · {followers} followers",
+    "ratingSuffix": " · ★ {rating}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "statusActive": "Active",
+    "statusHidden": "Hidden",
+    "edit": "Edit",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete"
+  },
+  "DashboardFeaturedCreatorsCreate": {
+    "backLink": "← Featured Creators",
+    "title": "Feature a creator",
+    "subtitle": "Curated row appears in the brand-side Top Creators carousel as soon as you publish.",
+    "submitLabel": "Publish"
+  },
+  "DashboardFeaturedCreatorsFormFeaturedCreatorForm": {
+    "pickExistingTitle": "Feature an existing influencer",
+    "pickExistingHint": "Search the directory and auto-fill the display fields.",
+    "searchCreators": "Search creators",
+    "usernameLabel": "Instagram username",
+    "usernamePlaceholder": "cristiano",
+    "displayNameLabel": "Display name",
+    "displayNamePlaceholder": "Cristiano Ronaldo",
+    "avatarLabel": "Avatar",
+    "avatarAlt": "avatar",
+    "changeAvatar": "Change avatar",
+    "uploadAvatar": "Upload avatar",
+    "avatarHint": "JPG, PNG, WebP. Max 5MB.",
+    "avatarSelected": "New avatar selected — will upload on save",
+    "uploading": "Uploading…",
+    "followersLabelLabel": "Followers label",
+    "followersPlaceholder": "1.4M",
+    "ratingLabel": "Rating (0–5)",
+    "ratingPlaceholder": "4.2",
+    "positionLabel": "Position",
+    "positionHint": "Lower numbers appear first.",
+    "instagramUrlLabel": "Instagram URL",
+    "verifiedLabel": "Verified badge",
+    "activeLabel": "Active (visible to brands)",
+    "saving": "Saving…",
+    "searchPlaceholder": "Search by handle, name or username…",
+    "searching": "Searching…",
+    "typeAtLeast": "Type at least 2 characters.",
+    "noMatches": "No matches.",
+    "followers": "followers",
+    "close": "Close"
+  },
+  "DashboardFeaturedCreatorsIdEdit": {
+    "backToFeaturedCreators": "← Featured Creators",
+    "title": "Edit featured creator",
+    "subtitle": "Changes go live on the brand home page immediately.",
+    "saveChanges": "Save changes"
+  },
+  "DashboardFeaturedStay": {
+    "title": "Plan Your Stay",
+    "description": "Hand-picked list shown in the “Plan your stay with us” carousel on the influencer home page. Curated separately from <link>Featured Campaigns</link>. Lower position = appears first.",
+    "statTotal": "Total",
+    "statActive": "Active",
+    "statHidden": "Hidden",
+    "emptyState": "No stay picks yet. Click <feature>Feature a campaign</feature> to add one.",
+    "emptyFallback": "Until you publish at least one, the influencer home falls back to a built-in placeholder list.",
+    "unknownBrand": "Unknown brand",
+    "missingCampaign": "(missing — campaign deleted)",
+    "deadlinePrefix": "deadline {date}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "statusActive": "Active",
+    "statusHidden": "Hidden",
+    "hide": "Hide",
+    "show": "Show",
+    "delete": "Delete"
+  },
+  "DashboardFeaturedStayComponentsAddFeaturedCampaign": {
+    "featureCampaign": "Feature a campaign",
+    "searchCampaigns": "Search campaigns",
+    "close": "Close",
+    "searchPlaceholder": "Search by campaign title or brand…",
+    "searching": "Searching…",
+    "typeAtLeast2": "Type at least 2 characters.",
+    "noMatches": "No matches (already-featured campaigns are hidden).",
+    "untitledCampaign": "(untitled campaign)",
+    "unknownBrand": "Unknown brand"
+  },
+  "DashboardFeaturedStayComponentsSectionTitleEditor": {
+    "label": "Section title (influencer home)",
+    "placeholder": "Plan your stay with us"
+  },
+  "DashboardInfluencers": {
+    "title": "Influencers",
+    "subtitle": "Manage influencer profiles and invitations",
+    "tabs": {
+      "all": "All",
+      "registered": "Registered",
+      "invited": "Invited"
+    },
+    "filter": {
+      "search": "Search",
+      "searchPlaceholder": "Search by name or username...",
+      "allStatuses": "All Statuses",
+      "active": "Active",
+      "suspended": "Suspended",
+      "pending": "Pending",
+      "followers": "Followers",
+      "followersUnder1k": "< 1K",
+      "followers1kTo10k": "1K - 10K",
+      "followers10kTo100k": "10K - 100K",
+      "followers100kPlus": "100K+",
+      "allCategories": "All Categories"
+    },
+    "table": {
+      "name": "Name",
+      "username": "Username",
+      "contactNumber": "Contact Number",
+      "followers": "Followers",
+      "categories": "Categories",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "failedToLoadInfluencers": "Failed to load influencers: {message}",
+    "noRegisteredInfluencers": "No registered influencers found",
+    "pendingInvitations": "Pending Invitations",
+    "failedToLoadInvitations": "Failed to load invitations: {message}",
+    "noPendingInvitations": "No pending invitations",
+    "clickInviteToCreate": "Click \"Invite Influencer\" above to create one"
+  },
+  "DashboardInfluencersBulkInviteInfluencers": {
+    "fullName": {
+      "label": "Full Name",
+      "example": "Priya Sharma",
+      "helper": "Required"
+    },
+    "instagramUsername": {
+      "label": "Instagram Username",
+      "example": "priyasharma",
+      "helper": "Required (without @)"
+    },
+    "city": {
+      "label": "City",
+      "example": "Mumbai; Pune",
+      "helper": "Required (semicolon-separated for multiple)"
+    },
+    "gender": {
+      "label": "Gender",
+      "example": "Female",
+      "helper": "Optional (male / female / non-binary — any other value becomes prefer_not_to_say)"
+    },
+    "categories": {
+      "label": "Categories",
+      "example": "Fashion & Lifestyle; Beauty & Skincare",
+      "helper": "Optional (semicolon-separated)"
+    },
+    "languages": {
+      "label": "Languages",
+      "example": "English; Hindi",
+      "helper": "Optional (semicolon-separated)"
+    },
+    "tags": {
+      "label": "Tags",
+      "example": "fitness; vegan",
+      "helper": "Optional (semicolon-separated)"
+    },
+    "notes": {
+      "label": "Notes",
+      "example": "Met at fashion week",
+      "helper": "Optional"
+    }
+  },
+  "DashboardInfluencersId": {
+    "unknown": "Unknown",
+    "statusUnknown": "unknown",
+    "joinedDate": "Joined {date}",
+    "deleteFallbackName": "Influencer",
+    "planFree": "Free",
+    "rawData": "Raw Data",
+    "stats": {
+      "followers": "Followers",
+      "following": "Following",
+      "posts": "Posts"
+    },
+    "card": {
+      "bio": "Bio",
+      "categories": "Categories",
+      "contactLocation": "Contact & Location"
+    },
+    "info": {
+      "email": "Email",
+      "phone": "Phone",
+      "city": "City",
+      "state": "State"
+    },
+    "profileDetails": {
+      "title": "Profile Details",
+      "fullName": "Full Name",
+      "username": "Username",
+      "status": "Status",
+      "verification": "Verification",
+      "plan": "Plan",
+      "source": "Source"
+    },
+    "igStats": {
+      "title": "Instagram Stats",
+      "followers": "Followers",
+      "following": "Following",
+      "media": "Media",
+      "engagement": "Engagement"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "joined": "Joined",
+      "updated": "Updated"
+    }
+  },
+  "DashboardInfluencersIdChangePlan": {
+    "freeLabel": "Free",
+    "changePlan": "Change plan",
+    "title": "Change Subscription Plan",
+    "subtitle": "Admin override — bypasses Stripe. Use for comps, trials, or fixes.",
+    "current": "Current",
+    "saving": "Saving...",
+    "savePlan": "Save plan",
+    "cancel": "Cancel"
+  },
+  "DashboardInfluencersIdEditInfluencer": {
+    "editButton": "Edit",
+    "modalTitle": "Edit Influencer",
+    "savingChanges": "Saving changes...",
+    "uploadingPhoto": "Uploading photo...",
+    "profilePhoto": "Profile Photo",
+    "profilePhotoHint": "Click to change. JPG, PNG, WebP.",
+    "newPhotoSelected": "New photo selected — will upload on save",
+    "fullName": "Full Name",
+    "username": "Username",
+    "instagramHandle": "Instagram Handle",
+    "email": "Email",
+    "location": "Location",
+    "gender": "Gender",
+    "genderNotSpecified": "Not specified",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "genderOther": "Other",
+    "dateOfBirth": "Date of Birth",
+    "status": "Status",
+    "statusActive": "Active",
+    "statusSuspended": "Suspended",
+    "statusPending": "Pending",
+    "statusInactive": "Inactive",
+    "verification": "Verification",
+    "verificationNone": "None",
+    "verificationPending": "Pending",
+    "verificationVerified": "Verified",
+    "verificationRejected": "Rejected",
+    "tier": "Tier",
+    "tierNone": "None",
+    "tierNano": "Nano",
+    "tierMicro": "Micro",
+    "tierMacro": "Macro",
+    "tierMega": "Mega",
+    "profileType": "Profile Type",
+    "profileTypeNotClassified": "Not classified",
+    "profileTypeMemePage": "Meme page",
+    "profileTypeCelebrity": "Celebrity",
+    "bio": "Bio",
+    "categoriesLabel": "Categories <muted>(comma-separated)</muted>",
+    "categoriesPlaceholder": "e.g. Fashion & Lifestyle, Food & Beverage",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel"
+  },
+  "DashboardInfluencersIdReferralLinkCard": {
+    "title": "Referral link",
+    "codeLabel": "Code",
+    "shareLinkLabel": "Share link",
+    "copied": "Copied!",
+    "copy": "Copy",
+    "noCode": "No referral code yet — it's generated when the creator first opens the Refer & Earn page."
+  },
+  "DashboardInfluencersInfluencerRow": {
+    "confirmSuspend": "Are you sure you want to suspend {name}?",
+    "confirmReactivate": "Are you sure you want to reactivate {name}?",
+    "unknown": "unknown",
+    "processing": "Processing...",
+    "suspend": "Suspend",
+    "reactivate": "Reactivate"
+  },
+  "DashboardInfluencersInviteInfluencerForm": {
+    "tags": "Tags",
+    "tagsPlaceholder": "Type and press Enter",
+    "errorSelectCity": "Select at least one city",
+    "loadingUploadingPhoto": "Uploading photo...",
+    "loadingCreatingInvitation": "Creating invitation...",
+    "successCreated": "Influencer invitation created!",
+    "errorGeneric": "Something went wrong",
+    "inviteInfluencer": "Invite Influencer",
+    "formSubtitle": "Create a placeholder — influencer will claim it via Instagram login",
+    "photo": "Photo",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "e.g. Priya Sharma",
+    "instagramUsername": "Instagram Username",
+    "instagramUsernamePlaceholder": "priyasharma",
+    "city": "City",
+    "gender": "Gender",
+    "selectGender": "Select gender",
+    "genderFemale": "Female",
+    "genderMale": "Male",
+    "genderNonBinary": "Non-binary",
+    "genderPreferNotToSay": "Prefer not to say",
+    "profileType": "Profile Type",
+    "optional": "(optional)",
+    "notClassified": "— Not classified —",
+    "memePage": "Meme page",
+    "celebrity": "Celebrity",
+    "categories": "Categories",
+    "contentLanguage": "Content Language",
+    "notes": "Notes",
+    "notesPlaceholder": "e.g. Contacted via DM",
+    "howThisWorks": "How this works:",
+    "howStep1": "You create an invitation with the influencer's Instagram handle",
+    "howStep2": "Influencer opens RecentGossips app and connects their Instagram",
+    "howStep3": "If the handle matches, they see a \"Complete your profile\" screen",
+    "howStep4": "Influencer verifies their phone and the account becomes active",
+    "creating": "Creating...",
+    "createInvitation": "Create Invitation",
+    "cancel": "Cancel"
+  },
+  "DashboardInfluencersInvitedInfluencerRow": {
+    "confirmRemove": "Remove invitation for @{username}?",
+    "awaitingClaim": "Awaiting Claim",
+    "created": "Created {date}",
+    "sendInvite": "Send invite",
+    "edit": "Edit",
+    "remove": "Remove",
+    "recipientLabel": "{name} (@{username})",
+    "modalTitle": "Edit Influencer Invitation",
+    "fullNameLabel": "Full Name *",
+    "instagramLabel": "Instagram *",
+    "cityLabel": "City",
+    "genderLabel": "Gender",
+    "selectGender": "Select gender",
+    "genderFemale": "Female",
+    "genderMale": "Male",
+    "genderNonBinary": "Non-binary",
+    "genderPreferNotToSay": "Prefer not to say",
+    "profileTypeLabel": "Profile Type <opt>(optional)</opt>",
+    "notClassified": "— Not classified —",
+    "memePage": "Meme page",
+    "celebrity": "Celebrity",
+    "categoriesLabel": "Categories <opt>(comma-separated)</opt>",
+    "categoriesPlaceholder": "e.g. Fashion & Lifestyle, Food & Beverage",
+    "languagesLabel": "Languages <opt>(comma-separated)</opt>",
+    "languagesPlaceholder": "e.g. English, Hindi",
+    "tagsLabel": "Tags <opt>(comma-separated)</opt>",
+    "tagsPlaceholder": "e.g. fitness, vegan, travel",
+    "notesLabel": "Notes",
+    "saving": "Saving...",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "DashboardLeads": {
+    "title": "Leads",
+    "subtitle": "Phone numbers from sign-in attempts",
+    "loadError": "Failed to load leads: {message}",
+    "leadCount": "{count, plural, one {# lead} other {# leads}}",
+    "empty": "No leads found",
+    "filters": {
+      "searchPhone": "Search phone",
+      "searchPhonePlaceholder": "Search by phone number...",
+      "allRoles": "All Roles",
+      "allSources": "All Sources"
+    },
+    "columns": {
+      "phone": "Phone",
+      "roleAttempted": "Role Attempted",
+      "source": "Source",
+      "attempts": "Attempts",
+      "lastAttempt": "Last Attempt",
+      "firstSeen": "First Seen"
+    }
+  },
+  "DashboardLoadTest": {
+    "title": "Load Test",
+    "description": "Fires read-only requests at the live edge functions and reports latency percentiles. Runs from the admin server (service key never leaves it). Concurrency is hard-capped at 20 virtual users × 20 iterations per scenario — this is a smoke-level check against production, not a stress rig."
+  },
+  "DashboardLoadTestComponentsLoadTestRunner": {
+    "errorFailed": "Load test failed",
+    "scenarios": "Scenarios",
+    "virtualUsers": "Virtual users",
+    "iterationsPerUser": "Iterations / user",
+    "maxHint": "(max {max})",
+    "running": "Running…",
+    "runLoadTest": "Run Load Test",
+    "totalRequestsSummary": "{total} total requests ({scenarios, plural, one {# scenario} other {# scenarios}} × {vus} × {iterations}), run sequentially per scenario",
+    "results": "Results",
+    "colScenario": "Scenario",
+    "colOkTotal": "OK / Total",
+    "colErrors": "Errors",
+    "colReqPerSec": "req/s",
+    "colP50": "p50 ms",
+    "colP95": "p95 ms",
+    "colMax": "max ms",
+    "colAvgKb": "avg KB",
+    "baselineNote": "Green dot: zero errors and p95 under 2s. Baseline (2026-07): p50 ≈ 450ms, p95 < 1s at 10 VUs."
+  },
+  "DashboardPayouts": {
+    "title": "Creator payouts",
+    "subtitle": "Manual payout queue. Transfer funds from your bank to the creator's UPI/account, then paste the UTR here to mark the payout complete.",
+    "emptyState": "No payouts in this state.",
+    "unknownCreator": "Unknown creator",
+    "bankFallback": "Bank",
+    "waitingForMethod": "Waiting for creator to add a payout method",
+    "notAutoVerified": "⚠ Bank not auto-verified — confirm details before sending.",
+    "paid": "Paid",
+    "released": "Released",
+    "status": {
+      "scheduled": "Ready to pay",
+      "pendingCreatorInfo": "Awaiting creator info",
+      "paid": "Paid"
+    },
+    "filters": {
+      "scheduled": "Ready to pay",
+      "pendingCreatorInfo": "Awaiting info",
+      "processed": "Recently paid",
+      "all": "All"
+    },
+    "methodLabel": {
+      "bank": "Bank account",
+      "upi": "UPI",
+      "default": "Payment method"
+    },
+    "noMethodOnFile": "No method on file"
+  },
+  "DashboardPayoutsComponentsMarkPaidForm": {
+    "markAsPaid": "Mark as paid",
+    "utrPlaceholder": "UTR / reference",
+    "leaveBlankNow": "leave blank = now",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "confirmPaid": "Confirm paid"
+  },
+  "DashboardQuoteRequests": {
+    "title": "Quote requests",
+    "description": "Influencer-submitted briefs. Open one to send a quote, decline, or follow the order through delivery.",
+    "empty": "Nothing in this view yet.",
+    "unknownName": "Unknown",
+    "role": {
+      "influencer": "Influencer",
+      "brand": "Brand"
+    },
+    "filters": {
+      "pending_quote": "Awaiting quote",
+      "active": "Active",
+      "completed": "Completed",
+      "declined": "Declined",
+      "all": "All"
+    },
+    "status": {
+      "pending_quote": "Awaiting quote",
+      "quoted": "Quote sent",
+      "counter_offered": "Counter offer",
+      "declined": "Declined",
+      "expired": "Expired",
+      "paid_advance": "Advance paid",
+      "in_progress": "In progress",
+      "draft_ready": "Draft ready",
+      "revision_requested": "Revision requested",
+      "paid_final": "Final paid",
+      "completed": "Completed"
+    }
+  },
+  "DashboardQuoteRequestsComponentsDeliverDraftForm": {
+    "cta": {
+      "deliverRevised": "Deliver revised draft",
+      "deliver": "Deliver draft"
+    },
+    "heading": {
+      "revisionPending": "Revision pending",
+      "workInProgress": "Work in progress"
+    },
+    "desc": {
+      "revision": "User asked for a revision ({used}/{allowed} used). Upload the new watermarked cut and deliver it back.",
+      "workInProgress": "When the watermarked draft is ready, paste the preview URL to send it for review."
+    },
+    "field": {
+      "draftUrlLabel": "Draft URL (watermarked)",
+      "draftUrlPlaceholder": "https://drive.google.com/… or https://vimeo.com/…",
+      "draftUrlHint": "Drive / Frame.io / Vimeo / YouTube unlisted — pick whatever lets the user preview without exposing the final file.",
+      "editorNoteLabel": "Editor note (optional)",
+      "editorNotePlaceholder": "Short context — what's in this cut, what you'd like the user to focus on…"
+    },
+    "button": {
+      "cancel": "Cancel",
+      "delivering": "Delivering…"
+    }
+  },
+  "DashboardQuoteRequestsComponentsDeliverFinalForm": {
+    "errors": {
+      "addAtLeastOne": "Add at least one file (name + URL)."
+    },
+    "collapsed": {
+      "title": "Deliver final files",
+      "description": "Final payment received. Upload your files (Drive / Dropbox / your CDN) and paste the links — the order closes when you submit.",
+      "openButton": "Deliver final files"
+    },
+    "form": {
+      "title": "Final files",
+      "description": "One row per file. Size is optional — used only for display.",
+      "fileNamePlaceholder": "File name (e.g. Aesthetic_Reel_Final_4K.mp4)",
+      "sizePlaceholder": "Size",
+      "removeRow": "Remove row",
+      "addAnother": "+ Add another file",
+      "cancel": "Cancel",
+      "submitting": "Submitting…",
+      "submit": "Mark completed & notify user"
+    }
+  },
+  "DashboardQuoteRequestsComponentsQuoteResponseForm": {
+    "respondHeading": "Respond to this request",
+    "respondDescription": "Send a quote with your price, delivery date and revisions allowed — or decline if it's not a fit.",
+    "sendQuote": "Send a quote",
+    "decline": "Decline",
+    "declineHeading": "Decline this request",
+    "declineReasonPlaceholder": "Optional — short reason shared with the requester",
+    "cancel": "Cancel",
+    "declining": "Declining…",
+    "declineRequest": "Decline request",
+    "sendQuoteHeading": "Send quote — {serviceTitle}",
+    "noPlatformFeeNote": "The user pays exactly the amount you quote — no platform fee added on top.",
+    "quotedAmountLabel": "Quoted amount (₹)",
+    "advancePctLabel": "Advance %",
+    "advancePctHint": "What share the user pays now",
+    "quotedDeliveryDateLabel": "Quoted delivery date",
+    "turnaroundDaysLabel": "Turnaround days",
+    "turnaroundDaysHint": "Working days after advance payment",
+    "revisionsAllowedLabel": "Revisions allowed",
+    "quoteValidityDaysLabel": "Quote validity (days)",
+    "quoteValidityDaysHint": "After this, the order auto-expires",
+    "finalFormatsLabel": "Final formats",
+    "finalFormatsHint": "What they'll receive",
+    "teamNoteLabel": "Note from our team",
+    "teamNotePlaceholder": "Optional — short note that shows on the user's quote screen",
+    "totalUserPaysLabel": "Total user pays",
+    "sending": "Sending…"
+  },
+  "DashboardQuoteRequestsId": {
+    "userUnknown": "Unknown",
+    "userInfluencer": "Influencer",
+    "userBrand": "Brand",
+    "backToList": "← Quote requests",
+    "from": "From",
+    "cardProjectDescription": "Project description",
+    "cardAssetLink": "Asset link",
+    "cardExtras": "Extras",
+    "styleReferences": "Style references",
+    "additionalNotes": "Additional notes",
+    "cardTimeline": "Timeline",
+    "noEventsYet": "No events yet.",
+    "cardOrderSummary": "Order summary",
+    "fieldStatus": "Status",
+    "fieldScope": "Scope",
+    "fieldBudgetRange": "Budget range",
+    "fieldDesiredDelivery": "Desired delivery",
+    "fieldSubmitted": "Submitted",
+    "counterOfferReceived": "Counter offer received",
+    "acceptCounter": "Accept counter — ₹{amount}",
+    "cardDeliveredFiles": "Delivered files",
+    "open": "Open ↗",
+    "cardQuoteSummary": "Quote summary",
+    "fieldQuoted": "Quoted",
+    "fieldTotal": "Total",
+    "fieldAdvance": "Advance",
+    "fieldValidUntil": "Valid until",
+    "noQuoteSent": "No quote was sent on this order."
+  },
+  "DashboardReferrals": {
+    "title": "Refer & Earn",
+    "subtitle": "Influencer referrals + Reward Credits wallet. Manual reviews land here when a referrer hits the daily cap or an anti-fraud rule fires.",
+    "unknownName": "Unknown",
+    "empty": "No referrals in this state.",
+    "referrer": "Referrer",
+    "referee": "Referee",
+    "code": "Code: {code}",
+    "notSignedUp": "(not signed up)",
+    "firstPlan": "First plan: {plan}",
+    "noPlanYet": "No plan yet",
+    "approve": "Approve",
+    "reject": "Reject",
+    "flag": "Flag:",
+    "ip": "IP: {ip}",
+    "device": "Device: {fp}",
+    "kpi": {
+      "total": "Total",
+      "rewarded": "Rewarded",
+      "inFlight": "In-flight",
+      "underReview": "Under review",
+      "signupToRewarded": "Signup → rewarded",
+      "clawbackRate": "Clawback rate",
+      "reversedAllTime": "Reversed (all-time)",
+      "signupsAllTime": "Signups (all-time)",
+      "rcEarned": "RC earned (referrals)",
+      "rcWelcome": "RC granted (welcome)",
+      "rcAdmin": "RC granted (admin)",
+      "rcRedeemed": "RC redeemed",
+      "rcClawedBack": "RC clawed back",
+      "rcOutstanding": "RC outstanding"
+    },
+    "filters": {
+      "review": "Needs review",
+      "rewarded": "Rewarded",
+      "signed_up": "Signed up",
+      "all": "All"
+    },
+    "reviewReason": {
+      "duplicate_device_fp": "Duplicate device fingerprint",
+      "duplicate_signup_ip": "Duplicate signup IP",
+      "daily_cap_hit": "Daily cap hit"
+    }
+  },
+  "DashboardReferralsComponentsAdjustRcForm": {
+    "amountRequired": "Amount is required",
+    "balanceAfter": "Balance after: {balance} RC",
+    "title": "Adjust RC wallet",
+    "description": "Grant / deduct Reward Credits for any influencer. All adjustments are logged with your admin id.",
+    "userIdPlaceholder": "Influencer user id",
+    "grantOption": "Grant (+)",
+    "deductOption": "Deduct (−)",
+    "amountPlaceholder": "Amount",
+    "reasonPlaceholder": "Reason (required — visible in audit log)"
+  },
+  "DashboardServices": {
+    "title": "Services",
+    "subtitle": "Catalogue shown to influencers. Edits go live immediately."
+  },
+  "DashboardServicesCreate": {
+    "backToServices": "← Services",
+    "title": "New service",
+    "subtitle": "Once published, this service appears in the influencer-side catalogue immediately.",
+    "submitLabel": "Publish Service"
+  },
+  "DashboardServicesFormServiceForm": {
+    "basics": {
+      "title": "Basics"
+    },
+    "pricing": {
+      "title": "Pricing"
+    },
+    "included": {
+      "title": "What's included",
+      "subtitle": "One bullet per row — these appear with green checkmarks on the detail page.",
+      "placeholder": "Inclusion #{n}",
+      "remove": "Remove",
+      "addAnother": "+ Add another"
+    },
+    "packages": {
+      "title": "Typical packages",
+      "subtitle": "Name + spec + price — admin can re-order by drag in a future iteration.",
+      "namePlaceholder": "Package name (e.g. Basic Reel)",
+      "specPlaceholder": "Spec (e.g. 15-30 sec, 1 revision)",
+      "pricePlaceholder": "Price",
+      "remove": "Remove package",
+      "addAnother": "+ Add another package"
+    },
+    "featured": {
+      "title": "Featured image",
+      "subtitle": "Optional. When set, replaces the gradient hero on the detail page.",
+      "imageAlt": "Featured",
+      "replace": "Replace",
+      "remove": "Remove",
+      "uploading": "Uploading…",
+      "upload": "Upload featured image",
+      "uploadHint": "JPG / PNG · up to 5 MB"
+    },
+    "gallery": {
+      "title": "Gallery",
+      "subtitle": "Showcase additional images and video. Drop image files, or paste video URLs (YouTube / Vimeo / Loom).",
+      "uploading": "Uploading…",
+      "addImage": "Add image",
+      "addVideo": "Add video URL",
+      "captionPlaceholder": "Caption (optional)",
+      "remove": "Remove"
+    },
+    "logistics": {
+      "title": "Logistics"
+    },
+    "presets": {
+      "title": "Visual presets",
+      "subtitle": "Used when no featured image is set, plus on the catalogue tile."
+    },
+    "visibility": {
+      "title": "Visibility"
+    },
+    "fields": {
+      "title": {
+        "label": "Title",
+        "placeholder": "e.g. Aesthetic Reel Production — Pro Video Editing"
+      },
+      "slug": {
+        "label": "Slug",
+        "hint": "URL-safe identifier. Leave blank to auto-generate from title."
+      },
+      "tag": {
+        "label": "Tag",
+        "hint": "Uppercase category (CONTENT / ADS / DESIGN …)"
+      },
+      "description": {
+        "label": "Short description",
+        "hint": "Appears on the card under the title",
+        "placeholder": "Cinematic Reel edits from your raw footage — trending audio, dynamic captions"
+      },
+      "about": {
+        "label": "About this service",
+        "hint": "Long-form paragraph shown on the detail page"
+      },
+      "priceStarting": {
+        "label": "Starting price (₹)"
+      },
+      "priceTo": {
+        "label": "Upper price (₹)",
+        "hint": "\"X priced between Y–Z\""
+      },
+      "suffix": {
+        "label": "Suffix",
+        "hint": "e.g. \"/mo\""
+      },
+      "quoteSla": {
+        "label": "Quote SLA (hrs)"
+      },
+      "deliveryDays": {
+        "label": "Delivery days",
+        "hint": "Free text — \"3-7 d\", \"Ongoing\", \"Setup in 3 d\"…"
+      },
+      "paymentSplit": {
+        "label": "Payment split"
+      },
+      "icon": {
+        "label": "Icon",
+        "hint": "Lucide icon name"
+      },
+      "accent": {
+        "label": "Accent (chip color)"
+      },
+      "gradient": {
+        "label": "Hero gradient"
+      },
+      "displayOrder": {
+        "label": "Display order",
+        "hint": "Lower = earlier in the list"
+      },
+      "active": {
+        "label": "Active",
+        "checkbox": "Service is active"
+      }
+    },
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "saveDefault": "Save Service"
+  },
+  "DashboardServicesIdEdit": {
+    "backToServices": "← Services",
+    "title": "Edit service",
+    "subtitle": "Changes go live immediately. The influencer catalogue picks them up on next page load.",
+    "saveChanges": "Save Changes"
+  },
+  "DeleteUserModal": {
+    "kindInfluencer": "influencer",
+    "kindBrand": "brand",
+    "deleteKind": "Delete {kind}",
+    "titleDeleted": "Deleted",
+    "titleStopped": "Stopped",
+    "failedFallback": "Failed",
+    "permanentlyDelete": "This will permanently delete:",
+    "bulletApplications": "All campaign applications & activity",
+    "bulletCampaigns": "All campaigns owned by this brand",
+    "bulletServiceOrders": "All service orders & their history",
+    "bulletFeatured": "Featured-creator & story listings",
+    "bulletProfile": "The {kind} profile row",
+    "bulletAuth": "The authentication account (phone & Instagram tokens)",
+    "cannotUndo": "This cannot be undone.",
+    "typeToConfirm": "Type <code>{confirmText}</code> to confirm",
+    "deletePermanently": "Delete permanently",
+    "cancel": "Cancel",
+    "allStepsCompleted": "All steps completed. Redirecting…",
+    "deletionStopped": "Deletion stopped at the failed step. Earlier steps already completed cannot be undone.",
+    "pleaseWait": "Please wait — do not close this window.",
+    "close": "Close"
+  },
+  "DeleteWithStepsModal": {
+    "titleDone": "Done",
+    "titleStopped": "Stopped",
+    "failedFallback": "Failed",
+    "permanentlyDelete": "This will permanently delete:",
+    "cannotUndo": "This cannot be undone.",
+    "confirmDefault": "Remove",
+    "cancel": "Cancel",
+    "allStepsCompleted": "All steps completed.",
+    "removalStopped": "Removal stopped at the failed step. Earlier steps that already completed cannot be undone.",
+    "pleaseWait": "Please wait — do not close this window.",
+    "close": "Close"
+  },
+  "FilterBar": {
+    "clearSelection": "Clear selection",
+    "clearFilters": "Clear filters"
+  },
+  "MultiSelectChips": {
+    "selectedCount": "{count} selected",
+    "selectPlaceholder": "Select {label}",
+    "searchPlaceholder": "Search {label}...",
+    "noMatches": "No matches for \"{search}\""
+  },
+  "NotificationBell": {
+    "title": "Notifications",
+    "loading": "Loading...",
+    "campaignFallback": "Campaign",
+    "deliverablesSubmitted": "Deliverables submitted",
+    "status": {
+      "pending_quote": "Awaiting quote",
+      "counter_offered": "Counter offer received",
+      "revision_requested": "Revision requested"
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago"
+    },
+    "empty": {
+      "title": "You're all caught up",
+      "subtitle": "No items awaiting action"
+    }
+  },
+  "Pagination": {
+    "showing": "Showing <b>{range}</b> of <b>{count}</b>",
+    "prev": "Prev",
+    "next": "Next"
+  },
+  "RefreshButton": {
+    "refreshData": "Refresh data"
+  },
+  "SectionTitleEditor": {
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save"
+  },
+  "SendInviteEmailModal": {
+    "title": "Send invite email",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "name@example.com",
+    "noteLabel": "Personal note",
+    "optional": "(optional)",
+    "notePlaceholder": "Add a short message to the invitation…",
+    "sentConfirmation": "Invitation sent.",
+    "sending": "Sending…",
+    "sendInvite": "Send invite",
+    "cancel": "Cancel"
+  },
+  "Login": {
+    "heading": "Admin Panel",
+    "subtitle": "Sign in to manage the platform",
+    "emailLabel": "Email",
+    "emailPlaceholder": "admin@rgossips.com",
+    "passwordLabel": "Password",
+    "signingIn": "Signing in...",
+    "signIn": "Sign In",
+    "footer": "RGossips Admin Panel — Authorized access only"
   }
 }

@@ -317,7 +317,7 @@ async function PayoutRow({
           />
         )}
         {!isPaid && app.payout_status === "pending_creator_info" && (
-          <span className="text-[11px] text-gray-400 italic">No method on file</span>
+          <span className="text-[11px] text-gray-400 italic">{t("noMethodOnFile")}</span>
         )}
       </div>
     </div>

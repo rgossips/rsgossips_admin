@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { uploadServiceImage } from "../actions";
 
 type GalleryItem = { type: "image" | "video"; url: string; caption?: string };
@@ -70,12 +71,13 @@ const ACCENT_PRESETS = [
 export function ServiceForm({
   initial,
   action,
-  submitLabel = "Save Service",
+  submitLabel,
 }: {
   initial?: Service;
   action: (formData: FormData) => Promise<{ error?: string }>;
   submitLabel?: string;
 }) {
+  const t = useTranslations("DashboardServicesFormServiceForm");
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -152,18 +154,18 @@ export function ServiceForm({
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         {/* ── LEFT COLUMN ── */}
         <div className="space-y-6">
-          <Card title="Basics">
-            <Field label="Title" required>
+          <Card title={t("basics.title")}>
+            <Field label={t("fields.title.label")} required>
               <input
                 name="title"
                 defaultValue={initial?.title || ""}
                 required
                 className="input"
-                placeholder="e.g. Aesthetic Reel Production — Pro Video Editing"
+                placeholder={t("fields.title.placeholder")}
               />
             </Field>
             <Row cols={2}>
-              <Field label="Slug" hint="URL-safe identifier. Leave blank to auto-generate from title.">
+              <Field label={t("fields.slug.label")} hint={t("fields.slug.hint")}>
                 <input
                   name="slug"
                   defaultValue={initial?.slug || ""}
@@ -172,7 +174,7 @@ export function ServiceForm({
                   pattern="^[a-z0-9-]+$"
                 />
               </Field>
-              <Field label="Tag" required hint="Uppercase category (CONTENT / ADS / DESIGN …)">
+              <Field label={t("fields.tag.label")} required hint={t("fields.tag.hint")}>
                 <input
                   name="tag"
                   defaultValue={initial?.tag || ""}
@@ -182,15 +184,15 @@ export function ServiceForm({
                 />
               </Field>
             </Row>
-            <Field label="Short description" hint="Appears on the card under the title">
+            <Field label={t("fields.description.label")} hint={t("fields.description.hint")}>
               <input
                 name="description"
                 defaultValue={initial?.description || ""}
                 className="input"
-                placeholder="Cinematic Reel edits from your raw footage — trending audio, dynamic captions"
+                placeholder={t("fields.description.placeholder")}
               />
             </Field>
-            <Field label="About this service" hint="Long-form paragraph shown on the detail page">
+            <Field label={t("fields.about.label")} hint={t("fields.about.hint")}>
               <textarea
                 name="about"
                 defaultValue={initial?.about || ""}
@@ -200,9 +202,9 @@ export function ServiceForm({
             </Field>
           </Card>
 
-          <Card title="Pricing">
+          <Card title={t("pricing.title")}>
             <Row cols={3}>
-              <Field label="Starting price (₹)" required>
+              <Field label={t("fields.priceStarting.label")} required>
                 <input
                   name="price_starting"
                   defaultValue={initial?.price_starting ?? 0}
@@ -212,7 +214,7 @@ export function ServiceForm({
                   className="input"
                 />
               </Field>
-              <Field label="Upper price (₹)" hint='"X priced between Y–Z"'>
+              <Field label={t("fields.priceTo.label")} hint={t("fields.priceTo.hint")}>
                 <input
                   name="price_to"
                   defaultValue={initial?.price_to ?? ""}
@@ -221,7 +223,7 @@ export function ServiceForm({
                   className="input"
                 />
               </Field>
-              <Field label="Suffix" hint='e.g. "/mo"'>
+              <Field label={t("fields.suffix.label")} hint={t("fields.suffix.hint")}>
                 <input
                   name="price_suffix"
                   defaultValue={initial?.price_suffix ?? ""}
@@ -232,14 +234,14 @@ export function ServiceForm({
             </Row>
           </Card>
 
-          <Card title="What's included" subtitle="One bullet per row — these appear with green checkmarks on the detail page.">
+          <Card title={t("included.title")} subtitle={t("included.subtitle")}>
             <div className="space-y-2">
               {included.map((item, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input
                     value={item}
                     onChange={(e) => setIncluded((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
-                    placeholder={`Inclusion #${i + 1}`}
+                    placeholder={t("included.placeholder", { n: i + 1 })}
                     className="input flex-1"
                   />
                   <button
@@ -247,7 +249,7 @@ export function ServiceForm({
                     onClick={() => setIncluded((prev) => prev.filter((_, idx) => idx !== i))}
                     disabled={included.length === 1}
                     className="shrink-0 px-2 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-rose-500 disabled:opacity-30 cursor-pointer"
-                    aria-label="Remove"
+                    aria-label={t("included.remove")}
                   >
                     ✕
                   </button>
@@ -258,12 +260,12 @@ export function ServiceForm({
                 onClick={() => setIncluded((prev) => [...prev, ""])}
                 className="text-[12px] font-semibold text-indigo-600 hover:underline cursor-pointer"
               >
-                + Add another
+                {t("included.addAnother")}
               </button>
             </div>
           </Card>
 
-          <Card title="Typical packages" subtitle='Name + spec + price — admin can re-order by drag in a future iteration.'>
+          <Card title={t("packages.title")} subtitle={t("packages.subtitle")}>
             <div className="space-y-3">
               {packages.map((pkg, i) => (
                 <div key={i} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-lg p-3 space-y-2">
@@ -273,7 +275,7 @@ export function ServiceForm({
                       onChange={(e) =>
                         setPackages((prev) => prev.map((x, idx) => (idx === i ? { ...x, name: e.target.value } : x)))
                       }
-                      placeholder="Package name (e.g. Basic Reel)"
+                      placeholder={t("packages.namePlaceholder")}
                       className="input col-span-12 sm:col-span-5"
                     />
                     <input
@@ -281,7 +283,7 @@ export function ServiceForm({
                       onChange={(e) =>
                         setPackages((prev) => prev.map((x, idx) => (idx === i ? { ...x, spec: e.target.value } : x)))
                       }
-                      placeholder="Spec (e.g. 15-30 sec, 1 revision)"
+                      placeholder={t("packages.specPlaceholder")}
                       className="input col-span-9 sm:col-span-5"
                     />
                     <input
@@ -289,7 +291,7 @@ export function ServiceForm({
                       onChange={(e) =>
                         setPackages((prev) => prev.map((x, idx) => (idx === i ? { ...x, price: e.target.value } : x)))
                       }
-                      placeholder="Price"
+                      placeholder={t("packages.pricePlaceholder")}
                       type="number"
                       className="input col-span-3 sm:col-span-2"
                     />
@@ -300,7 +302,7 @@ export function ServiceForm({
                     disabled={packages.length === 1}
                     className="text-[11px] font-bold text-rose-500 hover:underline disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    Remove package
+                    {t("packages.remove")}
                   </button>
                 </div>
               ))}
@@ -309,7 +311,7 @@ export function ServiceForm({
                 onClick={() => setPackages((prev) => [...prev, { name: "", spec: "", price: "" }])}
                 className="text-[12px] font-semibold text-indigo-600 hover:underline cursor-pointer"
               >
-                + Add another package
+                {t("packages.addAnother")}
               </button>
             </div>
           </Card>
@@ -317,16 +319,16 @@ export function ServiceForm({
 
         {/* ── RIGHT COLUMN ── */}
         <div className="space-y-6">
-          <Card title="Featured image" subtitle="Optional. When set, replaces the gradient hero on the detail page.">
+          <Card title={t("featured.title")} subtitle={t("featured.subtitle")}>
             {featuredImage ? (
               <div className="space-y-2">
                 <div className="aspect-[2.4/1] rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={featuredImage} alt="Featured" className="w-full h-full object-cover" />
+                  <img src={featuredImage} alt={t("featured.imageAlt")} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex gap-2">
                   <label className="flex-1 cursor-pointer text-center px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-                    Replace
+                    {t("featured.replace")}
                     <input
                       type="file"
                       accept="image/*"
@@ -339,21 +341,21 @@ export function ServiceForm({
                     onClick={() => setFeaturedImage("")}
                     className="px-3 py-2 rounded-lg border border-rose-200 text-rose-500 text-[12px] font-semibold hover:bg-rose-50 cursor-pointer"
                   >
-                    Remove
+                    {t("featured.remove")}
                   </button>
                 </div>
               </div>
             ) : (
               <label className="flex flex-col items-center justify-center gap-2 cursor-pointer aspect-[2.4/1] rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 bg-gray-50 dark:bg-gray-800/40 transition-colors">
                 {featuredUploading ? (
-                  <span className="text-[12px] font-semibold text-gray-500">Uploading…</span>
+                  <span className="text-[12px] font-semibold text-gray-500">{t("featured.uploading")}</span>
                 ) : (
                   <>
                     <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
-                    <p className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">Upload featured image</p>
-                    <p className="text-[10px] text-gray-400">JPG / PNG · up to 5 MB</p>
+                    <p className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">{t("featured.upload")}</p>
+                    <p className="text-[10px] text-gray-400">{t("featured.uploadHint")}</p>
                   </>
                 )}
                 <input
@@ -366,7 +368,7 @@ export function ServiceForm({
             )}
           </Card>
 
-          <Card title="Gallery" subtitle="Showcase additional images and video. Drop image files, or paste video URLs (YouTube / Vimeo / Loom).">
+          <Card title={t("gallery.title")} subtitle={t("gallery.subtitle")}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {gallery.map((g, i) => (
                 <GalleryTile
@@ -379,13 +381,13 @@ export function ServiceForm({
               {/* Upload tile */}
               <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 bg-gray-50 dark:bg-gray-800/40">
                 {galleryUploading ? (
-                  <span className="text-[11px] font-semibold text-gray-500">Uploading…</span>
+                  <span className="text-[11px] font-semibold text-gray-500">{t("gallery.uploading")}</span>
                 ) : (
                   <>
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                     </svg>
-                    <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">Add image</p>
+                    <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">{t("gallery.addImage")}</p>
                   </>
                 )}
                 <input
@@ -407,14 +409,14 @@ export function ServiceForm({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">Add video URL</p>
+                <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">{t("gallery.addVideo")}</p>
               </button>
             </div>
           </Card>
 
-          <Card title="Logistics">
+          <Card title={t("logistics.title")}>
             <Row cols={3}>
-              <Field label="Quote SLA (hrs)" required>
+              <Field label={t("fields.quoteSla.label")} required>
                 <input
                   name="quote_sla_hours"
                   defaultValue={initial?.quote_sla_hours ?? 24}
@@ -424,7 +426,7 @@ export function ServiceForm({
                   className="input"
                 />
               </Field>
-              <Field label="Delivery days" hint='Free text — "3-7 d", "Ongoing", "Setup in 3 d"…'>
+              <Field label={t("fields.deliveryDays.label")} hint={t("fields.deliveryDays.hint")}>
                 <input
                   name="delivery_days"
                   defaultValue={initial?.delivery_days || ""}
@@ -432,7 +434,7 @@ export function ServiceForm({
                   placeholder="3-7 d"
                 />
               </Field>
-              <Field label="Payment split">
+              <Field label={t("fields.paymentSplit.label")}>
                 <input
                   name="payment_split"
                   defaultValue={initial?.payment_split || "50/50"}
@@ -443,9 +445,9 @@ export function ServiceForm({
             </Row>
           </Card>
 
-          <Card title="Visual presets" subtitle="Used when no featured image is set, plus on the catalogue tile.">
+          <Card title={t("presets.title")} subtitle={t("presets.subtitle")}>
             <Row cols={3}>
-              <Field label="Icon" hint="Lucide icon name">
+              <Field label={t("fields.icon.label")} hint={t("fields.icon.hint")}>
                 <select name="icon_name" defaultValue={initial?.icon_name || "Sparkles"} className="input">
                   {ICONS.map((i) => (
                     <option key={i} value={i}>
@@ -454,7 +456,7 @@ export function ServiceForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Accent (chip color)">
+              <Field label={t("fields.accent.label")}>
                 <select name="accent" defaultValue={initial?.accent || ACCENT_PRESETS[0]} className="input">
                   {ACCENT_PRESETS.map((a) => (
                     <option key={a} value={a}>
@@ -463,7 +465,7 @@ export function ServiceForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Hero gradient">
+              <Field label={t("fields.gradient.label")}>
                 <select name="hero_gradient" defaultValue={initial?.hero_gradient || GRADIENT_PRESETS[0]} className="input">
                   {GRADIENT_PRESETS.map((g) => (
                     <option key={g} value={g}>
@@ -475,9 +477,9 @@ export function ServiceForm({
             </Row>
           </Card>
 
-          <Card title="Visibility">
+          <Card title={t("visibility.title")}>
             <Row cols={2}>
-              <Field label="Display order" hint="Lower = earlier in the list">
+              <Field label={t("fields.displayOrder.label")} hint={t("fields.displayOrder.hint")}>
                 <input
                   name="display_order"
                   defaultValue={initial?.display_order ?? 0}
@@ -485,7 +487,7 @@ export function ServiceForm({
                   className="input"
                 />
               </Field>
-              <Field label="Active">
+              <Field label={t("fields.active.label")}>
                 <label className="inline-flex items-center gap-2 mt-2">
                   <input
                     name="is_active"
@@ -493,7 +495,7 @@ export function ServiceForm({
                     defaultChecked={initial?.is_active ?? true}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-200">Service is active</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-200">{t("fields.active.checkbox")}</span>
                 </label>
               </Field>
             </Row>
@@ -507,14 +509,14 @@ export function ServiceForm({
           onClick={() => router.push("/dashboard/services")}
           className="px-5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
         >
-          Cancel
+          {t("cancel")}
         </button>
         <button
           type="submit"
           disabled={pending}
           className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-60"
         >
-          {pending ? "Saving…" : submitLabel}
+          {pending ? t("saving") : (submitLabel ?? t("saveDefault"))}
         </button>
       </div>
 
@@ -552,6 +554,7 @@ function GalleryTile({
   onUpdate: (patch: Partial<GalleryItem>) => void;
   onRemove: () => void;
 }) {
+  const t = useTranslations("DashboardServicesFormServiceForm");
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
       <div className="aspect-[4/3] bg-gray-100 dark:bg-gray-800 relative">
@@ -574,7 +577,7 @@ function GalleryTile({
           type="button"
           onClick={onRemove}
           className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white hover:bg-rose-500 flex items-center justify-center text-xs cursor-pointer"
-          aria-label="Remove"
+          aria-label={t("gallery.remove")}
         >
           ✕
         </button>
@@ -591,7 +594,7 @@ function GalleryTile({
         <input
           value={item.caption || ""}
           onChange={(e) => onUpdate({ caption: e.target.value })}
-          placeholder="Caption (optional)"
+          placeholder={t("gallery.captionPlaceholder")}
           className="input text-[11px]"
         />
       </div>

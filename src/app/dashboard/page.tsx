@@ -320,17 +320,17 @@ export default async function DashboardPage() {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Fulfilment Stats</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Campaigns Completed vs Ongoing</p>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("charts.fulfilment.title")}</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("charts.fulfilment.subtitle")}</p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                <span className="text-gray-500 dark:text-gray-400">Completed</span>
+                <span className="text-gray-500 dark:text-gray-400">{t("charts.fulfilment.completed")}</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                <span className="text-gray-500 dark:text-gray-400">Ongoing</span>
+                <span className="text-gray-500 dark:text-gray-400">{t("charts.fulfilment.ongoing")}</span>
               </span>
             </div>
           </div>
@@ -341,17 +341,17 @@ export default async function DashboardPage() {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Monthly Signups</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Influencer & Brand Registrations</p>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("charts.signups.title")}</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("charts.signups.subtitle")}</p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                <span className="text-gray-500 dark:text-gray-400">Influencer</span>
+                <span className="text-gray-500 dark:text-gray-400">{t("charts.signups.influencer")}</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-pink-400" />
-                <span className="text-gray-500 dark:text-gray-400">Business</span>
+                <span className="text-gray-500 dark:text-gray-400">{t("charts.signups.business")}</span>
               </span>
             </div>
           </div>
@@ -362,8 +362,8 @@ export default async function DashboardPage() {
       {/* Weekly campaigns full width */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Weekly New Campaigns</h3>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Campaign creation over the last 4 weeks</p>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("charts.weekly.title")}</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("charts.weekly.subtitle")}</p>
         </div>
         <DashboardCharts type="weeklyCampaigns" data={stats.weeklyCampaigns} />
       </div>

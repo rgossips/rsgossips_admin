@@ -111,18 +111,18 @@ export default function AuthCallbackPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
-                placeholder="At least 8 characters"
+                placeholder={t("passwordPlaceholder")}
                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm Password</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{t("confirmPasswordLabel")}</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                placeholder="Re-enter the password"
+                placeholder={t("confirmPasswordPlaceholder")}
                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -131,7 +131,7 @@ export default function AuthCallbackPage() {
               disabled={saving}
               className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 text-white font-medium transition-all cursor-pointer"
             >
-              {saving ? "Saving..." : "Set password and continue"}
+              {saving ? t("saving") : t("setPasswordCta")}
             </button>
           </form>
         )}
@@ -141,7 +141,7 @@ export default function AuthCallbackPage() {
             onClick={() => router.push("/login")}
             className="w-full py-2.5 px-4 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium cursor-pointer"
           >
-            Back to login
+            {t("backToLogin")}
           </button>
         )}
       </div>
