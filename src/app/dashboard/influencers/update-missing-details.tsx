@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
-import { scanMissingPhotos, enrichInvitations } from "./enrich-actions";
-import { ENRICH_CHUNK_SIZE, type MissingPhotoRow, type EnrichOutcome } from "./enrich-constants";
+import { scanMissingDetails, enrichInvitations } from "./enrich-actions";
+import { ENRICH_CHUNK_SIZE, type MissingDetailRow, type EnrichOutcome } from "./enrich-constants";
 
 type Phase = "idle" | "scanning" | "listed" | "updating" | "done";
 
@@ -12,7 +12,7 @@ export function UpdateMissingDetails() {
   const t = useTranslations("DashboardInfluencersUpdateMissingDetails");
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
-  const [rows, setRows] = useState<MissingPhotoRow[]>([]);
+  const [rows, setRows] = useState<MissingDetailRow[]>([]);
   const [truncated, setTruncated] = useState(false);
   const [done, setDone] = useState(0);
   const [outcomes, setOutcomes] = useState<EnrichOutcome[]>([]);
@@ -24,7 +24,7 @@ export function UpdateMissingDetails() {
     setError("");
     setOutcomes([]);
     setDone(0);
-    const res = await scanMissingPhotos();
+    const res = await scanMissingDetails();
     if (res.error) {
       setError(res.error);
       setPhase("idle");
@@ -124,13 +124,25 @@ export function UpdateMissingDetails() {
                   )}
                   <ul className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg">
                     {rows.map((r) => (
-                      <li key={r.id} className="px-3 py-2 flex items-center justify-between gap-3">
-                        <span className="text-[13px] text-gray-700 dark:text-gray-200 truncate">
-                          {r.full_name || t("unnamed")}
-                        </span>
-                        <span className="text-[11px] font-mono text-gray-400 shrink-0">
-                          @{r.instagram_username}
-                        </span>
+                      <li key={r.id} className="px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[13px] text-gray-700 dark:text-gray-200 truncate">
+                            {r.full_name || t("unnamed")}
+                          </span>
+                          <span className="text-[11px] font-mono text-gray-400 shrink-0">
+                            @{r.instagram_username}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {r.missing.map((m) => (
+                            <span
+                              key={m}
+                              className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[10px] font-semibold text-gray-500 dark:text-gray-400"
+                            >
+                              {t(`field.${m}`)}
+                            </span>
+                          ))}
+                        </div>
                       </li>
                     ))}
                   </ul>

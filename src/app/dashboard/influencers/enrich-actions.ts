@@ -5,7 +5,12 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { adminGate, requireAdmin } from "@/lib/require-super-admin";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { friendlyDbError, logError } from "@/lib/log";
-import { ENRICH_CHUNK_SIZE, type MissingPhotoRow, type EnrichOutcome } from "./enrich-constants";
+import {
+  ENRICH_CHUNK_SIZE,
+  CORE_FIELDS,
+  type MissingDetailRow,
+  type EnrichOutcome,
+} from "./enrich-constants";
 
 // Backfills profile photos on PENDING influencer_invitations from HikerAPI.
 // Scoped to invitations only: a registered creator with no photo may have
@@ -17,24 +22,57 @@ import { ENRICH_CHUNK_SIZE, type MissingPhotoRow, type EnrichOutcome } from "./e
 // in our own bucket — storing the CDN URL directly yields dead images later.
 
 const HIKER_BASE = "https://api.hikerapi.com";
-const MAX_SCAN_ROWS = 2000;
+const MAX_SCAN_ROWS = 5000;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 12_000;
 
 // Each call costs HikerAPI credits, so cap how fast one admin can burn them.
 // One call == one chunk == ENRICH_CHUNK_SIZE creators.
 //
-// Sized against the real backlog: ~838 invitations => ~168 chunks for a full
-// pass. 400 leaves room for a full run plus a retry sweep over the failures
-// (private accounts, renamed handles) inside the same hour, while still
-// capping a runaway at ~2000 lookups/hr.
-const ENRICH_LIMIT_PER_HOUR = 400;
+// Sized against the real backlog. The scan covers ALL core fields, not just
+// photos, so the first full pass is ~1578 rows => ~316 chunks. 600 leaves room
+// for that pass plus a retry sweep over the failures (dead/renamed handles)
+// inside the same hour, while still capping a runaway at ~3000 lookups/hr.
+const ENRICH_LIMIT_PER_HOUR = 600;
 
-// Lists pending invitations with no profile photo. Read-only + admin-gated:
-// instagram_username + full_name are PII, so this must never be reachable
-// by a viewer or an unauthenticated session.
-export async function scanMissingPhotos(): Promise<{
-  rows?: MissingPhotoRow[];
+// Reads the JSON trailer out of `notes`. Tolerates every shape in the wild:
+// null, free text only, bare JSON, or text + "\n---\n" + JSON.
+function parseMeta(notes: string | null): Record<string, unknown> {
+  if (!notes) return {};
+  const sep = notes.indexOf("\n---\n");
+  const raw = sep !== -1 ? notes.slice(sep + 5) : notes.trim().startsWith("{") ? notes : "";
+  if (!raw) return {};
+  try {
+    return (JSON.parse(raw) as Record<string, unknown>) || {};
+  } catch {
+    return {};
+  }
+}
+
+const isBlank = (v: unknown) => v === undefined || v === null || v === "";
+
+// Which core fields this row is still missing. `verified`/`isPrivate` are
+// booleans, so `false` counts as present — only absent means missing.
+function missingCoreFields(row: { profile_photo_url: string | null; notes: string | null }): string[] {
+  const meta = parseMeta(row.notes);
+  const missing: string[] = [];
+  if (isBlank(row.profile_photo_url)) missing.push("photo");
+  for (const f of CORE_FIELDS) {
+    if (f === "photo") continue;
+    if (isBlank(meta[f])) missing.push(f);
+  }
+  return missing;
+}
+
+// Lists pending invitations missing ANY core field — not just a photo.
+// Read-only + admin-gated: instagram_username + full_name are PII, so this
+// must never be reachable by a viewer or an unauthenticated session.
+//
+// The "missing" test lives in JSON inside a text column, which PostgREST
+// can't filter on, so we page the pending set in and test in memory. Only
+// the filtered result crosses to the client.
+export async function scanMissingDetails(): Promise<{
+  rows?: MissingDetailRow[];
   truncated?: boolean;
   error?: string;
 }> {
@@ -42,24 +80,41 @@ export async function scanMissingPhotos(): Promise<{
   if (gate) return gate;
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("influencer_invitations")
-    .select("id, full_name, instagram_username")
-    .eq("status", "pending")
-    // Rows land here with either NULL or "" depending on which form/import
-    // created them, so both count as missing. No user input in this filter.
-    .or("profile_photo_url.is.null,profile_photo_url.eq.")
-    .order("created_at", { ascending: false })
-    .limit(MAX_SCAN_ROWS + 1);
+  const all: any[] = [];
 
-  if (error) {
-    return { error: friendlyDbError("influencers.scanMissingPhotos", error, "Scan failed") };
+  // PostgREST caps a page at 1000 and there are ~1578 pending, so a single
+  // select would silently return a truncated set.
+  for (let from = 0; from <= MAX_SCAN_ROWS; from += 1000) {
+    const { data, error } = await admin
+      .from("influencer_invitations")
+      .select("id, full_name, instagram_username, profile_photo_url, notes")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .range(from, from + 999);
+
+    if (error) {
+      return { error: friendlyDbError("influencers.scanMissingDetails", error, "Scan failed") };
+    }
+    all.push(...(data || []));
+    if (!data || data.length < 1000) break;
   }
 
-  // Only rows we can actually look up — no handle means nothing to query.
-  const usable = (data || []).filter((r) => (r.instagram_username || "").trim());
-  const truncated = usable.length > MAX_SCAN_ROWS;
-  return { rows: usable.slice(0, MAX_SCAN_ROWS), truncated };
+  const rows: MissingDetailRow[] = [];
+  for (const r of all) {
+    // No handle means nothing to look up.
+    if (!(r.instagram_username || "").trim()) continue;
+    const missing = missingCoreFields(r);
+    if (missing.length === 0) continue;
+    rows.push({
+      id: r.id,
+      full_name: r.full_name,
+      instagram_username: r.instagram_username,
+      missing,
+    });
+  }
+
+  const truncated = rows.length > MAX_SCAN_ROWS;
+  return { rows: rows.slice(0, MAX_SCAN_ROWS), truncated };
 }
 
 // Bounded fetch — a hung upstream would otherwise sit until the platform

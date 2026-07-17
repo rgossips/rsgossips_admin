@@ -9,12 +9,35 @@
 // Keep this small: a chunk that times out loses the whole chunk's API spend.
 export const ENRICH_CHUNK_SIZE = 5;
 
-// A row awaiting a photo. Deliberately narrow — this crosses to the client,
-// so it carries no PII beyond what the list page already renders.
-export type MissingPhotoRow = {
+// Fields that decide whether a row counts as "missing details".
+//
+// ONLY fields HikerAPI returns for every reachable account belong here —
+// measured live at a 100% fill rate. Put a patchy field in this list and the
+// scan stops converging: rows that legitimately have no value would be listed
+// (and re-bought) on every single run, forever.
+//
+// Deliberately excluded despite being filled opportunistically:
+//   bio, businessCategory  — a creator can genuinely have neither
+//   email (75%), externalUrl (38%), phone (0%) — mostly absent in practice
+export const CORE_FIELDS = [
+  "photo",
+  "followers",
+  "follows",
+  "posts",
+  "verified",
+  "isPrivate",
+] as const;
+
+export type CoreField = (typeof CORE_FIELDS)[number];
+
+// A row with at least one core field missing. Deliberately narrow — this
+// crosses to the client, so it carries no PII beyond what the list already
+// renders.
+export type MissingDetailRow = {
   id: string;
   full_name: string | null;
   instagram_username: string | null;
+  missing: string[];
 };
 
 export type EnrichOutcome = {
