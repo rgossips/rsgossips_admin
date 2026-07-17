@@ -87,6 +87,14 @@ Creators sign in by phone. `phone` lives on `auth.users`, **not** on `influencer
 - [parseStoredCities()](src/lib/cities.ts) is the single owner of the split/normalize contract — splits on comma, keeps only known cities (case-insensitively → canonical), drops legacy free-text tokens like the country in "Mumbai, India". Use it to prefill the multiselect everywhere.
 - [cities.ts](src/lib/cities.ts) intentionally keeps spelling **aliases** (Hubli/Hubli-Dharwad, Tiruchirappalli/Tiruchirapalli, plus Goa, Gulbarga) for back-compat with values saved under the older shorter list. Kept hand-synced with the web repo's `src/utils/indianCities.js` — mirror any edit there.
 
+### Languages (multi-select, JSON array)
+
+- [languages.ts](src/lib/languages.ts) is the single owner of the content-language options — imported by the campaign targeting form and the influencer invite form. Both used to hardcode their own array and had drifted (campaigns was missing Odia + Urdu, so creators tagged with those were unreachable by any campaign). Don't re-add a local copy.
+- Unlike cities, languages persist as a **JSON array** — `metadata.languages` on invitations, `target_languages` in the `campaigns.description` trailer. Adding options is purely additive; no migration needed.
+- **Labels must never be substrings of one another.** RS_Gossips `list-influencers` matches bidirectionally (`il.includes(sel) || sel.includes(il)`), so "Rajasthani/Marwari" alongside "Marwari" would cross-match and silently widen every filter. Keep one canonical single-token label — no slashes, no parenthetical alt-names.
+- The list is creator-led, not the official Eighth Schedule 22: it includes non-scheduled but high-volume languages (Bhojpuri, Haryanvi, Tulu, Chhattisgarhi, Awadhi, Magahi, Rajasthani) and still covers all 22. Tiers are ordering only — the flat `INDIAN_LANGUAGES` is what forms import.
+- The invited-influencer **edit** row is a free-text `languages_csv` input, not a picker — it does not use this list.
+
 ### Invitation → profile claim (cross-repo)
 
 - Admin-curated invitation metadata (`creator_type`, `categories`, `gender`, `city`) is packed into `influencer_invitations.notes` and only becomes real profile columns when the creator **claims** the invitation — that copy happens in the **RS_Gossips `create-profile` edge function**, not here. If you add a field to the invite/edit form that must survive claim, update that edge function too or it silently drops on signup.

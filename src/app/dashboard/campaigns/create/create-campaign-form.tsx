@@ -7,6 +7,7 @@ import { createCampaign, updateCampaign, uploadCampaignImage } from "../actions"
 import { FullPageLoader } from "@/components/spinner";
 
 import { CATEGORIES } from "@/lib/categories";
+import { INDIAN_LANGUAGES } from "@/lib/languages";
 
 // Shape passed in when the form is in edit mode. Optional fields mirror
 // the columns we read off `campaigns` + the metadata we pack into the
@@ -58,10 +59,6 @@ const CITIES = [
   "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai",
   "Kolkata", "Ahmedabad", "Jaipur", "Lucknow", "Chandigarh", "Indore",
   "Bhopal", "Kochi", "Remote",
-];
-const LANGUAGES = [
-  "Hindi", "English", "Tamil", "Telugu", "Marathi", "Kannada",
-  "Bengali", "Gujarati", "Punjabi", "Malayalam",
 ];
 const GENDERS = ["Male", "Female", "Any"];
 
@@ -828,7 +825,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
             <div>
               <label className={labelClass}>{t("fields.preferredLanguages")}</label>
               <div className="flex flex-wrap gap-2">
-                {LANGUAGES.map((l) => (
+                {INDIAN_LANGUAGES.map((l) => (
                   <Chip key={l} label={l} on={selectedLanguages.includes(l)} onClick={() => toggle(setSelectedLanguages)(l)} />
                 ))}
               </div>
