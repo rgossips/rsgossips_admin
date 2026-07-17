@@ -21,7 +21,7 @@ export function normalizeGender(raw: string | undefined | null): string {
 // case-insensitive) match — Instagram handles legitimately contain `_`,
 // which is a LIKE wildcard and would otherwise cause false-positive
 // "already exists" hits (priya_sharma matching priyaXsharma).
-function escapeLike(value: string): string {
+export function escapeLike(value: string): string {
   return value.replace(/([\\%_])/g, "\\$1");
 }
 

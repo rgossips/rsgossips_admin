@@ -1615,9 +1615,10 @@
   "DashboardReferralsComponentsAdjustRcForm": {
     "amountRequired": "Amount is required",
     "balanceAfter": "Balance after: {balance} RC",
+    "adjustedFor": "{label} — balance after: {balance} RC",
     "title": "Adjust RC wallet",
-    "description": "Grant / deduct Reward Credits for any influencer. All adjustments are logged with your admin id.",
-    "userIdPlaceholder": "Influencer user id",
+    "description": "Grant / deduct Reward Credits for any influencer by their Instagram username. All adjustments are logged with your admin id.",
+    "usernamePlaceholder": "Instagram username",
     "grantOption": "Grant (+)",
     "deductOption": "Deduct (−)",
     "amountPlaceholder": "Amount",

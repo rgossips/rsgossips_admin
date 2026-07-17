@@ -6,7 +6,7 @@ import { adjustRc } from "../actions";
 
 export function AdjustRcForm({ canWrite }: { canWrite: boolean }) {
   const t = useTranslations("DashboardReferralsComponentsAdjustRcForm");
-  const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [mode, setMode] = useState<"grant" | "deduct">("grant");
@@ -24,12 +24,16 @@ export function AdjustRcForm({ canWrite }: { canWrite: boolean }) {
     }
     const delta = mode === "grant" ? abs : -abs;
     startSave(async () => {
-      const res = await adjustRc(userId.trim(), delta, note);
+      const res = await adjustRc(username.trim(), delta, note);
       if (res?.error) {
         setFeedback({ error: res.error });
         return;
       }
-      setFeedback({ ok: t("balanceAfter", { balance: res.balanceAfter ?? 0 }) });
+      setFeedback({
+        ok: res.label
+          ? t("adjustedFor", { label: res.label, balance: res.balanceAfter ?? 0 })
+          : t("balanceAfter", { balance: res.balanceAfter ?? 0 }),
+      });
       setAmount("");
       setNote("");
     });
@@ -47,12 +51,18 @@ export function AdjustRcForm({ canWrite }: { canWrite: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
-        <input
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          placeholder={t("userIdPlaceholder")}
-          className="lg:col-span-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-        />
+        <div className="lg:col-span-2 flex items-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 focus-within:ring-2 focus-within:ring-indigo-500">
+          <span className="pl-3 pr-0.5 text-sm text-gray-400 select-none">@</span>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder={t("usernamePlaceholder")}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="flex-1 min-w-0 py-2 pr-3 bg-transparent text-sm outline-none font-mono"
+          />
+        </div>
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as any)}
@@ -86,7 +96,7 @@ export function AdjustRcForm({ canWrite }: { canWrite: boolean }) {
         <button
           type="button"
           onClick={submit}
-          disabled={saving || !userId.trim() || !amount || !note.trim()}
+          disabled={saving || !username.trim() || !amount || !note.trim()}
           className={`px-4 py-2 rounded-lg text-white text-[12px] font-bold disabled:opacity-50 cursor-pointer ${
             mode === "grant" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
           }`}

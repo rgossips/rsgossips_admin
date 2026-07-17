@@ -3,6 +3,8 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/require-super-admin";
+import { escapeLike } from "@/lib/bulk-invite-utils";
+import { friendlyDbError } from "@/lib/log";
 
 // Manual RC adjustment (Phase-0 decision #11). Two modes:
 //   grant  → positive delta
@@ -14,11 +16,63 @@ import { requireAdmin } from "@/lib/require-super-admin";
 
 const MAX_ABS_DELTA = 10_000;
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The admin types an Instagram username; the ledger keys on the profile
+// UUID. Resolve here (server-side, after the gate) rather than in the form
+// — a client-side lookup would need an ungated read of influencer PII.
+//
+// Instagram handles have no unique constraint, so a multi-hit is possible;
+// we refuse rather than guess, because picking the wrong row silently moves
+// money to the wrong creator. A raw UUID is still accepted so an admin
+// holding an id (or an ambiguous handle) always has a way through.
+async function resolveInfluencer(
+  admin: ReturnType<typeof createAdminClient>,
+  input: string,
+): Promise<{ userId?: string; label?: string; error?: string }> {
+  const raw = (input || "").trim().replace(/^@+/, "");
+  if (!raw) return { error: "Instagram username is required" };
+
+  const describe = (p: any, fallback: string) =>
+    p?.instagram_handle
+      ? `${p.full_name || p.username || "Creator"} (@${p.instagram_handle})`
+      : p?.full_name || p?.username || fallback;
+
+  if (UUID_RE.test(raw)) {
+    const { data } = await admin
+      .from("influencer_profiles")
+      .select("influencer_id, full_name, username, instagram_handle")
+      .eq("influencer_id", raw)
+      .maybeSingle();
+    // Not finding a profile isn't fatal — the wallet is keyed on user id
+    // and a non-influencer user can still hold RC.
+    return { userId: raw, label: describe(data, raw) };
+  }
+
+  const { data, error } = await admin
+    .from("influencer_profiles")
+    .select("influencer_id, full_name, username, instagram_handle")
+    // escapeLike so a handle's `_` isn't treated as a LIKE wildcard
+    // (priya_sharma would otherwise match priyaXsharma).
+    .ilike("instagram_handle", escapeLike(raw))
+    .limit(5);
+
+  if (error) return { error: friendlyDbError("referrals.resolveInfluencer", error, "Lookup failed") };
+  if (!data || data.length === 0) return { error: `No influencer found with Instagram username @${raw}` };
+  if (data.length > 1) {
+    return {
+      error: `@${raw} matches ${data.length} profiles — use the influencer's user id instead`,
+    };
+  }
+  return { userId: data[0].influencer_id, label: describe(data[0], raw) };
+}
+
 export async function adjustRc(
-  userId: string,
+  usernameOrId: string,
   deltaRc: number,
   note: string,
-): Promise<{ ok?: boolean; error?: string; balanceAfter?: number }> {
+): Promise<{ ok?: boolean; error?: string; balanceAfter?: number; label?: string }> {
   // requireAdmin returns the acting admin's id — needed for the audit
   // trail below. (The old admin.auth.getUser() on the service-role client
   // has no session and always returned null, so admin_id was never
@@ -30,7 +84,6 @@ export async function adjustRc(
   const cleanNote = (note || "").trim();
   const cleanDelta = Math.trunc(Number(deltaRc));
 
-  if (!userId) return { error: "userId is required" };
   if (!Number.isFinite(cleanDelta) || cleanDelta === 0) {
     return { error: "Amount must be a non-zero integer" };
   }
@@ -41,6 +94,12 @@ export async function adjustRc(
   if (cleanNote.length > 500) return { error: "Note is too long (max 500 chars)" };
 
   const admin = createAdminClient();
+
+  // Validate the amount/note first so a typo'd username doesn't cost a
+  // lookup, then resolve the handle → the UUID the ledger keys on.
+  const resolved = await resolveInfluencer(admin, usernameOrId);
+  if (resolved.error) return { error: resolved.error };
+  const userId = resolved.userId!;
 
   // Current balance for the snapshot.
   const { data: balRow } = await admin
@@ -89,7 +148,10 @@ export async function adjustRc(
   } catch { /* non-fatal */ }
 
   revalidatePath("/dashboard/referrals");
-  return { ok: true, balanceAfter };
+  // label echoes back who actually got credited — this is a money action
+  // and the admin typed a handle, so confirming the resolved identity is
+  // the only way they can catch a wrong-creator hit.
+  return { ok: true, balanceAfter, label: resolved.label };
 }
 
 export async function resolveManualReview(
