@@ -74,13 +74,7 @@ export default async function FeaturedCampaignsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {t.rich("description", {
-              link: (c) => (
-                <a href="/dashboard/featured-stay" className="text-indigo-500 hover:underline">
-                  {c}
-                </a>
-              ),
-            })}
+            {t("description")}
           </p>
         </div>
         {canWrite && <AddFeaturedCampaignButton />}

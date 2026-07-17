@@ -948,7 +948,7 @@
   },
   "DashboardFeaturedCampaigns": {
     "title": "Featured Campaigns",
-    "description": "Hand-picked list shown on the influencer home page at the top (Deal Of The Day stacked carousel). Plan Your Stay With Us is curated separately under <link>Plan Your Stay</link>. Lower position = appears first.",
+    "description": "Hand-picked list shown on the influencer home page at the top (Deal Of The Day stacked carousel). Lower position = appears first.",
     "stat": {
       "total": "Total",
       "active": "Active",
