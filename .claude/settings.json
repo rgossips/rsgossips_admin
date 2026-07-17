@@ -3,7 +3,13 @@
     "allow": [
       "Bash(grep -rn \"escape\\\\|replace\\(/\\\\[%_\\\\]\" src/lib/bulk-invite-utils.ts)",
       "Bash(node \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/esc.js\")",
-      "Bash(node \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/extract.js\")"
+      "Bash(node \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/extract.js\")",
+      "Bash(grep -v '^$')",
+      "Bash(node \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/probe.js\" instagram)",
+      "Bash(node \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/scan-check.js\")",
+      "Bash(cp \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/scan-check.js\" ./.scan-check.tmp.cjs)",
+      "Bash(node ./.scan-check.tmp.cjs)",
+      "Bash(rm -f ./.scan-check.tmp.cjs)"
     ]
   }
 }

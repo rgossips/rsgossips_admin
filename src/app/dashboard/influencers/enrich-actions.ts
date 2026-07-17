@@ -23,7 +23,12 @@ const FETCH_TIMEOUT_MS = 12_000;
 
 // Each call costs HikerAPI credits, so cap how fast one admin can burn them.
 // One call == one chunk == ENRICH_CHUNK_SIZE creators.
-const ENRICH_LIMIT_PER_HOUR = 200;
+//
+// Sized against the real backlog: ~838 invitations => ~168 chunks for a full
+// pass. 400 leaves room for a full run plus a retry sweep over the failures
+// (private accounts, renamed handles) inside the same hour, while still
+// capping a runaway at ~2000 lookups/hr.
+const ENRICH_LIMIT_PER_HOUR = 400;
 
 // Lists pending invitations with no profile photo. Read-only + admin-gated:
 // instagram_username + full_name are PII, so this must never be reachable
