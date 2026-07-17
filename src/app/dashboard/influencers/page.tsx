@@ -6,6 +6,8 @@ import { InvitedInfluencerRow } from "./invited-influencer-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
 import { sanitizeSearchTerm } from "@/lib/validation";
+import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
 
 const INVITES_PER_PAGE = 12;
@@ -46,6 +48,8 @@ export default async function InfluencersPage({
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
   const { data: influencers, error } = await query;
 
+  const canWrite = await isAdminOrAbove();
+
   // Phone numbers live on auth.users, not influencer_profiles. Bulk-fetch
   // and build an id→phone map so we can render the column without an
   // N+1. Same pattern the admins page uses for auth status.
@@ -84,7 +88,10 @@ export default async function InfluencersPage({
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
           <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{t("subtitle")}</p>
         </div>
-        <RefreshButton />
+        <div className="flex items-center gap-2">
+          {canWrite && <UpdateMissingDetails />}
+          <RefreshButton />
+        </div>
       </div>
 
       <InviteInfluencerForm />

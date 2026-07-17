@@ -95,6 +95,15 @@ Creators sign in by phone. `phone` lives on `auth.users`, **not** on `influencer
 - The list is creator-led, not the official Eighth Schedule 22: it includes non-scheduled but high-volume languages (Bhojpuri, Haryanvi, Tulu, Chhattisgarhi, Awadhi, Magahi, Rajasthani) and still covers all 22. Tiers are ordering only — the flat `INDIAN_LANGUAGES` is what forms import.
 - The invited-influencer **edit** row is a free-text `languages_csv` input, not a picker — it does not use this list.
 
+### Profile-photo enrichment (HikerAPI)
+
+- "Update missing details" on the influencer list page ([update-missing-details.tsx](src/app/dashboard/influencers/update-missing-details.tsx)) scans **pending `influencer_invitations` only** for an empty `profile_photo_url`, lists them, then backfills via HikerAPI. Registered `influencer_profiles` are deliberately out of scope — a creator with no photo may have chosen that.
+- Needs **`HIKER_API_KEY`** (server-only) in `.env.local` + Netlify. The scan works without it; only the update call needs it. Each call spends HikerAPI credits, so `enrichInvitationPhotos` is `requireAdmin()`-gated and rate-limited (`enrich_photos`, 200 calls/admin/hr).
+- **Instagram CDN URLs are signed and expire** — the photo MUST be downloaded and re-hosted in the `influencer-photos` bucket. Storing the CDN URL directly yields dead images weeks later. This is the same constraint the older RS_Gossips `scripts/enrich_invitations.js` (Apify) worked around; this in-portal flow supersedes it.
+- **Client-chunked** at `ENRICH_CHUNK_SIZE` (5) — same shape as bulk-invite. Instagram lookups are ~1-2s each and Netlify's function timeout is short, so one request per chunk with the chunk's items run in parallel. The action rejects chunks larger than the constant.
+- `extractPhotoUrl()` probes several response shapes (v1 flat / v2 `user`-nested / `data`-nested, hd + sd) because HikerAPI has shipped more than one. A shape change degrades to "no photo found" rather than writing `undefined` over a row.
+- The runner re-reads rows server-side and re-checks the photo is still empty — never trusts client-sent usernames, and won't spend credits twice if a concurrent admin already filled it. It writes **only** `profile_photo_url`, never `notes` (that trailer holds `followers`/`bio` keys — see below).
+
 ### Invitation → profile claim (cross-repo)
 
 - Admin-curated invitation metadata (`creator_type`, `categories`, `gender`, `city`) is packed into `influencer_invitations.notes` and only becomes real profile columns when the creator **claims** the invitation — that copy happens in the **RS_Gossips `create-profile` edge function**, not here. If you add a field to the invite/edit form that must survive claim, update that edge function too or it silently drops on signup.

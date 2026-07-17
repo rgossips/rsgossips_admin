@@ -1083,6 +1083,22 @@
     "label": "Section title (influencer home)",
     "placeholder": "Plan your stay with us"
   },
+  "DashboardInfluencersUpdateMissingDetails": {
+    "button": "Update missing details",
+    "title": "Update missing details",
+    "subtitle": "Finds pending invitations with no profile picture and fetches it from Instagram.",
+    "scanning": "Scanning invitations…",
+    "noneMissing": "Every pending invitation already has a profile picture.",
+    "foundCount": "{count, plural, one {# invitation is missing a profile picture} other {# invitations are missing a profile picture}}",
+    "truncated": "Showing the first 2000 only — run again afterwards to pick up the rest.",
+    "unnamed": "(no name)",
+    "updateCount": "Update {count}",
+    "updatingProgress": "Updating {done} of {total}…",
+    "finished": "Done — {ok} updated, {failed} skipped.",
+    "notUpdated": "Not updated",
+    "close": "Close",
+    "cancel": "Cancel"
+  },
   "DashboardInfluencers": {
     "title": "Influencers",
     "subtitle": "Manage influencer profiles and invitations",
