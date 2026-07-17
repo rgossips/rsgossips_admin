@@ -30,7 +30,15 @@ function DebouncedInput({
 }) {
   const [value, setValue] = useState(initialValue);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const isFirstRender = useRef(true);
+
+  // Hold the callback in a ref rather than depending on it. It's a
+  // useCallback over `searchParams`, so its identity changes on EVERY
+  // navigation — as an effect dep it re-armed the debounce after our own
+  // push, which pushed again, and so on: an endless ?_rsc= refetch loop.
+  const cbRef = useRef(onDebouncedChange);
+  useEffect(() => {
+    cbRef.current = onDebouncedChange;
+  });
 
   // Sync when URL params change externally (e.g. clear filters)
   useEffect(() => {
@@ -38,18 +46,18 @@ function DebouncedInput({
   }, [initialValue]);
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+    // Already in sync with the URL, so there's nothing to push. This covers
+    // the first render and — crucially — the settle after our own push, which
+    // is what stops the loop rather than merely delaying it.
+    if (value === initialValue) return;
     if (timeout.current) clearTimeout(timeout.current);
     timeout.current = setTimeout(() => {
-      onDebouncedChange(name, value);
+      cbRef.current(name, value);
     }, 400);
     return () => {
       if (timeout.current) clearTimeout(timeout.current);
     };
-  }, [value, name, onDebouncedChange]);
+  }, [value, initialValue, name]);
 
   return (
     <input
@@ -142,6 +150,18 @@ export function FilterBar({ fields }: { fields: FilterField[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Navigate only when the query actually changes. Belt-and-braces against
+  // the loop above, and it drops the stray trailing "?" that made the bare
+  // path look like a distinct URL to the router.
+  const pushParams = useCallback(
+    (params: URLSearchParams) => {
+      const next = params.toString();
+      if (next === searchParams.toString()) return;
+      router.push(next ? `${pathname}?${next}` : pathname);
+    },
+    [router, pathname, searchParams]
+  );
+
   const updateFilter = useCallback(
     (name: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -150,9 +170,9 @@ export function FilterBar({ fields }: { fields: FilterField[] }) {
       } else {
         params.delete(name);
       }
-      router.push(pathname + "?" + params.toString());
+      pushParams(params);
     },
-    [router, pathname, searchParams]
+    [searchParams, pushParams]
   );
 
   const updateMultiFilter = useCallback(
@@ -163,9 +183,9 @@ export function FilterBar({ fields }: { fields: FilterField[] }) {
       } else {
         params.delete(name);
       }
-      router.push(pathname + "?" + params.toString());
+      pushParams(params);
     },
-    [router, pathname, searchParams]
+    [searchParams, pushParams]
   );
 
   const clearAll = () => {

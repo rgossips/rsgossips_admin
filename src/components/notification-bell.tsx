@@ -14,6 +14,23 @@ interface Notification {
   time: string;
 }
 
+// Some source tables (campaign_applications) return timestamps WITHOUT a
+// timezone — "2026-07-04T06:26:54.174", no Z, no offset — while others
+// (service_orders) include "+00:00". Per the ES spec, a timezone-less ISO
+// string is parsed as the VIEWER's local time, but every value in this stack
+// is UTC wall-clock (Supabase's session TZ is UTC). Left as-is, an
+// application notification is skewed by the viewer's offset (5.5h in IST),
+// which is why a fresh one read as hours/days old. Normalise: if the string
+// carries no timezone designator, treat it as UTC.
+function parseTimestamp(iso: string): number {
+  if (!iso) return NaN;
+  const hasTz = /[zZ]$|[+-]\d\d:?\d\d$/.test(iso);
+  // Space-separated form ("2026-07-04 06:26:54") also parses inconsistently
+  // across engines — normalise the separator before appending the marker.
+  const normalized = hasTz ? iso : iso.replace(" ", "T") + "Z";
+  return new Date(normalized).getTime();
+}
+
 export function NotificationBell() {
   const t = useTranslations("NotificationBell");
   const [open, setOpen] = useState(false);
@@ -82,7 +99,7 @@ export function NotificationBell() {
           });
         }
 
-        items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+        items.sort((a, b) => parseTimestamp(b.time) - parseTimestamp(a.time));
 
         if (!cancelled) {
           setNotifications(items);
@@ -102,17 +119,20 @@ export function NotificationBell() {
   }, []);
 
   const formatTime = (iso: string) => {
-    const d = new Date(iso);
+    const ms = parseTimestamp(iso);
+    if (!Number.isFinite(ms)) return "";
     const now = Date.now();
-    const diff = now - d.getTime();
+    const diff = now - ms;
+    // A slightly-future timestamp (clock skew between DB and browser) should
+    // read "just now", not a negative age.
+    if (diff < 60_000) return t("time.justNow");
     const mins = Math.floor(diff / 60_000);
-    if (mins < 1) return t("time.justNow");
     if (mins < 60) return t("time.minutesAgo", { count: mins });
     const hours = Math.floor(mins / 60);
     if (hours < 24) return t("time.hoursAgo", { count: hours });
     const days = Math.floor(hours / 24);
     if (days < 7) return t("time.daysAgo", { count: days });
-    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+    return new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
   return (
