@@ -78,8 +78,14 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 // flat, v2 nests it under `user`), and the HD variant isn't always present.
 // Probe rather than assume, so a shape change degrades to "not found"
 // instead of writing `undefined` over a photo.
+function unwrapUser(payload: any): any {
+  return payload?.user ?? payload?.data?.user ?? payload?.data ?? payload;
+}
+
 function extractPhotoUrl(payload: any): string | null {
-  const user = payload?.user ?? payload?.data?.user ?? payload?.data ?? payload;
+  const user = unwrapUser(payload);
+  // _hd is genuinely absent for many real creators (null on @uv_techh but
+  // present on @instagram), so the sd fallback is load-bearing, not padding.
   const candidate =
     user?.profile_pic_url_hd ||
     user?.profile_pic_url ||
@@ -89,10 +95,110 @@ function extractPhotoUrl(payload: any): string | null {
   return typeof candidate === "string" && candidate.startsWith("http") ? candidate : null;
 }
 
+// Maps a HikerAPI user onto the notes-trailer keys ALREADY in use (written
+// by the old RS_Gossips Apify script, read by the featured-creators /
+// creator-stories pickers). Key names and value shapes must match it exactly:
+// followers/follows/posts are numbers, bio a trimmed string, verified a
+// boolean, businessCategory a string.
+//
+// A key is emitted ONLY when the API actually returned something usable —
+// absent fields must not clobber a populated value with 0/""/false. `verified`
+// and `isPrivate` are the exceptions: false is a real answer, not a blank.
+//
+// Deliberately NOT written: city, categories, gender, languages. Those are
+// admin-curated (city is a canonical comma-joined scalar the RS_Gossips
+// brand-campaigns matcher depends on) and a scraped value would corrupt them.
+function buildExtras(payload: any): Record<string, unknown> {
+  const u = unwrapUser(payload) || {};
+  const extras: Record<string, unknown> = {};
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+  if (typeof u.follower_count === "number") extras.followers = u.follower_count;
+  if (typeof u.following_count === "number") extras.follows = u.following_count;
+  if (typeof u.media_count === "number") extras.posts = u.media_count;
+  if (typeof u.is_verified === "boolean") extras.verified = u.is_verified;
+  if (typeof u.is_private === "boolean") extras.isPrivate = u.is_private;
+
+  const bio = str(u.biography);
+  if (bio) extras.bio = bio;
+
+  // Apify wrote businessCategoryName here; HikerAPI splits the same idea
+  // across three fields and often only populates `category`.
+  const category = str(u.business_category_name) || str(u.category_name) || str(u.category);
+  if (category) extras.businessCategory = category;
+
+  const email = str(u.public_email);
+  if (email) extras.email = email;
+
+  const externalUrl = str(u.external_url);
+  if (externalUrl) extras.externalUrl = externalUrl;
+
+  const phone = [str(u.public_phone_country_code), str(u.public_phone_number)].filter(Boolean).join(" ");
+  if (phone) extras.phone = phone;
+
+  return extras;
+}
+
+// Preserves the free-text half of `notes` and MERGES into the JSON trailer —
+// never rebuilds it. The trailer holds admin-curated keys this action knows
+// nothing about (city, categories, gender, languages, tags); a wholesale
+// rewrite would wipe them. Mirrors mergeNotes() in the Apify script.
+function mergeNotes(existing: string | null, extras: Record<string, unknown>): string {
+  let text = "";
+  let meta: Record<string, unknown> = {};
+  if (existing) {
+    const sep = existing.indexOf("\n---\n");
+    if (sep >= 0) {
+      text = existing.slice(0, sep);
+      try { meta = JSON.parse(existing.slice(sep + 5)) || {}; } catch { /* keep {} */ }
+    } else if (existing.trim().startsWith("{")) {
+      try { meta = JSON.parse(existing) || {}; } catch { text = existing; }
+    } else {
+      text = existing;
+    }
+  }
+  const merged = { ...meta, ...extras };
+  return text ? `${text}\n---\n${JSON.stringify(merged)}` : JSON.stringify(merged);
+}
+
+// Downloads and re-hosts the photo. Returns null (never throws) so a photo
+// problem can't cost us the text fields we already have in hand.
+async function rehostPhoto(
+  admin: ReturnType<typeof createAdminClient>,
+  photoUrl: string,
+  username: string,
+): Promise<string | null> {
+  try {
+    const img = await fetchWithTimeout(photoUrl);
+    if (!img.ok) return null;
+
+    const contentType = img.headers.get("content-type") || "image/jpeg";
+    if (!contentType.startsWith("image/")) return null;
+
+    const bytes = Buffer.from(await img.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_PHOTO_BYTES) return null;
+
+    const ext = contentType.split("/")[1]?.split(";")[0] || "jpg";
+    // Server-generated path — never trust a remote filename.
+    const path = `photos/enriched/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await admin.storage
+      .from("influencer-photos")
+      .upload(path, bytes, { contentType, upsert: true });
+    if (error) {
+      logError("influencers.enrich.upload", error, { username });
+      return null;
+    }
+    return admin.storage.from("influencer-photos").getPublicUrl(path).data.publicUrl;
+  } catch (e) {
+    logError("influencers.enrich.photo", e, { username });
+    return null;
+  }
+}
+
 async function enrichOne(
   admin: ReturnType<typeof createAdminClient>,
   apiKey: string,
-  row: { id: string; instagram_username: string },
+  row: { id: string; instagram_username: string; full_name: string | null; notes: string | null; profile_photo_url: string | null },
 ): Promise<EnrichOutcome> {
   const username = row.instagram_username.trim().replace(/^@+/, "");
   const fail = (error: string): EnrichOutcome => ({ id: row.id, username, ok: false, error });
@@ -108,46 +214,67 @@ async function enrichOne(
     if (res.status === 429) return fail("HikerAPI rate limit — try again shortly");
     if (!res.ok) return fail(`HikerAPI error ${res.status}`);
 
-    const photoUrl = extractPhotoUrl(await res.json());
-    if (!photoUrl) return fail("No profile photo in the API response");
+    const payload = await res.json();
+    const user = unwrapUser(payload) || {};
 
-    // Re-host: the CDN URL above is signed and expires.
-    const img = await fetchWithTimeout(photoUrl);
-    if (!img.ok) return fail(`Photo download failed (${img.status})`);
+    const updates: Record<string, unknown> = {};
+    const updated: string[] = [];
 
-    const contentType = img.headers.get("content-type") || "image/jpeg";
-    if (!contentType.startsWith("image/")) return fail("Downloaded file was not an image");
-
-    const bytes = Buffer.from(await img.arrayBuffer());
-    if (bytes.byteLength === 0) return fail("Downloaded photo was empty");
-    if (bytes.byteLength > MAX_PHOTO_BYTES) return fail("Photo larger than 5MB");
-
-    const ext = contentType.split("/")[1]?.split(";")[0] || "jpg";
-    // Server-generated path — never trust a remote filename.
-    const path = `photos/enriched/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error: upErr } = await admin.storage
-      .from("influencer-photos")
-      .upload(path, bytes, { contentType, upsert: true });
-    if (upErr) {
-      logError("influencers.enrich.upload", upErr, { username });
-      return fail("Storage upload failed");
+    // Text fields from the same response the photo comes from — free.
+    const extras = buildExtras(payload);
+    if (Object.keys(extras).length > 0) {
+      updates.notes = mergeNotes(row.notes, extras);
+      updated.push(...Object.keys(extras));
     }
 
-    const { data: pub } = admin.storage.from("influencer-photos").getPublicUrl(path);
+    // Only fill a blank name — an admin may have deliberately set a display
+    // name that differs from the Instagram one.
+    const apiName = typeof user.full_name === "string" ? user.full_name.trim() : "";
+    if (apiName && !(row.full_name || "").trim()) {
+      updates.full_name = apiName;
+      updated.push("full_name");
+    }
 
-    // Only profile_photo_url — never touch `notes`. The RS_Gossips
-    // enrichment script packs keys (followers, bio, …) into that trailer
-    // and a write here would race/wipe them.
+    // Photo last: it's the only step that can fail on its own, and doing it
+    // after the field mapping means a dead CDN link still leaves the row
+    // better off than it started.
+    let photoProblem = "";
+    if (!(row.profile_photo_url || "").trim()) {
+      const photoUrl = extractPhotoUrl(payload);
+      if (!photoUrl) {
+        photoProblem = "no photo in API response";
+      } else {
+        const hosted = await rehostPhoto(admin, photoUrl, username);
+        if (hosted) {
+          updates.profile_photo_url = hosted;
+          updated.push("photo");
+        } else {
+          photoProblem = "photo download/upload failed";
+        }
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return fail(photoProblem || "API returned nothing usable");
+    }
+
     const { error: updErr } = await admin
       .from("influencer_invitations")
-      .update({ profile_photo_url: pub.publicUrl })
+      .update(updates)
       .eq("id", row.id);
     if (updErr) {
       logError("influencers.enrich.update", updErr, { username });
       return fail("DB update failed");
     }
 
-    return { id: row.id, username, ok: true };
+    // Partial success is still success — surface what was missed.
+    return {
+      id: row.id,
+      username,
+      ok: true,
+      updated,
+      error: photoProblem || undefined,
+    };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
     logError("influencers.enrich", e, { username });
@@ -159,7 +286,7 @@ async function enrichOne(
 // trusting client-sent usernames, and each row is re-checked for an empty
 // photo so a concurrent admin's work isn't overwritten (and its credits
 // aren't spent twice).
-export async function enrichInvitationPhotos(
+export async function enrichInvitations(
   ids: string[],
 ): Promise<{ results?: EnrichOutcome[]; error?: string }> {
   let adminId: string;
@@ -190,21 +317,31 @@ export async function enrichInvitationPhotos(
   }
 
   const admin = createAdminClient();
+  // Re-read server-side rather than trusting client-sent usernames, and pull
+  // notes/full_name so the merge is against current DB state, not a stale
+  // copy the client scanned minutes ago.
   const { data: rows, error } = await admin
     .from("influencer_invitations")
-    .select("id, instagram_username, profile_photo_url")
+    .select("id, instagram_username, profile_photo_url, full_name, notes")
     .in("id", ids);
   if (error) {
     return { error: friendlyDbError("influencers.enrichChunk", error, "Lookup failed") };
   }
 
-  const targets = (rows || []).filter(
-    (r) => (r.instagram_username || "").trim() && !(r.profile_photo_url || "").trim(),
-  );
+  // Nothing to look up without a handle. A row that already has a photo is
+  // still processed — it may be missing the text fields (the old Apify pass
+  // left ~18 such rows), and this call's response covers both anyway.
+  const targets = (rows || []).filter((r) => (r.instagram_username || "").trim());
 
   const results = await Promise.all(
     targets.map((r) =>
-      enrichOne(admin, apiKey, { id: r.id, instagram_username: r.instagram_username as string }),
+      enrichOne(admin, apiKey, {
+        id: r.id,
+        instagram_username: r.instagram_username as string,
+        full_name: r.full_name,
+        notes: r.notes,
+        profile_photo_url: r.profile_photo_url,
+      }),
     ),
   );
 

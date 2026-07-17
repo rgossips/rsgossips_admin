@@ -22,4 +22,7 @@ export type EnrichOutcome = {
   username: string;
   ok: boolean;
   error?: string;
+  // Which fields this row actually gained, for the run summary — a row can
+  // succeed on the text fields but fail the photo (or vice-versa).
+  updated?: string[];
 };

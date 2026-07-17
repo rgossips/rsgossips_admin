@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
-import { scanMissingPhotos, enrichInvitationPhotos } from "./enrich-actions";
+import { scanMissingPhotos, enrichInvitations } from "./enrich-actions";
 import { ENRICH_CHUNK_SIZE, type MissingPhotoRow, type EnrichOutcome } from "./enrich-constants";
 
 type Phase = "idle" | "scanning" | "listed" | "updating" | "done";
@@ -45,7 +45,7 @@ export function UpdateMissingDetails() {
     // continues — one bad handle must not strand the remaining rows.
     for (let i = 0; i < rows.length; i += ENRICH_CHUNK_SIZE) {
       const slice = rows.slice(i, i + ENRICH_CHUNK_SIZE);
-      const res = await enrichInvitationPhotos(slice.map((r) => r.id));
+      const res = await enrichInvitations(slice.map((r) => r.id));
 
       if (res.error) {
         // A key/limit failure applies to every remaining chunk too — stop
@@ -72,6 +72,10 @@ export function UpdateMissingDetails() {
 
   const okCount = outcomes.filter((o) => o.ok).length;
   const failed = outcomes.filter((o) => !o.ok);
+  // A row can succeed on the text fields yet miss the photo — worth calling
+  // out separately from an outright failure, since it still improved.
+  const partial = outcomes.filter((o) => o.ok && o.error);
+  const photoCount = outcomes.filter((o) => o.updated?.includes("photo")).length;
 
   return (
     <>
@@ -141,6 +145,25 @@ export function UpdateMissingDetails() {
                       ? t("updatingProgress", { done, total: rows.length })
                       : t("finished", { ok: okCount, failed: failed.length })}
                   </p>
+                  {phase === "done" && okCount > 0 && (
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                      {t("photoSummary", { photos: photoCount, total: okCount })}
+                    </p>
+                  )}
+                  {phase === "done" && partial.length > 0 && (
+                    <div className="rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400 mb-1">
+                        {t("partial")}
+                      </p>
+                      <ul className="space-y-0.5">
+                        {partial.map((p) => (
+                          <li key={p.id} className="text-[11px] text-sky-800 dark:text-sky-300">
+                            <span className="font-mono">@{p.username}</span> — {p.error}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {phase === "done" && failed.length > 0 && (
                     <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-1">

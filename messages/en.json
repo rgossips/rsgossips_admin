@@ -1086,7 +1086,7 @@
   "DashboardInfluencersUpdateMissingDetails": {
     "button": "Update missing details",
     "title": "Update missing details",
-    "subtitle": "Finds pending invitations with no profile picture and fetches it from Instagram.",
+    "subtitle": "Finds pending invitations with no profile picture, then fills in their picture, followers, bio, verified status and more from Instagram.",
     "scanning": "Scanning invitations…",
     "noneMissing": "Every pending invitation already has a profile picture.",
     "foundCount": "{count, plural, one {# invitation is missing a profile picture} other {# invitations are missing a profile picture}}",
@@ -1095,6 +1095,8 @@
     "updateCount": "Update {count}",
     "updatingProgress": "Updating {done} of {total}…",
     "finished": "Done — {ok} updated, {failed} skipped.",
+    "photoSummary": "{photos} of {total} also got a profile picture.",
+    "partial": "Updated, but without a picture",
     "notUpdated": "Not updated",
     "close": "Close",
     "cancel": "Cancel"
