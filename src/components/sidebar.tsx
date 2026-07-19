@@ -60,6 +60,7 @@ const navGroups: NavGroup[] = [
 
 const adminNav: NavSpec[] = [
   { label: "Admin Users", href: "/dashboard/admins", icon: "shield" },
+  { label: "AI Settings", href: "/dashboard/ai-settings", icon: "sparkles" },
   { label: "Load Test", href: "/dashboard/load-test", icon: "grid" },
 ];
 
