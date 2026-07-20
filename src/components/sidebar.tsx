@@ -61,6 +61,7 @@ const navGroups: NavGroup[] = [
 const adminNav: NavSpec[] = [
   { label: "Admin Users", href: "/dashboard/admins", icon: "shield" },
   { label: "AI Settings", href: "/dashboard/ai-settings", icon: "sparkles" },
+  { label: "AI Usage", href: "/dashboard/ai-usage", icon: "chart" },
   { label: "Load Test", href: "/dashboard/load-test", icon: "grid" },
 ];
 
@@ -133,6 +134,11 @@ const icons: Record<string, React.ReactNode> = {
   wallet: (
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2H3V8zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6zm14 3a1 1 0 100 2 1 1 0 000-2z" />
+    </svg>
+  ),
+  chart: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3v18h18M8 17V9m5 8V5m5 12v-6" />
     </svg>
   ),
 };

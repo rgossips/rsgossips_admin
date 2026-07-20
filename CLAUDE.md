@@ -95,6 +95,14 @@ Creators sign in by phone. `phone` lives on `auth.users`, **not** on `influencer
 - The list is creator-led, not the official Eighth Schedule 22: it includes non-scheduled but high-volume languages (Bhojpuri, Haryanvi, Tulu, Chhattisgarhi, Awadhi, Magahi, Rajasthani) and still covers all 22. Tiers are ordering only — the flat `INDIAN_LANGUAGES` is what forms import.
 - The invited-influencer **edit** row is a free-text `languages_csv` input, not a picker — it does not use this list.
 
+### AI usage analytics (`/dashboard/ai-usage`, super-admin)
+
+- The consumer app's `ai-generate` edge function (RS_Gossips) is the only AI feature surface — 10 tools (caption/script/pitch/…) through a provider-swappable adapter (`_shared/ai.ts`, Anthropic/OpenAI/Gemini). It already metered tokens per `(user, month, tool)` in `ai_generation_usage` (migration 050) for **quota**, but that aggregate records neither provider nor model.
+- For analytics we added a **separate append-only** `ai_usage_events` table (RS_Gossips **migration 052**) — one row per generation with `provider`/`model`/`tokens`/`tool`/`user_id`. Kept separate from the quota table on purpose: widening `ai_generation_usage`'s grain would ripple into every consumer-app quota reader. The edge fn writes **both** (quota bump + one event), the event insert best-effort so analytics can never break a generation.
+- The admin page never pulls raw rows — it calls two `security definer` rollup RPCs (`ai_usage_rollup` grouped by provider/model/tool, `ai_usage_by_user` top-N) added in the same migration. Provider/feature/model/total costs are exact (rollup carries `model`); per-influencer cost is a **blended estimate** (period in/out cost distributed by each creator's tokens — the user rollup has no model dimension by design).
+- **Cost is estimated, never stored.** [ai-pricing.ts](src/lib/ai-pricing.ts) holds a default USD/1M-token map; the admin can override per-model on the page, persisted to `ai_config.model_pricing` (jsonb, added in 052). `resolvePricing()` merges overrides over defaults; unknown model → cost `—`, tokens still counted.
+- **Ships dark:** the page degrades to a "not live yet" state until migration 052 is applied AND the `ai-generate` edge fn is redeployed. Nothing is backfilled — data accrues from deploy onward.
+
 ### Profile-photo enrichment (HikerAPI)
 
 - "Update missing details" on the influencer list page ([update-missing-details.tsx](src/app/dashboard/influencers/update-missing-details.tsx)) scans **pending `influencer_invitations` only** for a missing `CORE_FIELDS` value, lists them with per-row "what's missing" chips, then backfills via HikerAPI. Registered `influencer_profiles` are deliberately out of scope — a creator with no photo may have chosen that.

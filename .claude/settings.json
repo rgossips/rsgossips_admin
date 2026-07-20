@@ -29,6 +29,9 @@
       "Bash(node ./.rc.tmp.cjs)",
       "Bash(cp \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/appcols.js\" ./.ac.tmp.cjs)",
       "Bash(node ./.ac.tmp.cjs)"
+    ],
+    "additionalDirectories": [
+      "d:\\Development\\React\\RS_Gossips\\supabase\\functions\\ai-generate"
     ]
   }
 }
