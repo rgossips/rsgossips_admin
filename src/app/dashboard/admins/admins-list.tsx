@@ -79,7 +79,8 @@ export function AdminsList({
       </div>
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-180">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800">
               <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-6 py-4">{t("colName")}</th>
@@ -111,6 +112,7 @@ export function AdminsList({
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </>
   );

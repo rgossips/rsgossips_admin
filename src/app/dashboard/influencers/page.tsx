@@ -108,7 +108,8 @@ export default async function InfluencersPage({
           <FilterBar fields={filterFields} />
           {error && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">{t("failedToLoadInfluencers", { message: error.message })}</div>}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-180">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.name")}</th>
@@ -126,6 +127,7 @@ export default async function InfluencersPage({
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

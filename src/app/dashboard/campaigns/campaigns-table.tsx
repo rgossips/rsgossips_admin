@@ -137,7 +137,8 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
       )}
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-180">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
               {showChecks && (
@@ -187,6 +188,7 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </>
   );

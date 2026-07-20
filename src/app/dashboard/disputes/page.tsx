@@ -98,7 +98,8 @@ export default async function DisputesPage({
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-180 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">{t("columns.campaign")}</th>
@@ -142,6 +143,7 @@ export default async function DisputesPage({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

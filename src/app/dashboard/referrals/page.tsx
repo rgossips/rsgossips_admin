@@ -176,7 +176,8 @@ export default async function ReferralsPage({
         {(rows || []).length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">{t("empty")}</div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="overflow-x-auto">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 min-w-225">
             {(rows || []).map((r: any) => {
               const pill = {
                 label: (r.status || "—").replace(/_/g, " "),
@@ -268,6 +269,7 @@ export default async function ReferralsPage({
                 </div>
               );
             })}
+          </div>
           </div>
         )}
       </div>

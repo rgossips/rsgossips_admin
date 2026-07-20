@@ -104,7 +104,8 @@ export default async function BrandsPage({
           )}
 
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-180">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.brandName")}</th>
@@ -128,6 +129,7 @@ export default async function BrandsPage({
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

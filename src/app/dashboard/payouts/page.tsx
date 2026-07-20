@@ -161,7 +161,8 @@ export default async function PayoutsPage({
             {t("emptyState")}
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="overflow-x-auto">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 min-w-225">
             {(apps || []).map((app: any) => {
               const creator = creators.get(app.influencer_id);
               const campaign = campaigns.get(app.campaign_id);
@@ -185,6 +186,7 @@ export default async function PayoutsPage({
                 />
               );
             })}
+          </div>
           </div>
         )}
       </div>
