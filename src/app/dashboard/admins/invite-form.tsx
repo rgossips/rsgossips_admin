@@ -70,7 +70,16 @@ export function InviteForm() {
             </div>
           )}
 
-          <form action={handleSubmit} className="space-y-4">
+          {/* onSubmit (not action=) so setLoading is an urgent update that
+              paints the loader immediately — a React 19 form action runs in a
+              transition, which can skip the loader paint for a fast invite. */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit(new FormData(e.currentTarget));
+            }}
+            className="space-y-4"
+          >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("fullNameLabel")}</label>
