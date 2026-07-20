@@ -60,7 +60,10 @@ export default function AuthCallbackPage() {
     if (password.length < 8) { setError(t("passwordTooShort")); return; }
     if (password !== confirmPassword) { setError(t("passwordsMismatch")); return; }
     setSaving(true);
-    const { error: updErr } = await supabase.auth.updateUser({ password });
+    // Clear pending_setup here — this is the moment setup actually completes.
+    // Harmless for non-admin recoveries (they never carry the flag). This is
+    // what promotes an invited admin from "pending/verified" to "active".
+    const { error: updErr } = await supabase.auth.updateUser({ password, data: { pending_setup: false } });
     setSaving(false);
     if (updErr) { setError(updErr.message); return; }
     router.push("/dashboard");

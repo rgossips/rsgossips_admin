@@ -12,6 +12,7 @@ interface AdminWithAuth {
   created_at: string;
   lastSignInAt: string | null;
   emailConfirmedAt: string | null;
+  pendingSetup: boolean;
 }
 
 // Client-side filtering for the admins page. The full list is small (admin
@@ -101,6 +102,7 @@ export function AdminsList({
                   isCurrentUser={a.id === currentUserId}
                   lastSignInAt={a.lastSignInAt}
                   emailConfirmedAt={a.emailConfirmedAt}
+                  pendingSetup={a.pendingSetup}
                 />
               ))
             ) : (

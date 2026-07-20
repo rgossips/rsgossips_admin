@@ -83,12 +83,20 @@ export async function inviteAdmin(formData: FormData) {
     });
     if (linkError) return { error: linkError.message };
     acceptUrl = linkData?.properties?.action_link || null;
+    // Orphan is re-entering setup — flag it too, merging so we don't wipe
+    // any existing metadata.
+    await adminClient.auth.admin.updateUserById(existing.id, {
+      user_metadata: { ...(existing.user_metadata || {}), full_name: fullName, pending_setup: true },
+    });
   } else {
-    // Fresh invite — create user + invite link.
+    // Fresh invite — create user + invite link. pending_setup flags that
+    // they haven't chosen a password yet; it's what keeps the status out of
+    // "active" until they finish (clicking the link signs them in, which
+    // would otherwise flip last_sign_in_at). Cleared in the auth callback.
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "invite",
       email,
-      options: { data: { full_name: fullName }, redirectTo },
+      options: { data: { full_name: fullName, pending_setup: true }, redirectTo },
     });
     if (linkError) return { error: linkError.message };
     acceptUrl = linkData?.properties?.action_link || null;

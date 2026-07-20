@@ -20,12 +20,14 @@ export function AdminRow({
   isCurrentUser,
   lastSignInAt,
   emailConfirmedAt,
+  pendingSetup,
 }: {
   admin: Admin;
   isSuperAdmin: boolean;
   isCurrentUser: boolean;
   lastSignInAt: string | null;
   emailConfirmedAt: string | null;
+  pendingSetup: boolean;
 }) {
   const t = useTranslations("DashboardAdminsAdminRow");
   const [removing, setRemoving] = useState(false);
@@ -46,12 +48,20 @@ export function AdminRow({
     viewer: t("roles.viewer"),
   };
 
-  // Acceptance status: signed in at least once = fully active. Email
-  // confirmed but never signed in = "verified link, no password set yet".
-  // Neither = pending invite.
-  const accepted = !!lastSignInAt;
-  const verifiedOnly = !accepted && !!emailConfirmedAt;
-  const status: "active" | "verified" | "pending" = accepted ? "active" : verifiedOnly ? "verified" : "pending";
+  // Acceptance status. `pending_setup` (set at invite, cleared when the
+  // password is actually chosen) is authoritative — clicking the invite link
+  // signs the user in and sets last_sign_in_at BEFORE they pick a password,
+  // so last_sign_in_at alone would flip them to "active" too early.
+  //   active   = setup finished (flag cleared, and they've signed in)
+  //   verified = link opened but password not set yet (still pending_setup)
+  //   pending  = invited, link not opened
+  const accepted = !pendingSetup && !!lastSignInAt;
+  const openedButIncomplete = pendingSetup && (!!lastSignInAt || !!emailConfirmedAt);
+  const status: "active" | "verified" | "pending" = accepted
+    ? "active"
+    : openedButIncomplete
+      ? "verified"
+      : "pending";
 
   const statusBadge =
     status === "active"

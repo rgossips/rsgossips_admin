@@ -136,7 +136,7 @@
     },
     "status": {
       "active": "Active",
-      "linkVerified": "Link verified",
+      "linkVerified": "Awaiting password",
       "pendingInvite": "Pending invite"
     },
     "revoke": {

@@ -38,13 +38,16 @@ export default async function AdminsPage() {
 
   // Join acceptance status from auth.users. `last_sign_in_at` non-null
   // means they've logged in at least once = invite accepted.
-  const authMap = new Map<string, { lastSignInAt: string | null; emailConfirmedAt: string | null }>();
+  const authMap = new Map<string, { lastSignInAt: string | null; emailConfirmedAt: string | null; pendingSetup: boolean }>();
   try {
     const { data: list } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
     for (const u of list?.users || []) {
       authMap.set(u.id, {
         lastSignInAt: u.last_sign_in_at || null,
         emailConfirmedAt: u.email_confirmed_at || null,
+        // Set at invite, cleared once the password is chosen. Absent for
+        // admins onboarded before this flag existed → treated as done.
+        pendingSetup: (u.user_metadata as Record<string, unknown> | undefined)?.pending_setup === true,
       });
     }
   } catch {
@@ -57,6 +60,7 @@ export default async function AdminsPage() {
       ...a,
       lastSignInAt: auth?.lastSignInAt ?? null,
       emailConfirmedAt: auth?.emailConfirmedAt ?? null,
+      pendingSetup: auth?.pendingSetup ?? false,
     };
   });
 
