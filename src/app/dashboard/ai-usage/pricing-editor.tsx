@@ -66,13 +66,13 @@ export function PricingEditor({
       {open && (
         <div className="px-5 pb-5 space-y-3 border-t border-gray-100 dark:border-gray-800 pt-4">
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="min-w-full text-[13px]">
               <thead>
                 <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  <th className="py-2">Model</th>
-                  <th className="py-2 text-right">Input $/1M</th>
-                  <th className="py-2 text-right">Output $/1M</th>
-                  <th className="py-2 text-right w-20">Default?</th>
+                  <th className="py-2 pr-3 whitespace-nowrap">Model</th>
+                  <th className="py-2 text-right pl-3 whitespace-nowrap">Input $/1M</th>
+                  <th className="py-2 text-right pl-3 whitespace-nowrap">Output $/1M</th>
+                  <th className="py-2 text-right pl-3 w-20 whitespace-nowrap">Default?</th>
                 </tr>
               </thead>
               <tbody>
@@ -80,8 +80,8 @@ export function PricingEditor({
                   const changed = Number(rows[m].in) !== defaults[m].in || Number(rows[m].out) !== defaults[m].out;
                   return (
                     <tr key={m} className="border-t border-gray-50 dark:border-gray-800/50">
-                      <td className="py-1.5 font-mono text-[11px] text-gray-700 dark:text-gray-200">{m}</td>
-                      <td className="py-1.5 text-right">
+                      <td className="py-1.5 pr-3 font-mono text-[11px] whitespace-nowrap text-gray-700 dark:text-gray-200">{m}</td>
+                      <td className="py-1.5 pl-3 text-right">
                         <input
                           value={rows[m].in}
                           onChange={(e) => set(m, "in", e.target.value)}
@@ -89,7 +89,7 @@ export function PricingEditor({
                           className="w-20 px-2 py-1 text-right rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-[12px] outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </td>
-                      <td className="py-1.5 text-right">
+                      <td className="py-1.5 pl-3 text-right">
                         <input
                           value={rows[m].out}
                           onChange={(e) => set(m, "out", e.target.value)}
@@ -97,7 +97,7 @@ export function PricingEditor({
                           className="w-20 px-2 py-1 text-right rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-[12px] outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </td>
-                      <td className="py-1.5 text-right text-[11px] text-gray-400">{changed ? "overridden" : "default"}</td>
+                      <td className="py-1.5 pl-3 text-right text-[11px] whitespace-nowrap text-gray-400">{changed ? "overridden" : "default"}</td>
                     </tr>
                   );
                 })}

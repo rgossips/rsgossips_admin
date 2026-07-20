@@ -265,7 +265,9 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+    // min-w-0 lets this grid child shrink below its content width so the inner
+    // overflow-x-auto actually scrolls instead of forcing the page wider.
+    <div className="min-w-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
       {subtitle && <p className="text-[11px] text-gray-400 mt-0.5">{subtitle}</p>}
       <div className="mt-3 overflow-x-auto">{children}</div>
@@ -274,12 +276,15 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
 }
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
+  // min-w-full + nowrap cells: fills the panel when there's room, and when a
+  // long value (e.g. a model id) exceeds it, the panel's overflow-x-auto
+  // scrolls rather than the column wrapping or the page overflowing.
   return (
-    <table className="w-full text-[13px]">
+    <table className="min-w-full text-[13px]">
       <thead>
         <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-gray-800">
           {head.map((h, i) => (
-            <th key={i} className={`py-2 ${i === 0 ? "" : "text-right"}`}>{h}</th>
+            <th key={i} className={`py-2 whitespace-nowrap ${i === 0 ? "pr-3" : "text-right pl-3"}`}>{h}</th>
           ))}
         </tr>
       </thead>
@@ -287,7 +292,12 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
         {rows.map((cells, ri) => (
           <tr key={ri} className="border-b border-gray-50 dark:border-gray-800/50 last:border-0">
             {cells.map((c, ci) => (
-              <td key={ci} className={`py-2 text-gray-700 dark:text-gray-200 ${ci === 0 ? "" : "text-right tabular-nums"}`}>{c}</td>
+              <td
+                key={ci}
+                className={`py-2 whitespace-nowrap text-gray-700 dark:text-gray-200 ${ci === 0 ? "pr-3" : "text-right tabular-nums pl-3"}`}
+              >
+                {c}
+              </td>
             ))}
           </tr>
         ))}
