@@ -223,6 +223,44 @@ export async function updateApplicationStatus(
   return { success: true };
 }
 
+// Review-queue moderation. Approval must run through the brand-campaigns
+// edge fn (action adminApprove, authorized by the service-role bearer) so
+// the approved campaign gets the SAME match-and-notify fan-out to creators
+// a direct publish would have — a plain status update here would silently
+// skip notifications. Reject sends the campaign back to draft.
+export async function reviewCampaign(
+  campaignId: string,
+  decision: "approve" | "reject",
+): Promise<{ error?: string; success?: boolean; matchingCount?: number }> {
+  const gate = await adminGate();
+  if (gate) return gate;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return { error: "Server misconfigured" };
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/brand-campaigns`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        action: decision === "approve" ? "adminApprove" : "adminReject",
+        campaignId,
+      }),
+    });
+    const data = await res.json();
+    if (data?.error) return { error: data.error };
+    revalidatePath("/dashboard/campaigns");
+    return { success: true, matchingCount: data?.matchingCount };
+  } catch (e: any) {
+    return { error: e?.message || "Review failed" };
+  }
+}
+
 export async function updateCampaignStatus(campaignId: string, status: string): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;

@@ -38,7 +38,8 @@
       "Bash(cp \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/verify052.js\" ./.v052.tmp.cjs)",
       "Bash(node ./.v052.tmp.cjs)",
       "Bash(timeout 180 npx --no-install supabase functions deploy ai-generate --no-verify-jwt --project-ref hlfevcdtbehukxrrgykv)",
-      "Bash(timeout 30 npx --no-install supabase functions list)"
+      "Bash(timeout 30 npx --no-install supabase functions list)",
+      "Bash(git rev-list *)"
     ],
     "additionalDirectories": [
       "d:\\Development\\React\\RS_Gossips\\supabase\\functions\\ai-generate"

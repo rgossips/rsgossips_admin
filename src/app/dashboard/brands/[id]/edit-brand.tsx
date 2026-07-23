@@ -136,10 +136,15 @@ function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void })
             </div>
             <div>
               <label className={labelClass}>{t("status")}</label>
+              {/* Includes the user-initiated states (deactivated / pending
+                  deletion) — without them a paused brand's real status fell
+                  back to the first option and read as "Active". */}
               <select name="status" defaultValue={brand.status || "active"} className={inputClass}>
                 <option value="active">{t("statusActive")}</option>
                 <option value="inactive">{t("statusInactive")}</option>
                 <option value="suspended">{t("statusSuspended")}</option>
+                <option value="deactivated">{t("statusDeactivated")}</option>
+                <option value="pending_deletion">{t("statusPendingDeletion")}</option>
               </select>
             </div>
             <div>
@@ -177,6 +182,21 @@ function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void })
               <input name="preferred_influencer_tier" type="text" defaultValue={brand.preferred_influencer_tier || ""} placeholder={t("preferredTierPlaceholder")} className={inputClass} />
             </div>
           </div>
+          {/* Auto-approve: campaigns from this brand skip the admin review
+              queue and publish straight to Active. */}
+          <label className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              name="auto_approve_campaigns"
+              defaultChecked={!!brand.auto_approve_campaigns}
+              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-800 dark:text-gray-200">{t("autoApprove")}</span>
+              <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("autoApproveHint")}</span>
+            </span>
+          </label>
+
           <div>
             <label className={labelClass}>{t("shortDescription")}</label>
             <input name="short_description" type="text" defaultValue={brand.short_description || ""} className={inputClass} />
@@ -190,7 +210,7 @@ function EditBrandModal({ brand, onClose }: { brand: any; onClose: () => void })
             <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 text-white text-sm font-semibold transition-colors cursor-pointer">
               {loading && <ButtonSpinner />}{loading ? t("saving") : t("saveChanges")}
             </button>
-            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">{t("cancel")}</button>
+            <button type="button" onClick={onClose} disabled={loading} className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer disabled:opacity-50">{t("cancel")}</button>
           </div>
         </form>
       </div>

@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteCampaigns } from "./actions";
+import { deleteCampaigns, reviewCampaign } from "./actions";
 import { useRole } from "@/components/role-context";
 import { ConfirmDialog, useConfirmDialog } from "@/components/confirm-dialog";
 import { ButtonSpinner } from "@/components/spinner";
@@ -16,6 +16,7 @@ interface Campaign {
   max_influencers: number | null;
   campaign_start_date: string | null;
   campaign_end_date: string | null;
+  application_deadline: string | null;
   target_categories: string[] | null;
   brand_id: string | null;
   brand_invitation_id: string | null;
@@ -29,7 +30,49 @@ const statusColors: Record<string, string> = {
   active: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
   paused: "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400",
   completed: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
+  apps_closed: "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+  under_review: "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
 };
+
+// Inline Approve / Send back pair for campaigns waiting in the review
+// queue. Approve routes through the edge fn so creator match-notifications
+// fire; reject returns the campaign to draft.
+function ReviewButtons({ campaignId }: { campaignId: string }) {
+  const t = useTranslations("DashboardCampaignsCampaignsTable");
+  const router = useRouter();
+  const { isAdmin } = useRole();
+  const [pending, setPending] = useState<"approve" | "reject" | null>(null);
+  if (!isAdmin) return null;
+
+  const act = async (decision: "approve" | "reject") => {
+    setPending(decision);
+    const res = await reviewCampaign(campaignId, decision);
+    if (res.error) alert(res.error);
+    setPending(null);
+    router.refresh();
+  };
+
+  return (
+    <span className="flex items-center gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => act("approve")}
+        disabled={!!pending}
+        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 text-white cursor-pointer"
+      >
+        {pending === "approve" && <ButtonSpinner />}
+        {t("reviewApprove")}
+      </button>
+      <button
+        onClick={() => act("reject")}
+        disabled={!!pending}
+        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
+      >
+        {pending === "reject" && <ButtonSpinner />}
+        {t("reviewReject")}
+      </button>
+    </span>
+  );
+}
 
 function formatDate(d: string | null) {
   if (!d) return "—";
@@ -208,6 +251,12 @@ function Row({
   const t = useTranslations("DashboardCampaignsCampaignsTable");
   const brandName = campaign.brand_profiles?.brand_name || campaign.brand_invitations?.brand_name || "—";
   const status = campaign.status || "draft";
+  // DB-status "active" with a lapsed application deadline gets its own
+  // display status — creators can no longer apply, "active" misleads ops.
+  const appsClosed =
+    status === "active" &&
+    !!campaign.application_deadline &&
+    new Date(campaign.application_deadline).getTime() < Date.now();
   return (
     <tr className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${checked ? "bg-indigo-50/40 dark:bg-indigo-900/10" : ""}`}>
       {showCheck && (
@@ -240,9 +289,10 @@ function Row({
         )}
       </td>
       <td className="px-6 py-4">
-        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status] || statusColors.draft}`}>
-          {status}
+        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${appsClosed ? statusColors.apps_closed : statusColors[status] || statusColors.draft}`}>
+          {appsClosed ? t("statusApplicationsClosed") : status === "under_review" ? t("statusUnderReview") : status}
         </span>
+        {status === "under_review" && <ReviewButtons campaignId={campaign.campaign_id} />}
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {campaign.max_influencers ?? "—"}

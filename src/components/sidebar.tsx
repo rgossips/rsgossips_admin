@@ -53,6 +53,7 @@ const navGroups: NavGroup[] = [
       { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
       { label: "Services", href: "/dashboard/services", icon: "sparkles" },
       { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
+      { label: "Callbacks", href: "/dashboard/callbacks", icon: "phone" },
       { label: "Leads", href: "/dashboard/leads", icon: "phone" },
     ],
   },

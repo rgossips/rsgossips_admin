@@ -365,7 +365,11 @@
     "fullDescription": "Full Description",
     "saving": "Saving...",
     "saveChanges": "Save Changes",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "statusDeactivated": "Deactivated (by brand)",
+    "statusPendingDeletion": "Pending deletion",
+    "autoApprove": "Auto-approve campaigns",
+    "autoApproveHint": "When on, campaigns this brand publishes skip the review queue and go live immediately."
   },
   "DashboardBrandsInvitedBrandRow": {
     "awaitingClaim": "Awaiting Claim",
@@ -398,6 +402,39 @@
     "save": "Save",
     "cancel": "Cancel"
   },
+  "DashboardCallbacks": {
+    "title": "Callback Requests",
+    "description": "Callback requests submitted from the in-app support chats",
+    "openBadge": "{count} open",
+    "filters": {
+      "all": "All",
+      "open": "Open",
+      "done": "Done"
+    },
+    "columns": {
+      "requester": "Requester",
+      "topic": "Topic",
+      "phone": "Phone",
+      "preferredTime": "Preferred Time",
+      "notes": "Notes",
+      "requestedAt": "Requested",
+      "status": "Status"
+    },
+    "role": {
+      "influencer": "Influencer",
+      "brand": "Brand"
+    },
+    "status": {
+      "open": "Open",
+      "done": "Done"
+    },
+    "unknownName": "Unknown user",
+    "empty": "No callback requests here."
+  },
+  "DashboardCallbacksComponentsStatusToggle": {
+    "markDone": "Mark done",
+    "reopen": "Reopen"
+  },
   "DashboardCampaigns": {
     "title": "Campaigns",
     "subtitle": "Track and manage influencer campaigns",
@@ -422,7 +459,8 @@
       "draft": "Draft",
       "active": "Active",
       "paused": "Paused",
-      "completed": "Completed"
+      "completed": "Completed",
+      "underReview": "Under review"
     }
   },
   "DashboardCampaignsCampaignsTable": {
@@ -451,7 +489,11 @@
     "selectRow": "Select {title}",
     "campaignFallback": "campaign",
     "invited": "Invited",
-    "dateRangeTo": "to {date}"
+    "dateRangeTo": "to {date}",
+    "statusApplicationsClosed": "applications closed",
+    "statusUnderReview": "under review",
+    "reviewApprove": "Approve",
+    "reviewReject": "Send back"
   },
   "DashboardCampaignsCreate": {
     "title": "Create Campaign",
@@ -1886,5 +1928,12 @@
     "signingIn": "Signing in...",
     "signIn": "Sign In",
     "footer": "RGossips Admin Panel — Authorized access only"
+  },
+  "OfflineGate": {
+    "title": "Connection lost. 📵",
+    "body": "Your internet dropped — the console will resume the moment you are back online.",
+    "refresh": "Try again",
+    "checking": "Checking…",
+    "autoNote": "We reconnect automatically when your network returns."
   }
 }
