@@ -270,6 +270,9 @@ export async function updateCampaignStatus(campaignId: string, status: string): 
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard/campaigns");
+  // The detail page renders the status too — without this it kept showing
+  // the previous value after a change.
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
   return { success: true };
 }
 
@@ -431,6 +434,69 @@ export async function updateCampaign(campaignId: string, formData: FormData): Pr
 // campaign_applications (otherwise the FK would block the delete). Also
 // nukes any featured_campaigns rows so the home carousel doesn't render
 // a deleted campaign.
+// Removes every row that hangs off a campaign, deepest-first, so the final
+// `campaigns` delete can't trip an FK and nothing is left orphaned.
+//
+// Only two of these FKs actually declare ON DELETE CASCADE (campaign_ratings
+// →applications, featured_campaigns→campaigns), so the rest MUST be deleted
+// explicitly. Deleting rows a cascade would have removed anyway is a harmless
+// no-op, which is why this is safe regardless of each FK's setting.
+//
+// Order: messages → (payments, deliverables, status history, reviews,
+// ratings) → conversations/featured/applications → caller deletes campaigns.
+async function purgeCampaignChildren(
+  adminClient: ReturnType<typeof createAdminClient>,
+  ids: string[],
+): Promise<string[]> {
+  const problems: string[] = [];
+
+  const del = async (table: string, column: string, values: string[]) => {
+    if (values.length === 0) return;
+    const { error } = await adminClient.from(table).delete().in(column, values);
+    // Non-fatal: a table that doesn't exist in this project, or an empty
+    // match, must not block the delete. Collected so the caller can report.
+    if (error) problems.push(`${table}: ${error.message}`);
+  };
+
+  const { data: apps } = await adminClient
+    .from("campaign_applications")
+    .select("id")
+    .in("campaign_id", ids);
+  const appIds = (apps || []).map((a: { id: string }) => a.id).filter(Boolean);
+
+  const { data: convs } = await adminClient
+    .from("conversations")
+    .select("conversation_id")
+    .in("campaign_id", ids);
+  const convIds = (convs || [])
+    .map((c: { conversation_id: string }) => c.conversation_id)
+    .filter(Boolean);
+
+  // Deepest first: messages hang off conversations.
+  await del("messages", "conversation_id", convIds);
+
+  // Everything keyed to an application.
+  for (const table of [
+    "payments",
+    "campaign_deliverables",
+    "application_status_history",
+    "reviews",
+    "campaign_ratings",
+  ]) {
+    await del(table, "application_id", appIds);
+  }
+
+  // Ratings can also be keyed straight to the campaign.
+  await del("campaign_ratings", "campaign_id", ids);
+
+  // Then the direct children of the campaign.
+  await del("conversations", "campaign_id", ids);
+  await del("featured_campaigns", "campaign_id", ids);
+  await del("campaign_applications", "campaign_id", ids);
+
+  return problems;
+}
+
 export async function deleteCampaigns(campaignIds: string[]): Promise<{ error?: string; deleted?: number }> {
   const gate = await superAdminGate();
   if (gate) return gate;
@@ -439,26 +505,49 @@ export async function deleteCampaigns(campaignIds: string[]): Promise<{ error?: 
   if (ids.length === 0) return { error: "No campaigns selected" };
 
   const adminClient = createAdminClient();
-
-  // Applications reference campaigns by FK, so drop them first.
-  const { error: appsErr } = await adminClient
-    .from("campaign_applications")
-    .delete()
-    .in("campaign_id", ids);
-  if (appsErr) return { error: `Failed to remove applications: ${appsErr.message}` };
-
-  // Featured listings reference campaigns too — best-effort, swallow
-  // errors so a missing/empty table doesn't block the actual delete.
-  try {
-    await adminClient.from("featured_campaigns").delete().in("campaign_id", ids);
-  } catch { /* non-fatal */ }
+  const problems = await purgeCampaignChildren(adminClient, ids);
 
   const { error, count } = await adminClient
     .from("campaigns")
     .delete({ count: "exact" })
     .in("campaign_id", ids);
-  if (error) return { error: error.message };
+  // Surface the child failures only if they actually blocked the delete —
+  // they're the likely cause.
+  if (error) {
+    return {
+      error: problems.length
+        ? `${error.message} (related data: ${problems.join("; ")})`
+        : error.message,
+    };
+  }
 
   revalidatePath("/dashboard/campaigns");
   return { deleted: count ?? ids.length };
+}
+
+// Single-campaign delete used from the campaign detail page. Same full
+// cascade as the bulk path — the campaign and all of its progress
+// (applications, deliverables, payments, chats, ratings, reviews) go.
+export async function deleteCampaign(campaignId: string): Promise<{ error?: string; success?: boolean }> {
+  const gate = await superAdminGate();
+  if (gate) return gate;
+  if (!campaignId) return { error: "Campaign id is required" };
+
+  const adminClient = createAdminClient();
+  const problems = await purgeCampaignChildren(adminClient, [campaignId]);
+
+  const { error } = await adminClient
+    .from("campaigns")
+    .delete()
+    .eq("campaign_id", campaignId);
+  if (error) {
+    return {
+      error: problems.length
+        ? `${error.message} (related data: ${problems.join("; ")})`
+        : error.message,
+    };
+  }
+
+  revalidatePath("/dashboard/campaigns");
+  return { success: true };
 }

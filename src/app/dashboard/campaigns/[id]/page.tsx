@@ -5,7 +5,8 @@ import { CampaignDetailActions } from "./detail-actions";
 import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
-import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
+import { DeleteCampaignButton } from "./delete-campaign";
 import { getTranslations } from "next-intl/server";
 
 export default async function CampaignDetailPage({
@@ -16,6 +17,7 @@ export default async function CampaignDetailPage({
   const { id } = await params;
   const supabase = createAdminClient();
   const canWrite = await isAdminOrAbove();
+  const superAdmin = await isSuperAdmin();
   const t = await getTranslations("DashboardCampaignsId");
 
   const { data: campaign, error } = await supabase
@@ -165,6 +167,13 @@ export default async function CampaignDetailPage({
         <div className="flex items-center gap-2">
           {canWrite && <EditCampaignButton campaign={campaign} description={description} bannerUrl={bannerUrl} galleryUrls={galleryUrls} engagementRate={engagementRate} deliverables={deliverables} />}
           {canWrite && <CampaignDetailActions campaignId={campaign.campaign_id} status={campaign.status} />}
+          {superAdmin && (
+            <DeleteCampaignButton
+              campaignId={campaign.campaign_id}
+              title={campaign.title || ""}
+              applicationCount={applications?.length || 0}
+            />
+          )}
           <RefreshButton />
         </div>
       </div>
