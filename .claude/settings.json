@@ -42,11 +42,14 @@
       "Bash(git rev-list *)",
       "Bash(timeout 180 npx --no-install supabase functions deploy list-campaigns --project-ref hlfevcdtbehukxrrgykv)",
       "Bash(cp \"C:/Users/Deepak/AppData/Local/Temp/claude/d--Development-React-rgossips-admin/00f17bb5-00d0-4824-a68e-6660288a6cfb/scratchpad/draft-check.js\" ./.dc.tmp.cjs)",
-      "Bash(node ./.dc.tmp.cjs)"
+      "Bash(node ./.dc.tmp.cjs)",
+      "Bash(awk '{print \"length:\", length\\($0\\); print \"starts eyJ \\(JWT\\)?:\", \\(substr\\($0,1,3\\)==\"eyJ\"\\)}')",
+      "Bash(timeout 180 npx --no-install supabase functions deploy brand-campaigns --no-verify-jwt --project-ref hlfevcdtbehukxrrgykv)"
     ],
     "additionalDirectories": [
       "d:\\Development\\React\\RS_Gossips\\supabase\\functions\\ai-generate",
-      "d:\\Development\\React\\RS_Gossips\\supabase\\functions\\list-campaigns"
+      "d:\\Development\\React\\RS_Gossips\\supabase\\functions\\list-campaigns",
+      "d:\\Development\\React\\RS_Gossips\\supabase\\functions\\brand-campaigns"
     ]
   }
 }

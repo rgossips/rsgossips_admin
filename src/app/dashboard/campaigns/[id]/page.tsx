@@ -7,6 +7,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
 import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
+import { CampaignReviewActions } from "./review-actions";
 import { getTranslations } from "next-intl/server";
 
 export default async function CampaignDetailPage({
@@ -165,6 +166,9 @@ export default async function CampaignDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {canWrite && campaign.status === "under_review" && (
+            <CampaignReviewActions campaignId={campaign.campaign_id} />
+          )}
           {canWrite && <EditCampaignButton campaign={campaign} description={description} bannerUrl={bannerUrl} galleryUrls={galleryUrls} engagementRate={engagementRate} deliverables={deliverables} />}
           {canWrite && <CampaignDetailActions campaignId={campaign.campaign_id} status={campaign.status} />}
           {superAdmin && (
