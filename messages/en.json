@@ -490,8 +490,8 @@
     "campaignFallback": "campaign",
     "invited": "Invited",
     "dateRangeTo": "to {date}",
-    "statusApplicationsClosed": "applications closed",
-    "statusUnderReview": "under review",
+    "statusApplicationsClosed": "Applications Closed",
+    "statusUnderReview": "Under Review",
     "reviewApprove": "Approve",
     "reviewReject": "Send back"
   },

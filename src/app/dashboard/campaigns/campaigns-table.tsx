@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { formatStatus } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { deleteCampaigns, reviewCampaign } from "./actions";
 import { useRole } from "@/components/role-context";
@@ -290,7 +291,7 @@ function Row({
       </td>
       <td className="px-6 py-4">
         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${appsClosed ? statusColors.apps_closed : statusColors[status] || statusColors.draft}`}>
-          {appsClosed ? t("statusApplicationsClosed") : status === "under_review" ? t("statusUnderReview") : status}
+          {appsClosed ? t("statusApplicationsClosed") : status === "under_review" ? t("statusUnderReview") : formatStatus(status)}
         </span>
         {status === "under_review" && <ReviewButtons campaignId={campaign.campaign_id} />}
       </td>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { formatStatus } from "@/lib/format";
 import { toggleInfluencerStatus } from "./actions";
 import { Avatar } from "@/components/avatar";
 import { useRole } from "@/components/role-context";
@@ -98,7 +99,7 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
               : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
           }`}
         >
-          {status || t("unknown")}
+          {formatStatus(status, t("unknown"))}
         </span>
       </td>
       <td className="px-6 py-4">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatStatus } from "@/lib/format";
 import { updateBrandVerification } from "./actions";
 import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
@@ -69,7 +70,7 @@ export function BrandRow({ brand }: { brand: Brand }) {
             statusColors[verificationStatus || "pending"] || statusColors.pending
           }`}
         >
-          {verificationStatus || "pending"}
+          {formatStatus(verificationStatus, "Pending")}
         </span>
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-mono text-xs">
