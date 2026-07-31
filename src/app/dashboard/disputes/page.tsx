@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { QueueCard } from "@/components/mobile/queue-card";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +98,9 @@ export default async function DisputesPage({
           {t("empty")}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <>
+        {/* Desktop table */}
+        <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full min-w-180 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
@@ -145,6 +148,27 @@ export default async function DisputesPage({
           </table>
           </div>
         </div>
+
+        {/* Mobile cards — tap through to the detail page to resolve. */}
+        <ul className="lg:hidden space-y-3">
+          {disputes.map((d: any) => {
+            const status = STATUS_LABEL[d.escrow_status] || STATUS_LABEL.disputed;
+            const creator = d.influencer_name || (d.influencer_username ? `@${d.influencer_username}` : "—");
+            return (
+              <li key={d.application_id}>
+                <QueueCard
+                  href={`/dashboard/disputes/${d.application_id}`}
+                  title={d.campaign_title || "—"}
+                  subtitle={`${d.brand_name || "—"} · ${creator}`}
+                  amount={formatINR(d.escrow_amount)}
+                  status={{ label: t(`status.${status.key}`), className: status.class }}
+                  meta={formatDate(d.dispute_opened_at)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+        </>
       )}
     </div>
   );

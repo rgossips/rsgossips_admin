@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAiConfig, setAiConfig, clearAiKey, type AiConfigView } from "./actions";
+import { DesktopBestBanner } from "@/components/mobile/desktop-best-banner";
 
 const PROVIDERS = [
   { id: "anthropic", label: "Anthropic (Claude)" },
@@ -101,6 +102,7 @@ export default function AiSettingsPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
+      <DesktopBestBanner />
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Settings</h1>

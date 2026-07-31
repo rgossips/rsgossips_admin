@@ -458,6 +458,7 @@
       "all": "All",
       "draft": "Draft",
       "active": "Active",
+      "appsClosed": "Applications Closed",
       "paused": "Paused",
       "completed": "Completed",
       "underReview": "Under review"
@@ -1900,6 +1901,25 @@
   },
   "RefreshButton": {
     "refreshData": "Refresh data"
+  },
+  "MobileNav": {
+    "overview": "Home",
+    "disputes": "Disputes",
+    "payouts": "Payouts",
+    "quotes": "Quotes",
+    "referrals": "Referrals"
+  },
+  "MobileOps": {
+    "heading": "Needs attention",
+    "allClear": "All clear — no items need attention right now.",
+    "disputes": "Disputes",
+    "payouts": "Payouts",
+    "quotes": "Quote requests",
+    "referrals": "Referral reviews"
+  },
+  "DesktopBestBanner": {
+    "message": "This screen is built for desktop. You can still use it here, but it's easier on a larger screen.",
+    "dismiss": "Dismiss"
   },
   "SectionTitleEditor": {
     "edit": "Edit",

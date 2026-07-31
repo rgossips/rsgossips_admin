@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { DashboardCharts } from "./charts";
+import { MobileOpsHub } from "@/components/mobile/ops-hub";
 
 async function getStats(t: (key: string, values?: Record<string, string | number | Date>) => string) {
   const supabase = createAdminClient();
@@ -180,8 +181,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-8 text-white">
+      {/* Mobile Operations hub — the focused "needs attention" home on phones.
+          lg:hidden; desktop keeps the full overview below. */}
+      <MobileOpsHub />
+
+      {/* Welcome Banner — desktop only (marketing chrome, no actions worth a
+          phone). */}
+      <div className="hidden lg:block relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-8 text-white">
         <div className="relative z-10 max-w-xl">
           <img src="/logo.svg" alt="RecentGossips" className="h-7 brightness-200 mb-3 opacity-80" />
           <h1 className="text-2xl font-bold">{t("welcome.title")}</h1>
@@ -314,8 +320,8 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts — Recharts, heavy and not useful on a phone; desktop only. */}
+      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Fulfilment Stats */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
@@ -359,8 +365,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Weekly campaigns full width */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
+      {/* Weekly campaigns full width — desktop only. */}
+      <div className="hidden lg:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("charts.weekly.title")}</h3>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("charts.weekly.subtitle")}</p>

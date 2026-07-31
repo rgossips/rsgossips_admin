@@ -161,8 +161,10 @@ export default async function PayoutsPage({
             {t("emptyState")}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-          <div className="divide-y divide-gray-100 dark:divide-gray-800 min-w-225">
+          // Scroll + min-width apply only at lg — the desktop grid rows are
+          // wide; the mobile card variant reflows and must not be forced wide.
+          <div className="lg:overflow-x-auto">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 lg:min-w-225">
             {(apps || []).map((app: any) => {
               const creator = creators.get(app.influencer_id);
               const campaign = campaigns.get(app.campaign_id);
@@ -234,8 +236,45 @@ async function PayoutRow({
 
   const isPaid = app.payout_status === "processed";
 
+  const creatorBlock = creator?.influencer_id ? (
+    <Link href={`/dashboard/influencers/${creator.influencer_id}`} className="font-bold text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline">
+      {creatorName}
+    </Link>
+  ) : (
+    <span className="font-bold text-gray-900 dark:text-white">{creatorName}</span>
+  );
+
   return (
-    <div className="p-4 grid grid-cols-12 gap-4 items-start">
+    <>
+    {/* Mobile card — same fields, reflowed; the SAME MarkPaidForm instance. */}
+    <div className="lg:hidden p-4 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 text-sm truncate">
+          {creatorBlock}
+          {handle && <span className="text-[11px] text-gray-400 ml-1">{handle}</span>}
+          {campaign?.title && <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate mt-0.5">{campaign.title}</p>}
+        </div>
+        <span className="text-sm font-black text-gray-900 dark:text-white shrink-0">{formatINR(app.escrow_amount)}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${statusInfo.class}`}>{statusInfo.label}</span>
+        <span className="text-[11px] text-gray-400">
+          {isPaid ? `${t("paid")} · ${formatDate(app.payout_processed_at)}` : `${t("released")} · ${formatDate(app.payout_release_at || app.payout_scheduled_at)}`}
+        </span>
+      </div>
+      {methodLine && methodLine !== "—" && (
+        <p className="text-[12px] font-mono text-gray-700 dark:text-gray-300 break-all">{methodLine}{methodHint ? ` · ${methodHint}` : ""}</p>
+      )}
+      {!isPaid && app.payout_status === "scheduled" && (
+        <MarkPaidForm applicationId={app.id} defaultMethod={paymentMethod?.type === "upi" ? "upi" : "imps"} canWrite={canWrite} />
+      )}
+      {!isPaid && app.payout_status === "pending_creator_info" && (
+        <span className="text-[11px] text-gray-400 italic">{t("noMethodOnFile")}</span>
+      )}
+    </div>
+
+    {/* Desktop grid row — unchanged, just hidden on mobile. */}
+    <div className="hidden lg:grid p-4 grid-cols-12 gap-4 items-start">
       {/* Creator — name + handle link to the influencer detail page */}
       <div className="col-span-3 min-w-0">
         {creator?.influencer_id ? (
@@ -323,5 +362,6 @@ async function PayoutRow({
         )}
       </div>
     </div>
+    </>
   );
 }

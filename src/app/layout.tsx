@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import OfflineGate from "@/components/offline-gate";
@@ -19,6 +19,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "RGossips Admin",
   description: "Admin panel for RGossips platform",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "RG Admin" },
+};
+
+// Installable-PWA viewport: device-width scaling, theme color per scheme, and
+// viewportFit:cover so the safe-area padding on the bottom-nav works on
+// notched phones.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default async function RootLayout({

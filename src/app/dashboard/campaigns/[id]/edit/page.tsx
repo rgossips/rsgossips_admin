@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DesktopBestBanner } from "@/components/mobile/desktop-best-banner";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CreateCampaignForm, type CampaignInitial } from "../../create/create-campaign-form";
@@ -109,6 +110,7 @@ export default async function EditCampaignPage({
 
   return (
     <div className="max-w-5xl mx-auto">
+      <DesktopBestBanner />
       <div className="flex items-center gap-4 mb-8">
         <Link
           href={`/dashboard/campaigns/${id}`}

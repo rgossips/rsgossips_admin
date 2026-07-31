@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DesktopBestBanner } from "@/components/mobile/desktop-best-banner";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { ServiceForm } from "../../_form/service-form";
@@ -25,6 +26,7 @@ export default async function EditServicePage({
 
   return (
     <div className="space-y-6">
+      <DesktopBestBanner />
       <div className="flex items-center gap-3">
         <Link
           href="/dashboard/services"

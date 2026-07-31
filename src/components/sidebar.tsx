@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useOpsBadges } from "@/hooks/use-ops-badges";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -148,14 +148,19 @@ function NavItem({
   item,
   isActive,
   badge,
+  onNavigate,
 }: {
   item: { label: string; href: string; icon: string; badgeKey?: string };
   isActive: boolean;
   badge?: number;
+  // Closes the mobile drawer after a tap. Safe on desktop: onClose sets
+  // collapsed=true, which still resolves to lg:translate-x-0 (stays visible).
+  onNavigate?: () => void;
 }) {
   return (
     <Link
       href={item.href}
+      onClick={onNavigate}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
         isActive
           ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
@@ -197,53 +202,9 @@ export function Sidebar({
   const { isSuperAdmin, role } = useRole();
   const t = useTranslations("Sidebar");
 
-  // Live counts used by nav badges. Currently just the inbox of pending
-  // quote requests; refresh every 30 s so admins see new submissions
-  // without a full reload.
-  const [badges, setBadges] = useState<Record<string, number>>({});
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBadges = async () => {
-      try {
-        const supabase = createClient();
-        const [quoteRes, disputeRes, payoutRes, reviewRes] = await Promise.all([
-          supabase
-            .from("service_orders")
-            .select("*", { count: "exact", head: true })
-            .in("status", ["pending_quote", "counter_offered"]),
-          supabase
-            .from("escrow_disputes_v")
-            .select("*", { count: "exact", head: true })
-            .eq("escrow_status", "disputed"),
-          supabase
-            .from("campaign_applications")
-            .select("*", { count: "exact", head: true })
-            .in("payout_status", ["scheduled", "pending_creator_info"]),
-          supabase
-            .from("referrals")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "MANUAL_REVIEW"),
-        ]);
-        if (!cancelled) {
-          setBadges((prev) => ({
-            ...prev,
-            pendingQuotes: quoteRes.count ?? 0,
-            openDisputes: disputeRes.count ?? 0,
-            pendingPayouts: payoutRes.count ?? 0,
-            referralReviews: reviewRes.count ?? 0,
-          }));
-        }
-      } catch {
-        // Non-fatal — leave previous count in place.
-      }
-    };
-    fetchBadges();
-    const t = setInterval(fetchBadges, 30_000);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, []);
+  // Live nav-badge counts — shared with the mobile bottom-nav and ops hub via
+  // the single source of truth so the three surfaces never drift.
+  const badges = useOpsBadges();
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -313,7 +274,8 @@ export function Sidebar({
                     key={item.href}
                     item={item}
                     isActive={isActive(item.href)}
-                    badge={item.badgeKey ? badges[item.badgeKey] : undefined}
+                    badge={item.badgeKey ? badges[item.badgeKey as keyof typeof badges] : undefined}
+                    onNavigate={onClose}
                   />
                 ))}
               </div>
@@ -327,7 +289,7 @@ export function Sidebar({
               </p>
               <div className="space-y-0.5">
                 {adminNav.map((item) => (
-                  <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
+                  <NavItem key={item.href} item={item} isActive={isActive(item.href)} onNavigate={onClose} />
                 ))}
               </div>
             </div>

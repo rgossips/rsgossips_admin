@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
+import { BottomNav } from "@/components/mobile/bottom-nav";
 import { RoleProvider, type AdminRole } from "@/components/role-context";
 
 export function DashboardShell({
@@ -16,7 +17,11 @@ export function DashboardShell({
   role: AdminRole;
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Default CLOSED. On mobile the drawer starts hidden (collapsed=true →
+  // -translate-x-full); on desktop the sidebar's `lg:translate-x-0` overrides
+  // that so it's always visible. Deriving this from CSS (not a viewport read)
+  // keeps SSR and first client paint identical — no hydration mismatch.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <RoleProvider role={role}>
@@ -32,7 +37,9 @@ export function DashboardShell({
             userEmail={userEmail}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           />
-          <main className="p-6">{children}</main>
+          {/* pb-24 on mobile clears the fixed bottom-nav; desktop unchanged. */}
+          <main className="p-6 pb-24 lg:pb-6">{children}</main>
+          <BottomNav />
         </div>
       </div>
     </RoleProvider>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DesktopBestBanner } from "@/components/mobile/desktop-best-banner";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { ServiceForm } from "../_form/service-form";
@@ -10,6 +11,7 @@ export default async function CreateServicePage() {
   const t = await getTranslations("DashboardServicesCreate");
   return (
     <div className="space-y-6">
+      <DesktopBestBanner />
       <div className="flex items-center gap-3">
         <Link
           href="/dashboard/services"

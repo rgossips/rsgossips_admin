@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { isSuperAdmin } from "@/lib/require-super-admin";
 import { LoadTestRunner } from "./_components/load-test-runner";
+import { DesktopBestBanner } from "@/components/mobile/desktop-best-banner";
 import { getScenarioCatalog } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function LoadTestPage() {
 
   return (
     <div className="space-y-6">
+      <DesktopBestBanner />
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("title")}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

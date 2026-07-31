@@ -63,7 +63,7 @@ export function MarkPaidForm({
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 space-y-2 min-w-[280px]">
+    <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 space-y-2 w-full lg:min-w-70">
       <div className="flex items-center gap-2">
         <input
           value={utr}
