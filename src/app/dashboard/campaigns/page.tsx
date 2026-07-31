@@ -26,7 +26,13 @@ export default async function CampaignsPage({
   if (searchTerm) {
     query = query.ilike("title", `%${searchTerm}%`);
   }
-  if (status) {
+  if (status === "apps_closed") {
+    // "Applications Closed" isn't a DB status — it's active campaigns whose
+    // application window has lapsed. `.lt` on a timestamp excludes NULL
+    // deadlines, so this matches the badge's rule (active + deadline in the
+    // past) exactly.
+    query = query.eq("status", "active").lt("application_deadline", new Date().toISOString());
+  } else if (status) {
     query = query.eq("status", status);
   }
   if (category) {
