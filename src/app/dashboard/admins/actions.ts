@@ -227,6 +227,40 @@ export async function resendAdminInvite(adminId: string) {
   return { success: true };
 }
 
+// Super-admin sets another admin's password directly (e.g. the admin can't
+// use the reset email, or needs immediate access). Clears pending_setup so the
+// account counts as set up. Bcrypt caps the effective password at 72 bytes.
+export async function setAdminPassword(adminId: string, newPassword: string): Promise<{ error?: string; success?: boolean }> {
+  await requireSuperAdmin();
+
+  const pw = (newPassword || "").trim();
+  if (pw.length < 8) return { error: "Password must be at least 8 characters" };
+  if (Buffer.byteLength(pw, "utf8") > 72) return { error: "Password is too long (max 72 bytes)" };
+
+  const adminClient = createAdminClient();
+
+  // Only allow setting the password of an actual admin_profiles row.
+  const { data: profile } = await adminClient
+    .from("admin_profiles")
+    .select("id")
+    .eq("id", adminId)
+    .maybeSingle();
+  if (!profile) return { error: "Admin not found" };
+
+  // Merge metadata so pending_setup clears without wiping full_name etc.
+  const { data: userRes } = await adminClient.auth.admin.getUserById(adminId);
+  const existingMeta = (userRes?.user?.user_metadata as Record<string, unknown>) || {};
+
+  const { error } = await adminClient.auth.admin.updateUserById(adminId, {
+    password: pw,
+    user_metadata: { ...existingMeta, pending_setup: false },
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/admins");
+  return { success: true };
+}
+
 export async function updateAdminRole(adminId: string, newRole: string) {
   const currentUser = await requireSuperAdmin();
 

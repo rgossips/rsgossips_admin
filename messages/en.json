@@ -129,6 +129,16 @@
     "loadError": "Failed to load admins: {message}"
   },
   "DashboardAdminsAdminRow": {
+    "setPassword": "Set password",
+    "setPasswordTitle": "Set password for {name}",
+    "setPasswordSubtitle": "The admin can sign in with this password immediately.",
+    "setPasswordPlaceholder": "New password",
+    "setPasswordHint": "At least 8 characters. Share it with them securely.",
+    "setPasswordConfirm": "Set password",
+    "setPasswordDone": "Password updated.",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "close": "Close",
     "roles": {
       "superAdmin": "Super Admin",
       "admin": "Admin",
@@ -1947,7 +1957,15 @@
     "passwordLabel": "Password",
     "signingIn": "Signing in...",
     "signIn": "Sign In",
-    "footer": "RGossips Admin Panel — Authorized access only"
+    "footer": "RGossips Admin Panel — Authorized access only",
+    "reset": {
+      "forgot": "Forgot password?",
+      "instructions": "Enter your admin email and we'll send you a link to reset your password.",
+      "sendLink": "Send reset link",
+      "sending": "Sending...",
+      "sent": "If an admin account exists for that email, a password reset link is on its way. Check your inbox.",
+      "backToSignIn": "Back to sign in"
+    }
   },
   "OfflineGate": {
     "title": "Connection lost. 📵",

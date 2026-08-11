@@ -345,6 +345,64 @@ export function renderUserDeletedEmail({ fullName, kind }: UserDeletedParams) {
   return { html, text };
 }
 
+// ── Admin password reset ─────────────────────────────────────────────────
+
+interface PasswordResetParams {
+  fullName: string;
+  resetUrl: string;
+}
+
+export function renderPasswordResetEmail({ fullName, resetUrl }: PasswordResetParams) {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reset your RecentGossips Admin password</title></head>
+<body style="margin:0;padding:0;background-color:#F4F5F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1F2937;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#F4F5F8;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="540" style="max-width:540px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,0.08);">
+        <tr><td style="background:${GRADIENT};padding:36px 32px;text-align:center;color:#ffffff;">
+          <div style="font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;opacity:0.85;">RecentGossips</div>
+          <div style="font-size:22px;font-weight:700;margin-top:6px;">Password reset</div>
+        </td></tr>
+        <tr><td style="padding:36px 36px 28px 36px;">
+          <p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#111827;">Hi ${escapeHtml(fullName)},</p>
+          <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#374151;">
+            We received a request to reset the password for your RecentGossips Admin account. Click the button below to choose a new one. This link expires in 1 hour.
+          </p>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%"><tr><td align="center" style="padding:8px 0 24px 0;">
+            <a href="${escapeAttr(resetUrl)}" style="display:inline-block;background:${GRADIENT};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:12px;">Reset password</a>
+          </td></tr></table>
+          <p style="margin:0 0 8px 0;font-size:13px;line-height:1.6;color:#6B7280;">Or paste this link into your browser:</p>
+          <p style="margin:0 0 24px 0;font-size:13px;line-height:1.6;word-break:break-all;">
+            <a href="${escapeAttr(resetUrl)}" style="color:${PRIMARY};text-decoration:none;">${escapeHtml(resetUrl)}</a>
+          </p>
+          <hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;" />
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#9CA3AF;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+        </td></tr>
+        <tr><td style="background:#F9FAFB;padding:20px 36px;text-align:center;border-top:1px solid #E5E7EB;">
+          <p style="margin:0;font-size:12px;color:#6B7280;">&copy; ${new Date().getFullYear()} RecentGossips &middot; <a href="https://rgossips.com" style="color:#6B7280;text-decoration:none;">rgossips.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const text = [
+    `Hi ${fullName},`,
+    "",
+    "We received a request to reset the password for your RecentGossips Admin account. Open the link below to choose a new one (expires in 1 hour):",
+    "",
+    resetUrl,
+    "",
+    "If you didn't request this, you can safely ignore this email — your password won't change.",
+    "",
+    "— RecentGossips",
+  ].join("\n");
+
+  return { html, text };
+}
+
 function escapeHtml(s: string) {
   return s
     .replace(/&/g, "&amp;")

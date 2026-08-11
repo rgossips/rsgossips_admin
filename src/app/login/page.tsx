@@ -5,14 +5,17 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTranslations } from "next-intl";
+import { requestPasswordReset } from "./actions";
 
 export default function LoginPage() {
   const t = useTranslations("Login");
+  const [mode, setMode] = useState<"login" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -35,6 +38,23 @@ export default function LoginPage() {
 
     router.push("/dashboard");
     router.refresh();
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    // Always resolves to a generic success — the action never reveals whether
+    // the email is an admin.
+    await requestPasswordReset(email);
+    setLoading(false);
+    setResetSent(true);
+  };
+
+  const switchMode = (next: "login" | "reset") => {
+    setMode(next);
+    setError("");
+    setResetSent(false);
   };
 
   return (
@@ -62,7 +82,56 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
+          {/* Reset-password view */}
+          {mode === "reset" ? (
+            resetSent ? (
+              <div className="space-y-5">
+                <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm">
+                  {t("reset.sent")}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => switchMode("login")}
+                  className="w-full py-2.5 px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  {t("reset.backToSignIn")}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleReset} className="space-y-5">
+                <p className="text-[13px] text-gray-500 dark:text-gray-400 -mt-2">{t("reset.instructions")}</p>
+                <div>
+                  <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    {t("emailLabel")}
+                  </label>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder={t("emailPlaceholder")}
+                    className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-all cursor-pointer shadow-lg"
+                >
+                  {loading ? t("reset.sending") : t("reset.sendLink")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode("login")}
+                  className="w-full text-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+                >
+                  {t("reset.backToSignIn")}
+                </button>
+              </form>
+            )
+          ) : (
+          /* Login view */
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label
@@ -125,7 +194,16 @@ export default function LoginPage() {
             >
               {loading ? t("signingIn") : t("signIn")}
             </button>
+
+            <button
+              type="button"
+              onClick={() => switchMode("reset")}
+              className="w-full text-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+            >
+              {t("reset.forgot")}
+            </button>
           </form>
+          )}
         </div>
 
         <p className="text-center text-white/60 dark:text-gray-600 text-xs mt-6">
