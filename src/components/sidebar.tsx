@@ -50,6 +50,9 @@ const navGroups: NavGroup[] = [
     titleKey: "operations",
     items: [
       { label: "Disputes", href: "/dashboard/disputes", icon: "scale", badgeKey: "openDisputes" },
+      // Required by Play's UGC policy and Apple Guideline 1.2 — both ask
+      // whether user reports are acted on, not merely collected.
+      { label: "Reports", href: "/dashboard/reports", icon: "shield" },
       { label: "Payouts", href: "/dashboard/payouts", icon: "wallet", badgeKey: "pendingPayouts" },
       { label: "Services", href: "/dashboard/services", icon: "sparkles" },
       { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
