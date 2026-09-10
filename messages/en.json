@@ -1291,8 +1291,11 @@
     "freeLabel": "Free",
     "changePlan": "Change plan",
     "title": "Change Subscription Plan",
-    "subtitle": "Admin override — bypasses Stripe. Use for comps, trials, or fixes.",
+    "subtitle": "Admin override — bypasses the payment gateway. Use for comps or fixes.",
     "current": "Current",
+    "cycleMonthly": "Monthly",
+    "cycleAnnual": "Annual",
+    "legacyPlanNotice": "This creator is on the legacy “{plan}” value, which the creator app doesn’t treat as an entitlement. Pick a tier and billing cycle below to grant a real plan.",
     "saving": "Saving...",
     "savePlan": "Save plan",
     "cancel": "Cancel"

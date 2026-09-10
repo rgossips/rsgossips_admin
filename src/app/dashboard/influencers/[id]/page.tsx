@@ -78,7 +78,7 @@ export default async function InfluencerDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canWrite && <ChangePlanButton influencerId={inf.influencer_id} currentPlan={inf.subscription_plan} />}
+          {canWrite && <ChangePlanButton influencerId={inf.influencer_id} currentPlan={inf.subscription_plan} currentCycle={inf.billing_cycle} />}
           {canWrite && <EditInfluencerButton influencer={inf} />}
           {superAdmin && (
             <DeleteInfluencerButton
@@ -138,7 +138,7 @@ export default async function InfluencerDetailPage({
             ["Instagram", inf.instagram_handle ? `@${inf.instagram_handle}` : "—"],
             [t("profileDetails.status"), inf.status || "—"],
             [t("profileDetails.verification"), inf.verification_status || "—"],
-            [t("profileDetails.plan"), inf.subscription_plan ? inf.subscription_plan.charAt(0).toUpperCase() + inf.subscription_plan.slice(1) : t("planFree")],
+            [t("profileDetails.plan"), inf.subscription_plan ? `${inf.subscription_plan.charAt(0).toUpperCase() + inf.subscription_plan.slice(1)}${inf.billing_cycle ? ` · ${inf.billing_cycle.charAt(0).toUpperCase() + inf.billing_cycle.slice(1)}` : ""}` : t("planFree")],
             [t("profileDetails.source"), inf.source || "—"],
           ]} />
           <SidebarTable title={t("igStats.title")} rows={[

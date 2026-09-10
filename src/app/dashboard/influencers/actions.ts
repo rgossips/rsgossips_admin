@@ -8,34 +8,52 @@ import { sendMail } from "@/lib/mailer";
 import { renderUserStatusEmail } from "@/lib/email-templates";
 import { normalizeGender, fetchExistingHandles } from "@/lib/bulk-invite-utils";
 import { enforceRateLimit, auditLog } from "@/lib/rate-limit";
-import { logError } from "@/lib/log";
+import { logError, friendlyDbError } from "@/lib/log";
 import { isHttpUrl, isInstagramHandle, clampLen } from "@/lib/validation";
+import {
+  VALID_PLAN_KEYS,
+  VALID_BILLING_CYCLES,
+  PLAN_RANK,
+  PLAN_LABEL,
+  TEMPLATE_MIN_PLAN,
+} from "@/lib/subscription-plans";
 
-// Admin-only override of an influencer's subscription plan. Bypasses
-// Stripe entirely — useful for comping accounts, granting trials, or
-// fixing data after a refund. Mirrors the Stripe-webhook reset behaviour:
-// if the user's saved media-kit template is above the new plan's tier
-// (e.g. they're on Glass Blue and admin moves them to Starter) we flip
-// media_kit_template back to "classic" in the same write, so the picker
-// is never stuck in an unsave-able state.
-const VALID_PLANS = new Set(["trial", "starter", "pro", "elite"]);
-const TEMPLATE_MIN_PLAN: Record<string, string> = {
-  classic: "starter",
-  glass_blue: "pro",
-  editorial_noir: "pro",
-  bento_sunset: "pro",
-  neo_brutalist: "pro",
-};
-const PLAN_RANK: Record<string, number> = { trial: 2, starter: 1, pro: 2, elite: 3 };
-
-export async function updateInfluencerPlan(influencerId: string, plan: string): Promise<{ error?: string; success?: boolean }> {
+// Admin-only override of an influencer's subscription plan. Bypasses the
+// payment gateway entirely — useful for comping accounts, granting a tier,
+// or fixing data after a refund.
+//
+// Writes THREE columns, because the consumer app needs all three to treat
+// the override as a real plan:
+//   subscription_plan — the tier getEffectivePlan() reads (starter/pro/elite
+//                       only; "trial" is NOT an entitlement over there, it
+//                       falls back to an account-age check, so comping
+//                       "trial" to an account older than 30 days granted
+//                       nothing — that's why overrides looked ignored).
+//   billing_cycle     — drives the renewal countdown; a tier without a cycle
+//                       shows someone on an annual comp a 30-day countdown.
+//   payment_gateway   — set to "admin" so a later stray gateway webhook
+//                       (subscription.cancelled on an old Razorpay sub) skips
+//                       its downgrade: the webhook bails when the gateway on
+//                       the row isn't its own. A real purchase overwrites
+//                       this back to the paying rail, so it's self-healing.
+//
+// Mirrors the webhooks' setUserPlan reset behaviour: if the user's saved
+// media-kit template is above the new tier (e.g. Neo-Brutalist on an
+// Elite→Pro downgrade) we flip media_kit_template back to "classic" in the
+// same write, so their picker is never stuck in an unsave-able state.
+export async function updateInfluencerPlan(
+  influencerId: string,
+  plan: string,
+  cycle: string,
+): Promise<{ error?: string; success?: boolean }> {
   // Money-relevant (comps a paid tier for free) — capture the actor for audit.
   let actorId: string;
   try { actorId = await requireAdmin(); }
   catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
 
-  if (!VALID_PLANS.has(plan)) return { error: "Invalid plan" };
-  await auditLog("update_plan", actorId, `${influencerId}:${plan}`);
+  if (!VALID_PLAN_KEYS.has(plan)) return { error: "Invalid plan" };
+  if (!VALID_BILLING_CYCLES.has(cycle)) return { error: "Invalid billing cycle" };
+  await auditLog("update_plan", actorId, `${influencerId}:${plan}:${cycle}`);
 
   const adminClient = createAdminClient();
 
@@ -51,6 +69,8 @@ export async function updateInfluencerPlan(influencerId: string, plan: string): 
 
   const update: Record<string, unknown> = {
     subscription_plan: plan,
+    billing_cycle: cycle,
+    payment_gateway: "admin",
     updated_at: new Date().toISOString(),
   };
   if (templateNoLongerAllowed) update.media_kit_template = "classic";
@@ -60,7 +80,9 @@ export async function updateInfluencerPlan(influencerId: string, plan: string): 
     .update(update)
     .eq("influencer_id", influencerId);
 
-  if (error) return { error: error.message };
+  if (error) {
+    return { error: friendlyDbError("update-plan", error, "Could not update the plan. Please try again.", { influencerId, plan, cycle }) };
+  }
 
   if (templateNoLongerAllowed) {
     // Best-effort heads-up so the creator knows their kit reverted; failures
@@ -71,7 +93,7 @@ export async function updateInfluencerPlan(influencerId: string, plan: string): 
         type: "media_kit_template_reset",
         title: "Media kit reset to Classic",
         body: JSON.stringify({
-          text: `Your ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan only includes the Classic media-kit template, so your kit was switched back. Pick another any time from your media-kit page.`,
+          text: `Your ${PLAN_LABEL[plan] || plan} plan doesn't include your previous media-kit template, so your kit was switched back to Classic. Pick another any time from your media-kit page.`,
           link: "/influencer/media-kit",
         }),
         is_read: false,
