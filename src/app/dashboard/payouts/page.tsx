@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { MarkPaidForm } from "./_components/mark-paid-form";
+import { FixPayoutDetails } from "./_components/fix-payout-details";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,7 @@ export default async function PayoutsPage({
       ? admin
           .from("payment_methods")
           .select(
-            "user_id, type, label, upi_id, account_holder_name, bank_name, account_number, ifsc, is_primary, validation_status",
+            "id, user_id, type, label, upi_id, account_holder_name, bank_name, account_number, ifsc, is_primary, validation_status",
           )
           .in("user_id", creatorIds)
           .eq("is_primary", true)
@@ -271,6 +272,15 @@ async function PayoutRow({
       {!isPaid && app.payout_status === "pending_creator_info" && (
         <span className="text-[11px] text-gray-400 italic">{t("noMethodOnFile")}</span>
       )}
+      {/* Recovery for a bounced transfer: reject the saved details so the
+          creator is told why, and/or enter the ones support collected. */}
+      {!isPaid && (
+        <FixPayoutDetails
+          userId={app.influencer_id}
+          paymentMethodId={paymentMethod?.id || null}
+          canWrite={canWrite}
+        />
+      )}
     </div>
 
     {/* Desktop grid row — unchanged, just hidden on mobile. */}
@@ -359,6 +369,15 @@ async function PayoutRow({
         )}
         {!isPaid && app.payout_status === "pending_creator_info" && (
           <span className="text-[11px] text-gray-400 italic">{t("noMethodOnFile")}</span>
+        )}
+      </div>
+      <div className="col-span-12 flex justify-end pt-2">
+        {!isPaid && (
+          <FixPayoutDetails
+            userId={app.influencer_id}
+            paymentMethodId={paymentMethod?.id || null}
+            canWrite={canWrite}
+          />
         )}
       </div>
     </div>

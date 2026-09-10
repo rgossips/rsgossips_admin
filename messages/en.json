@@ -1973,5 +1973,27 @@
     "refresh": "Try again",
     "checking": "Checking…",
     "autoNote": "We reconnect automatically when your network returns."
+  },
+  "DashboardPayoutsComponentsFixPayoutDetails": {
+    "markDetailsWrong": "Details are wrong",
+    "addDetails": "Add details",
+    "rejectHint": "Marks the saved details as rejected. The creator sees this reason in Payments and is asked to replace them.",
+    "reasonPlaceholder": "e.g. UPI ID does not exist",
+    "addHint": "Enter the details the creator confirmed. These become their primary method.",
+    "typeUpi": "UPI",
+    "typeBank": "Bank account",
+    "upiPlaceholder": "name@bank",
+    "holderPlaceholder": "Account holder name",
+    "holderOptionalPlaceholder": "Account holder name (optional)",
+    "accountPlaceholder": "Account number",
+    "ifscPlaceholder": "IFSC",
+    "bankPlaceholder": "Bank name (optional)",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "confirmReject": "Mark rejected",
+    "confirmAdd": "Save details",
+    "rejected": "Details rejected — creator notified.",
+    "added": "Details saved.",
+    "addedAndResumed": "Details saved — {count} payout(s) re-queued."
   }
 }
