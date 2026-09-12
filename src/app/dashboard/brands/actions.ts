@@ -7,12 +7,42 @@ import { fetchExistingHandles } from "@/lib/bulk-invite-utils";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { logError } from "@/lib/log";
 import { isEmail, isHttpUrl, isInstagramHandle, clampLen } from "@/lib/validation";
+import { notifyUser } from "@/lib/notify";
+
+// Verification is the gate on a brand doing anything: brand-campaigns refuses
+// to publish for a brand whose verification_status isn't "verified" and tells
+// them "your brand is still under review". So the verdict here is exactly the
+// thing they're waiting on, and until now it was delivered silently — a
+// verified brand had no idea it could start publishing.
+//
+// "pending" is deliberately silent: that's an admin moving a row back into the
+// queue, not a decision addressed to the brand.
+const VERIFICATION_NOTIFICATIONS: Record<string, { type: string; title: string; text: string }> = {
+  verified: {
+    type: "brand_verified",
+    title: "Your brand is verified",
+    text: "Verification is complete — you can now publish campaigns and start working with creators.",
+  },
+  rejected: {
+    type: "brand_verification_rejected",
+    title: "Verification needs another look",
+    text: "We couldn't verify your brand with the details provided. Update your profile and we'll review it again.",
+  },
+};
 
 export async function updateBrandVerification(brandId: string, action: "verified" | "rejected" | "pending"): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
 
   const adminClient = createAdminClient();
+
+  // Read the prior state so re-picking the same verdict doesn't re-notify.
+  const { data: prior } = await adminClient
+    .from("brand_profiles")
+    .select("verification_status")
+    .eq("brand_id", brandId)
+    .maybeSingle();
+
   const { error } = await adminClient
     .from("brand_profiles")
     .update({
@@ -23,7 +53,24 @@ export async function updateBrandVerification(brandId: string, action: "verified
 
   if (error) return { error: error.message };
 
+  const notification = VERIFICATION_NOTIFICATIONS[action];
+  if (notification && prior?.verification_status !== action) {
+    await notifyUser(
+      {
+        userId: brandId,
+        type: notification.type,
+        title: notification.title,
+        body: {
+          text: notification.text,
+          link: action === "verified" ? "/brands/campaigns" : "/brands/profile",
+        },
+      },
+      "brand-verification",
+    );
+  }
+
   revalidatePath("/dashboard/brands");
+  revalidatePath(`/dashboard/brands/${brandId}`);
   return { success: true };
 }
 

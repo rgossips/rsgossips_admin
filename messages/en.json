@@ -1905,7 +1905,8 @@
     "empty": {
       "title": "You're all caught up",
       "subtitle": "No items awaiting action"
-    }
+    },
+    "campaignAwaitingApproval": "Campaign awaiting approval"
   },
   "Pagination": {
     "showing": "Showing <b>{range}</b> of <b>{count}</b>",
@@ -1928,7 +1929,8 @@
     "disputes": "Disputes",
     "payouts": "Payouts",
     "quotes": "Quote requests",
-    "referrals": "Referral reviews"
+    "referrals": "Referral reviews",
+    "campaignReview": "Campaign approvals"
   },
   "DesktopBestBanner": {
     "message": "This screen is built for desktop. You can still use it here, but it's easier on a larger screen.",

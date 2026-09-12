@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { adminGate, superAdminGate } from "@/lib/require-super-admin";
+import { notifyUser } from "@/lib/notify";
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ error?: string; url?: string }> {
   const gate = await adminGate();
@@ -196,6 +197,45 @@ export async function createCampaign(formData: FormData): Promise<{ error?: stri
   return { success: true };
 }
 
+// What the creator is told for each decision we make on their application.
+// Types are the app_* family the consumer app already renders and routes:
+// its getNotifLink() sends any app_* carrying a campaignId to
+// /influencer/offers/<id>, and prefKeyForType() maps app_* to the
+// "applicationStatus" preference so a creator who muted these still won't be
+// pushed. Statuses absent from this map (withdrawn, payment, live_submitted,
+// submitted) are either creator-initiated or already notified elsewhere —
+// escrow-release owns the payout messages — so they stay silent here.
+const APPLICATION_NOTIFICATIONS: Record<
+  string,
+  { type: string; title: string; text: (campaign: string) => string }
+> = {
+  approved: {
+    type: "app_approved",
+    title: "Application approved",
+    text: (c) => `You're approved for "${c}". Check the brief and start creating.`,
+  },
+  accepted: {
+    type: "app_accepted",
+    title: "Work accepted",
+    text: (c) => `Your submission for "${c}" was accepted.`,
+  },
+  rejected: {
+    type: "app_rejected",
+    title: "Application not accepted",
+    text: (c) => `Your application for "${c}" wasn't accepted this time.`,
+  },
+  revision_needed: {
+    type: "app_revision_needed",
+    title: "Changes requested",
+    text: (c) => `The brand asked for changes to your submission for "${c}".`,
+  },
+  completed: {
+    type: "app_completed",
+    title: "Campaign completed",
+    text: (c) => `"${c}" is marked complete. Nice work.`,
+  },
+};
+
 export async function updateApplicationStatus(
   applicationId: string,
   newStatus: string,
@@ -216,8 +256,39 @@ export async function updateApplicationStatus(
     updates.rejection_reason = JSON.stringify({ note: revisionNote || "", links: revisionLinks || [] });
   }
 
+  // Read the creator + campaign before the write. Also lets us skip the
+  // notification when the status isn't actually changing — the badge dropdown
+  // is an any-to-any corrections tool, and re-picking the current value
+  // shouldn't push the creator a second time.
+  const { data: application } = await adminClient
+    .from("campaign_applications")
+    .select("influencer_id, campaign_id, status, campaigns(title)")
+    .eq("id", applicationId)
+    .maybeSingle();
+
   const { error } = await adminClient.from("campaign_applications").update(updates).eq("id", applicationId);
   if (error) return { error: error.message };
+
+  // Tell the creator. Best-effort — the decision is already committed.
+  const notification = APPLICATION_NOTIFICATIONS[newStatus];
+  if (notification && application?.influencer_id && application.status !== newStatus) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const campaignTitle = (application as any).campaigns?.title || "your campaign";
+    await notifyUser(
+      {
+        userId: application.influencer_id,
+        type: notification.type,
+        title: notification.title,
+        body: {
+          text: notification.text(campaignTitle),
+          link: `/influencer/offers/${application.campaign_id}`,
+          campaignId: application.campaign_id,
+          applicationId,
+        },
+      },
+      "application-status",
+    );
+  }
 
   revalidatePath("/dashboard/campaigns");
   return { success: true };
@@ -228,6 +299,14 @@ export async function updateApplicationStatus(
 // the approved campaign gets the SAME match-and-notify fan-out to creators
 // a direct publish would have — a plain status update here would silently
 // skip notifications. Reject sends the campaign back to draft.
+//
+// The edge fn notifies matching CREATORS on approve, but it tells the BRAND
+// nothing on either outcome — so the brand that submitted the campaign and is
+// waiting on us learned the verdict only by re-opening the page. We notify
+// them here rather than in the edge fn because adminApprove/adminReject are
+// gated on the service-role bearer, which only this portal holds: this action
+// is the sole caller, so the coverage is complete either way, and doing it
+// here ships with the app instead of needing an edge-fn redeploy.
 export async function reviewCampaign(
   campaignId: string,
   decision: "approve" | "reject",
@@ -238,6 +317,15 @@ export async function reviewCampaign(
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) return { error: "Server misconfigured" };
+
+  // Read the brand + title BEFORE the decision: adminReject flips the row to
+  // draft and adminApprove to active, but neither returns the brand id, and
+  // re-reading afterwards would race an edit.
+  const { data: campaign } = await createAdminClient()
+    .from("campaigns")
+    .select("brand_id, title")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
 
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/brand-campaigns`, {
@@ -254,7 +342,38 @@ export async function reviewCampaign(
     });
     const data = await res.json();
     if (data?.error) return { error: data.error };
+
+    // Best-effort, and only after the decision actually committed.
+    if (campaign?.brand_id) {
+      const title = campaign.title || "Your campaign";
+      await notifyUser(
+        decision === "approve"
+          ? {
+              userId: campaign.brand_id,
+              type: "campaign_approved",
+              title: "Campaign approved",
+              body: {
+                text: `"${title}" is approved and live — creators can now see and apply to it.`,
+                link: `/brands/campaign/${campaignId}`,
+                campaignId,
+              },
+            }
+          : {
+              userId: campaign.brand_id,
+              type: "campaign_rejected",
+              title: "Campaign sent back for changes",
+              body: {
+                text: `"${title}" wasn't approved and is back in your drafts. Review the details and submit it again.`,
+                link: `/brands/campaign/${campaignId}`,
+                campaignId,
+              },
+            },
+        "review-campaign",
+      );
+    }
+
     revalidatePath("/dashboard/campaigns");
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
     return { success: true, matchingCount: data?.matchingCount };
   } catch (e: any) {
     return { error: e?.message || "Review failed" };
@@ -266,6 +385,24 @@ export async function updateCampaignStatus(campaignId: string, status: string): 
   if (gate) return gate;
 
   const adminClient = createAdminClient();
+
+  // Guard the review pipeline. This dropdown is a free-form corrections tool
+  // and it offers "active" on a campaign that is still under_review — taking
+  // that shortcut writes the status directly and skips everything approval is
+  // supposed to do: the match-and-notify fan-out to creators (which only the
+  // edge fn performs) and the brand's "approved" notification. The campaign
+  // would go live to nobody. Route it through reviewCampaign() instead.
+  if (status === "active") {
+    const { data: current } = await adminClient
+      .from("campaigns")
+      .select("status")
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+    if (current?.status === "under_review") {
+      return { error: "Use Approve to publish a campaign that's awaiting review — that's what notifies the brand and matching creators." };
+    }
+  }
+
   const { error } = await adminClient.from("campaigns").update({ status }).eq("campaign_id", campaignId);
   if (error) return { error: error.message };
 

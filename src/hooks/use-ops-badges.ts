@@ -9,13 +9,15 @@ import { createClient } from "@/utils/supabase/client";
 // and fails soft — a transient error leaves the previous counts in place.
 //
 // Keys mirror the sidebar's badgeKey values so it can consume this directly:
-//   pendingQuotes / openDisputes / pendingPayouts / referralReviews
+//   pendingQuotes / openDisputes / pendingPayouts / referralReviews /
+//   campaignsUnderReview
 // plus submittedDeliverables (from the notification bell's second stream).
 export type OpsBadges = {
   pendingQuotes: number;
   openDisputes: number;
   pendingPayouts: number;
   referralReviews: number;
+  campaignsUnderReview: number;
   submittedDeliverables: number;
 };
 
@@ -24,6 +26,7 @@ const EMPTY: OpsBadges = {
   openDisputes: 0,
   pendingPayouts: 0,
   referralReviews: 0,
+  campaignsUnderReview: 0,
   submittedDeliverables: 0,
 };
 
@@ -36,7 +39,7 @@ export function useOpsBadges(intervalMs = 30_000): OpsBadges {
 
     const fetchBadges = async () => {
       try {
-        const [quoteRes, disputeRes, payoutRes, reviewRes, deliverRes] = await Promise.all([
+        const [quoteRes, disputeRes, payoutRes, reviewRes, campaignRes, deliverRes] = await Promise.all([
           supabase
             .from("service_orders")
             .select("*", { count: "exact", head: true })
@@ -53,6 +56,13 @@ export function useOpsBadges(intervalMs = 30_000): OpsBadges {
             .from("referrals")
             .select("*", { count: "exact", head: true })
             .eq("status", "MANUAL_REVIEW"),
+          // A brand published a campaign and it is parked in the review
+          // queue — nothing reaches creators until an admin approves it, so
+          // it is the queue with the most time pressure on it.
+          supabase
+            .from("campaigns")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "under_review"),
           supabase
             .from("campaign_applications")
             .select("*", { count: "exact", head: true })
@@ -64,6 +74,7 @@ export function useOpsBadges(intervalMs = 30_000): OpsBadges {
           openDisputes: disputeRes.count ?? 0,
           pendingPayouts: payoutRes.count ?? 0,
           referralReviews: reviewRes.count ?? 0,
+          campaignsUnderReview: campaignRes.count ?? 0,
           submittedDeliverables: deliverRes.count ?? 0,
         });
       } catch {

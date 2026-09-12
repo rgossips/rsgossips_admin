@@ -7,7 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 
 interface Notification {
   id: string;
-  type: "quote_request" | "submission" | "application";
+  type: "quote_request" | "submission" | "application" | "campaign_review";
   title: string;
   subtitle: string;
   href: string;
@@ -52,8 +52,9 @@ export function NotificationBell() {
 
     const load = async () => {
       try {
-        // Awaiting-action items: pending quotes + counter offers + submitted applications + revision needed
-        const [quotesRes, appsRes] = await Promise.all([
+        // Awaiting-action items: pending quotes + counter offers + submitted
+        // applications + revision needed + campaigns parked in the review queue.
+        const [quotesRes, appsRes, reviewRes] = await Promise.all([
           supabase
             .from("service_orders")
             .select("id, order_number, service_title, status, created_at, updated_at")
@@ -65,6 +66,17 @@ export function NotificationBell() {
             .select("id, status, campaign_id, created_at, updated_at, campaigns(title)")
             .in("status", ["submitted"])
             .order("updated_at", { ascending: false })
+            .limit(10),
+          // A brand published a campaign and it is waiting on an admin. Until
+          // someone approves it, it reaches no creators at all — so it belongs
+          // in the same "awaiting action" list as quotes and deliverables.
+          // Ordered by created_at: the review queue is FIFO, and an admin
+          // editing a pending campaign shouldn't push it back down the list.
+          supabase
+            .from("campaigns")
+            .select("campaign_id, title, created_at, brand_profiles(brand_name)")
+            .eq("status", "under_review")
+            .order("created_at", { ascending: false })
             .limit(10),
         ]);
 
@@ -96,6 +108,19 @@ export function NotificationBell() {
             subtitle: campaignTitle,
             href: `/dashboard/campaigns/${a.campaign_id}`,
             time: a.updated_at || a.created_at,
+          });
+        }
+
+        for (const c of reviewRes.data || []) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const brandName = (c as any).brand_profiles?.brand_name;
+          items.push({
+            id: `review-${c.campaign_id}`,
+            type: "campaign_review",
+            title: t("campaignAwaitingApproval"),
+            subtitle: brandName ? `${c.title || t("campaignFallback")} · ${brandName}` : c.title || t("campaignFallback"),
+            href: `/dashboard/campaigns/${c.campaign_id}`,
+            time: c.created_at,
           });
         }
 
@@ -179,11 +204,15 @@ export function NotificationBell() {
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                     n.type === "quote_request"
                       ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+                      : n.type === "campaign_review"
+                      ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
                       : "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
                   }`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       {n.type === "quote_request" ? (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      ) : n.type === "campaign_review" ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       ) : (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                       )}

@@ -41,7 +41,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Brands", href: "/dashboard/brands", icon: "briefcase" },
       { label: "Featured Brands", href: "/dashboard/featured-brands", icon: "tag" },
-      { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone" },
+      { label: "Campaigns", href: "/dashboard/campaigns", icon: "megaphone", badgeKey: "campaignsUnderReview" },
       { label: "Featured Campaigns", href: "/dashboard/featured-campaigns", icon: "flame" },
     ],
   },
