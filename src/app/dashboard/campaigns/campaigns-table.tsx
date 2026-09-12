@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatStatus } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { deleteCampaigns, reviewCampaign } from "./actions";
+import { RejectCampaignModal } from "./reject-campaign-modal";
 import { useRole } from "@/components/role-context";
 import { ConfirmDialog, useConfirmDialog } from "@/components/confirm-dialog";
 import { ButtonSpinner } from "@/components/spinner";
@@ -42,12 +43,15 @@ function ReviewButtons({ campaignId }: { campaignId: string }) {
   const t = useTranslations("DashboardCampaignsCampaignsTable");
   const router = useRouter();
   const { isAdmin } = useRole();
-  const [pending, setPending] = useState<"approve" | "reject" | null>(null);
+  const [pending, setPending] = useState<"approve" | null>(null);
+  // Reject opens the reason dialog instead of firing straight away — the
+  // brand's only clue about what to fix is what an admin types there.
+  const [rejecting, setRejecting] = useState(false);
   if (!isAdmin) return null;
 
-  const act = async (decision: "approve" | "reject") => {
-    setPending(decision);
-    const res = await reviewCampaign(campaignId, decision);
+  const approve = async () => {
+    setPending("approve");
+    const res = await reviewCampaign(campaignId, "approve");
     if (res.error) alert(res.error);
     setPending(null);
     router.refresh();
@@ -56,7 +60,7 @@ function ReviewButtons({ campaignId }: { campaignId: string }) {
   return (
     <span className="flex items-center gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => act("approve")}
+        onClick={approve}
         disabled={!!pending}
         className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 text-white cursor-pointer"
       >
@@ -64,13 +68,19 @@ function ReviewButtons({ campaignId }: { campaignId: string }) {
         {t("reviewApprove")}
       </button>
       <button
-        onClick={() => act("reject")}
+        onClick={() => setRejecting(true)}
         disabled={!!pending}
         className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
       >
-        {pending === "reject" && <ButtonSpinner />}
         {t("reviewReject")}
       </button>
+      {rejecting && (
+        <RejectCampaignModal
+          campaignId={campaignId}
+          onClose={() => setRejecting(false)}
+          onRejected={() => router.refresh()}
+        />
+      )}
     </span>
   );
 }

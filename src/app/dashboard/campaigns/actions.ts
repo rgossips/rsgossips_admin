@@ -2,8 +2,10 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { adminGate, superAdminGate } from "@/lib/require-super-admin";
+import { adminGate, superAdminGate, requireAdmin } from "@/lib/require-super-admin";
 import { notifyUser } from "@/lib/notify";
+import { auditLog } from "@/lib/rate-limit";
+import { clampLen } from "@/lib/validation";
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ error?: string; url?: string }> {
   const gate = await adminGate();
@@ -307,12 +309,24 @@ export async function updateApplicationStatus(
 // gated on the service-role bearer, which only this portal holds: this action
 // is the sole caller, so the coverage is complete either way, and doing it
 // here ships with the app instead of needing an edge-fn redeploy.
+// A rejection with no reason leaves the brand guessing at what to change,
+// which is the whole problem the review queue exists to solve — so the reason
+// rides along to them. Clamped because it goes into a notification body and,
+// through the push trigger, into a device notification payload.
+const MAX_REVIEW_REASON = 500;
+
 export async function reviewCampaign(
   campaignId: string,
   decision: "approve" | "reject",
+  reason?: string,
 ): Promise<{ error?: string; success?: boolean; matchingCount?: number }> {
-  const gate = await adminGate();
-  if (gate) return gate;
+  // requireAdmin (not adminGate) so the decision lands in the audit trail
+  // attributed to the admin who made it.
+  let actorId: string;
+  try { actorId = await requireAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
+
+  const reviewReason = clampLen(reason, MAX_REVIEW_REASON);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -343,6 +357,12 @@ export async function reviewCampaign(
     const data = await res.json();
     if (data?.error) return { error: data.error };
 
+    await auditLog(
+      "campaign_review",
+      actorId,
+      reviewReason ? `${campaignId}:${decision}:${reviewReason}` : `${campaignId}:${decision}`,
+    );
+
     // Best-effort, and only after the decision actually committed.
     if (campaign?.brand_id) {
       const title = campaign.title || "Your campaign";
@@ -363,9 +383,14 @@ export async function reviewCampaign(
               type: "campaign_rejected",
               title: "Campaign sent back for changes",
               body: {
-                text: `"${title}" wasn't approved and is back in your drafts. Review the details and submit it again.`,
+                text: reviewReason
+                  ? `"${title}" is back in your drafts: ${reviewReason}`
+                  : `"${title}" wasn't approved and is back in your drafts. Review the details and submit it again.`,
                 link: `/brands/campaign/${campaignId}`,
                 campaignId,
+                // Carried as its own field too, so the brand app can render the
+                // reason as a distinct block rather than only inside the text.
+                reason: reviewReason || undefined,
               },
             },
         "review-campaign",

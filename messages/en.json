@@ -2000,5 +2000,15 @@
     "rejected": "Details rejected — creator notified.",
     "added": "Details saved.",
     "addedAndResumed": "Details saved — {count} payout(s) re-queued."
+  },
+  "DashboardCampaignsReject": {
+    "title": "Send this campaign back?",
+    "description": "The campaign returns to the brand's drafts and is notified. It stays hidden from creators until they resubmit and you approve it.",
+    "reasonLabel": "Reason for the brand (optional)",
+    "reasonPlaceholder": "e.g. The budget per creator doesn't match the deliverables listed. Please revise and resubmit.",
+    "reasonHint": "This is the only thing telling them what to fix.",
+    "cancel": "Cancel",
+    "confirm": "Send back",
+    "sending": "Sending…"
   }
 }
