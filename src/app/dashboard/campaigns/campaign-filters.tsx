@@ -10,6 +10,7 @@ const STATUS_OPTIONS = [
   { key: "all", value: "" },
   { key: "draft", value: "draft" },
   { key: "underReview", value: "under_review" },
+  { key: "rejected", value: "rejected" },
   { key: "active", value: "active" },
   // Derived sub-state of active: still live but past its application deadline.
   // The page resolves this to status=active AND application_deadline < now.

@@ -352,6 +352,10 @@ export async function reviewCampaign(
       body: JSON.stringify({
         action: decision === "approve" ? "adminApprove" : "adminReject",
         campaignId,
+        // The reason has to reach the ROW, not just the notification and
+        // the audit log. A brand who misses or clears the notification
+        // otherwise opens the campaign to a bare status and no verdict.
+        reason: reviewReason || undefined,
       }),
     });
     const data = await res.json();
@@ -384,8 +388,8 @@ export async function reviewCampaign(
               title: "Campaign sent back for changes",
               body: {
                 text: reviewReason
-                  ? `"${title}" is back in your drafts: ${reviewReason}`
-                  : `"${title}" wasn't approved and is back in your drafts. Review the details and submit it again.`,
+                  ? `"${title}" was not approved: ${reviewReason}`
+                  : `"${title}" was not approved. Open it to see the details, make the changes and resubmit it for review.`,
                 link: `/brands/campaign/${campaignId}`,
                 campaignId,
                 // Carried as its own field too, so the brand app can render the
@@ -423,8 +427,12 @@ export async function updateCampaignStatus(campaignId: string, status: string): 
       .select("status")
       .eq("campaign_id", campaignId)
       .maybeSingle();
-    if (current?.status === "under_review") {
-      return { error: "Use Approve to publish a campaign that's awaiting review — that's what notifies the brand and matching creators." };
+    // `rejected` is guarded for the same reason as `under_review`: it is a
+    // campaign that has been through review, so publishing it from here
+    // would skip the fan-out AND silently leave the rejection reason on a
+    // live campaign.
+    if (current?.status === "under_review" || current?.status === "rejected") {
+      return { error: "Use Approve to publish a campaign that's been through review — that's what notifies the brand and matching creators, and clears the rejection reason." };
     }
   }
 

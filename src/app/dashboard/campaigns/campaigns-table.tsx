@@ -34,11 +34,13 @@ const statusColors: Record<string, string> = {
   completed: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
   apps_closed: "bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
   under_review: "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
+  rejected: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400",
 };
 
 // Inline Approve / Send back pair for campaigns waiting in the review
 // queue. Approve routes through the edge fn so creator match-notifications
-// fire; reject returns the campaign to draft.
+// fire; reject moves the campaign to `rejected` and records the reason on
+// the row so the brand can read it on their own campaign page.
 function ReviewButtons({ campaignId }: { campaignId: string }) {
   const t = useTranslations("DashboardCampaignsCampaignsTable");
   const router = useRouter();
