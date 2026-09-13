@@ -7,6 +7,7 @@ import { ChangePlanButton } from "./change-plan";
 import { DeleteInfluencerButton } from "./delete-influencer";
 import { ReferralLinkCard } from "./referral-link-card";
 import { Avatar } from "@/components/avatar";
+import { InstagramLink } from "@/components/instagram-link";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
 import { getTranslations } from "next-intl/server";
 
@@ -69,8 +70,8 @@ export default async function InfluencerDetailPage({
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
-                {inf.instagram_handle && <span className="text-sm text-gray-500 dark:text-gray-400">@{inf.instagram_handle}</span>}
-                {inf.username && inf.username !== inf.instagram_handle && (<><span className="text-gray-300 dark:text-gray-700">|</span><span className="text-sm text-gray-400 dark:text-gray-500">{inf.username}</span></>)}
+                {inf.instagram_handle && <InstagramLink handle={inf.instagram_handle} className="text-sm text-gray-500 dark:text-gray-400" />}
+                {inf.username && inf.username !== inf.instagram_handle && (<><span className="text-gray-300 dark:text-gray-700">|</span><InstagramLink handle={inf.username} showAt={false} className="text-sm text-gray-400 dark:text-gray-500" /></>)}
                 <span className="text-gray-300 dark:text-gray-700">|</span>
                 <span className="text-sm text-gray-400 dark:text-gray-500">{t("joinedDate", { date: formatDate(inf.created_at) })}</span>
               </div>
@@ -134,8 +135,8 @@ export default async function InfluencerDetailPage({
         <div className="space-y-6">
           <SidebarTable title={t("profileDetails.title")} rows={[
             [t("profileDetails.fullName"), inf.full_name || "—"],
-            [t("profileDetails.username"), inf.username || "—"],
-            ["Instagram", inf.instagram_handle ? `@${inf.instagram_handle}` : "—"],
+            [t("profileDetails.username"), <InstagramLink key="u" handle={inf.username || inf.instagram_handle} showAt={false} />],
+            ["Instagram", <InstagramLink key="ig" handle={inf.instagram_handle} />],
             [t("profileDetails.status"), inf.status || "—"],
             [t("profileDetails.verification"), inf.verification_status || "—"],
             [t("profileDetails.plan"), inf.subscription_plan ? `${inf.subscription_plan.charAt(0).toUpperCase() + inf.subscription_plan.slice(1)}${inf.billing_cycle ? ` · ${inf.billing_cycle.charAt(0).toUpperCase() + inf.billing_cycle.slice(1)}` : ""}` : t("planFree")],
@@ -183,7 +184,7 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   return (<div className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/50"><p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</p><p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">{value}</p></div>);
 }
 
-function SidebarTable({ title, rows }: { title: string; rows: [string, string][] }) {
+function SidebarTable({ title, rows }: { title: string; rows: [string, React.ReactNode][] }) {
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800"><h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2></div>

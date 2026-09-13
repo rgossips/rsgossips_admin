@@ -7,11 +7,13 @@ import { formatStatus } from "@/lib/format";
 import { toggleInfluencerStatus } from "./actions";
 import { Avatar } from "@/components/avatar";
 import { useRole } from "@/components/role-context";
+import { InstagramLink } from "@/components/instagram-link";
 
 interface Influencer {
   influencer_id: string;
   full_name: string | null;
   username: string | null;
+  instagram_handle?: string | null;
   profile_photo_url: string | null;
   followers_count: number | null;
   categories: string[] | null;
@@ -56,7 +58,9 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
         </Link>
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-        {inf.username || "—"}
+        {/* username mirrors the IG handle for every profile; prefer the handle
+            as the link target in case they ever diverge. */}
+        <InstagramLink handle={inf.instagram_handle || inf.username} showAt={false} />
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-mono">
         {phone ? (

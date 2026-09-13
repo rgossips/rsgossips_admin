@@ -11,6 +11,7 @@ import { INDIAN_CITIES, parseStoredCities } from "@/lib/cities";
 import { MultiSelectChips } from "@/components/multi-select-chips";
 import { useRole } from "@/components/role-context";
 import { SendInviteEmailModal } from "@/components/send-invite-email-modal";
+import { InstagramLink } from "@/components/instagram-link";
 
 interface Invitation {
   id: string;
@@ -60,7 +61,7 @@ export function InvitedInfluencerRow({ invitation }: { invitation: Invitation })
             <Avatar src={invitation.profile_photo_url} name={invitation.full_name} size="lg" shape="rounded" />
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{invitation.full_name}</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500">@{invitation.instagram_username}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500"><InstagramLink handle={invitation.instagram_username} /></p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">

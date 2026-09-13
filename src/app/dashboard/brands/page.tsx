@@ -6,6 +6,7 @@ import { InvitedBrandRow } from "./invited-brand-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
 import { sanitizeSearchTerm } from "@/lib/validation";
+import { authIdsByPhone, brandIdsByContactPhone, listAllAuthUsers, phoneQueryDigits } from "@/lib/phone-search";
 import { getTranslations } from "next-intl/server";
 
 const INVITES_PER_PAGE = 12;
@@ -45,8 +46,24 @@ export default async function BrandsPage({
     .select("brand_id, brand_name, logo_url, contact_phone, verification_status, gstin, instagram_username")
     .order("updated_at", { ascending: false });
 
+  // A digits-only search also matches the brand's contact phone or the phone
+  // they sign in with (auth.users). Invited brands have no phone stored, so
+  // they only match by name/handle.
+  const phoneQuery = phoneQueryDigits(search);
+  let phoneBrandIds: string[] = [];
+  if (phoneQuery) {
+    const [byContact, authUsers] = await Promise.all([
+      brandIdsByContactPhone(supabase, phoneQuery),
+      listAllAuthUsers(supabase).catch(() => []),
+    ]);
+    phoneBrandIds = [...new Set([...byContact, ...authIdsByPhone(authUsers, phoneQuery)])];
+  }
+
   if (searchTerm) {
-    brandQuery = brandQuery.or(`brand_name.ilike.%${searchTerm}%,gstin.ilike.%${searchTerm}%`);
+    const clauses = [`brand_name.ilike.%${searchTerm}%`, `gstin.ilike.%${searchTerm}%`];
+    // Auth ids include creators too; the IN filter only keeps real brand rows.
+    if (phoneBrandIds.length > 0) clauses.push(`brand_id.in.(${phoneBrandIds.join(",")})`);
+    brandQuery = brandQuery.or(clauses.join(","));
   }
   if (verification) {
     brandQuery = brandQuery.eq("verification_status", verification);

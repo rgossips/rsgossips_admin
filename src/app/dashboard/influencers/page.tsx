@@ -6,6 +6,7 @@ import { InvitedInfluencerRow } from "./invited-influencer-row";
 import { RefreshButton } from "@/components/refresh-button";
 import { Pagination } from "@/components/pagination";
 import { sanitizeSearchTerm } from "@/lib/validation";
+import { authIdsByPhone, influencerInvitationIdsByPhone, listAllAuthUsers, phoneQueryDigits, type AuthUserLite } from "@/lib/phone-search";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
@@ -40,9 +41,28 @@ export default async function InfluencersPage({
     { name: "category", label: t("filter.allCategories"), type: "multiselect" as const, options: categoryOptions },
   ];
 
+  // Phone numbers live on auth.users, not influencer_profiles — loaded once
+  // here for both the phone column and phone search.
+  let authUsers: AuthUserLite[] = [];
+  try {
+    authUsers = await listAllAuthUsers(supabase);
+  } catch {
+    // Non-fatal — the phone column shows "—" and phone search matches nothing.
+  }
+
+  // A digits-only search ("98765 43210", "+91…") also matches by phone: the
+  // number is resolved to ids here and OR-ed into the name search below.
+  const phoneQuery = phoneQueryDigits(search);
+  const phoneInfluencerIds = phoneQuery ? authIdsByPhone(authUsers, phoneQuery) : [];
+  const phoneInviteIds = phoneQuery ? await influencerInvitationIdsByPhone(supabase, phoneQuery) : [];
+
   // Fetch influencers
   let query = supabase.from("influencer_profiles").select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle").order("updated_at", { ascending: false });
-  if (searchTerm) query = query.or(`full_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%`);
+  if (searchTerm) {
+    const clauses = [`full_name.ilike.%${searchTerm}%`, `username.ilike.%${searchTerm}%`];
+    if (phoneInfluencerIds.length > 0) clauses.push(`influencer_id.in.(${phoneInfluencerIds.join(",")})`);
+    query = query.or(clauses.join(","));
+  }
   if (status) query = query.eq("status", status);
   if (followers) { const [min, max] = followers.split("-"); if (min) query = query.gte("followers_count", parseInt(min)); if (max) query = query.lte("followers_count", parseInt(max)); }
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
@@ -50,19 +70,10 @@ export default async function InfluencersPage({
 
   const canWrite = await isAdminOrAbove();
 
-  // Phone numbers live on auth.users, not influencer_profiles. Bulk-fetch
-  // and build an id→phone map so we can render the column without an
-  // N+1. Same pattern the admins page uses for auth status.
+  // id→phone map for the column, without an N+1.
   const phoneMap = new Map<string, string>();
-  if (influencers && influencers.length > 0) {
-    try {
-      const { data: list } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      for (const u of list?.users || []) {
-        if (u.phone) phoneMap.set(u.id, u.phone);
-      }
-    } catch {
-      // Non-fatal — column just shows "—" if we can't reach the auth API.
-    }
+  for (const u of authUsers) {
+    if (u.phone) phoneMap.set(u.id, u.phone);
   }
 
   // Fetch pending invitations — paginated. `count: exact` gives the
@@ -75,7 +86,11 @@ export default async function InfluencersPage({
     .eq("status", "pending")
     .order("created_at", { ascending: false })
     .range(inviteFrom, inviteTo);
-  if (searchTerm) inviteQuery = inviteQuery.or(`full_name.ilike.%${searchTerm}%,instagram_username.ilike.%${searchTerm}%`);
+  if (searchTerm) {
+    const clauses = [`full_name.ilike.%${searchTerm}%`, `instagram_username.ilike.%${searchTerm}%`];
+    if (phoneInviteIds.length > 0) clauses.push(`id.in.(${phoneInviteIds.join(",")})`);
+    inviteQuery = inviteQuery.or(clauses.join(","));
+  }
   const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
   const invitesTotal = pendingInviteCount ?? 0;
 
