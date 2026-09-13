@@ -49,6 +49,19 @@ function StatCard({ card, icon }: { card: StatCardSpec; icon: React.ReactNode })
   );
 }
 
+const IST_PARTS = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+
+// IST calendar parts of a DB timestamp. Some tables return timestamps WITHOUT
+// a zone ("2026-07-04T06:26:54") that are really UTC; `new Date()` would read
+// those as server-local time, so mark them UTC first (same rule as the
+// notification bell's parseTimestamp).
+function istDateParts(ts: string): { year: string; month: string; day: string } {
+  const iso = /[zZ]$|[+-]\d\d:?\d\d$/.test(ts) ? ts : `${ts.replace(" ", "T")}Z`;
+  const parts = IST_PARTS.formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "0";
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
 // "Today" for the admins means the India calendar day, not UTC — a UTC day
 // would roll over at 5:30am IST. Returned as a UTC ISO string, which compares
 // correctly against both timestamptz and UTC-wall-clock `timestamp` columns.
@@ -137,15 +150,30 @@ async function getStats(t: (key: string, values?: Record<string, string | number
   if (newSubscriptionsToday.error) logError("dashboard-new-subscriptions", newSubscriptionsToday.error);
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthlySignups = months.map((month, i) => {
-    const infCount = influencersByMonth.data?.filter(
-      (r) => new Date(r.created_at).getMonth() === i
-    ).length ?? 0;
-    const brandCount = brandsByMonth.data?.filter(
-      (r) => new Date(r.created_at).getMonth() === i
-    ).length ?? 0;
-    return { month, influencers: infCount, brands: brandCount };
-  });
+
+  // Signups bucketed by IST month AND day in one pass, so a month's bar always
+  // equals the sum of its daily drill-down (double-click a month on the chart).
+  // Previously bucketed with getMonth() on the server clock — UTC on Netlify —
+  // which filed late-evening IST signups under the wrong day/month.
+  const istYear = Number(istDateParts(new Date().toISOString()).year);
+  const signupsDaily = months.map((_, m) =>
+    Array.from({ length: new Date(Date.UTC(istYear, m + 1, 0)).getUTCDate() }, (_, d) => ({ day: String(d + 1), influencers: 0, brands: 0 })),
+  );
+  const tally = (rows: { created_at: string }[] | null, key: "influencers" | "brands") => {
+    for (const r of rows || []) {
+      const p = istDateParts(r.created_at);
+      if (Number(p.year) !== istYear) continue;
+      const slot = signupsDaily[Number(p.month) - 1]?.[Number(p.day) - 1];
+      if (slot) slot[key]++;
+    }
+  };
+  tally(influencersByMonth.data, "influencers");
+  tally(brandsByMonth.data, "brands");
+  const monthlySignups = months.map((month, m) => ({
+    month,
+    influencers: signupsDaily[m].reduce((n, d) => n + d.influencers, 0),
+    brands: signupsDaily[m].reduce((n, d) => n + d.brands, 0),
+  }));
 
   const campaignMonthly = months.map((month, i) => {
     const monthCampaigns = campaignsByStatus.data?.filter(
@@ -179,6 +207,7 @@ async function getStats(t: (key: string, values?: Record<string, string | number
     pendingBrandVerif: brandsPendingVerif.count ?? 0,
     pendingCampaignApproval: campaignsPendingApproval.count ?? 0,
     monthlySignups,
+    signupsDaily,
     campaignMonthly,
     weeklyCampaigns,
     openDisputes: openDisputes.data || [],
@@ -465,7 +494,7 @@ export default async function DashboardPage() {
               </span>
             </div>
           </div>
-          <DashboardCharts type="signups" data={stats.monthlySignups} />
+          <DashboardCharts type="signups" data={stats.monthlySignups} daily={stats.signupsDaily} />
         </div>
       </div>
 
