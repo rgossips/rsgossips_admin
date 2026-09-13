@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# desktop widget config holds the WIDGET_API_TOKEN (see widget/config.example.json)
+widget/config.json
+
 # vercel
 .vercel
 

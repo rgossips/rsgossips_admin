@@ -1,0 +1,8 @@
+{
+  "apiUrl": "https://rgossipsadmin.netlify.app",
+  "dashboardUrl": "https://rgossipsadmin.netlify.app/dashboard",
+  "token": "",
+  "refreshSeconds": 60,
+  "opacity": 0.97,
+  "scale": 1.0
+}

@@ -2,6 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export const updateSession = async (request: NextRequest) => {
+  // Token-authenticated machine endpoints (the desktop widget). They have no
+  // browser session, so the login redirect below would break them — and
+  // there's no cookie to refresh. The route checks its own bearer token.
+  if (request.nextUrl.pathname.startsWith("/api/widget/")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
