@@ -35,6 +35,8 @@ yarn-error.log*
 
 # desktop widget config holds the WIDGET_API_TOKEN (see widget/config.example.json)
 widget/config.json
+# built by widget/build/Build-WidgetExe.ps1 - share the file, don't commit it
+widget/dist/
 
 # vercel
 .vercel

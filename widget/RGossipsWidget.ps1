@@ -9,9 +9,13 @@
 
   Run:      powershell -NoProfile -ExecutionPolicy Bypass -File RGossipsWidget.ps1
   Silent:   double-click Start-Widget.vbs  (no console window)
-  Settings: config.json next to this file (apiUrl + token); window position,
-            size, opacity and interval are remembered in
-            %LOCALAPPDATA%\RGossipsAdminWidget\state.json
+  Packaged: RGossipsWidget.exe (build/Build-WidgetExe.ps1) hosts this same script
+            in-process; it sets RGW_SCRIPT_DIR / RGW_EXE_PATH.
+  Settings: config.json next to this file and/or in
+            %LOCALAPPDATA%\RGossipsAdminWidget (the per-user one wins). The
+            access token is asked for on first run and stored DPAPI-encrypted
+            for the current Windows user. Position, size, opacity and interval
+            are remembered in %LOCALAPPDATA%\RGossipsAdminWidget\state.json
 
   Adapted from myshop-client/widget. This file is deliberately pure ASCII - the
   rupee sign and other symbols are built from code points so it survives any
@@ -31,6 +35,7 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Net.Http
 Add-Type -AssemblyName System.Windows.Forms   # global cursor position / modifier keys while resizing
+Add-Type -AssemblyName System.Security        # ProtectedData (DPAPI) for the stored token
 
 # The live site is https; older PowerShell defaults to TLS 1.0 and would fail.
 try {
@@ -43,7 +48,11 @@ $createdNew = $false
 $singleton  = New-Object System.Threading.Mutex($true, 'Local\RGossipsAdminWidget', [ref]$createdNew)
 if (-not $createdNew) { return }
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+# Hosted inside RGossipsWidget.exe there is no script file, so $MyInvocation
+# can't locate one - the launcher passes its folder and exe path instead.
+$ScriptDir = $env:RGW_SCRIPT_DIR
+if (-not $ScriptDir) { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ExePath = $env:RGW_EXE_PATH
 $RS  = [char]0x20B9   # rupee sign
 $SEP = [char]0x00B7   # middle dot
 $ELL = [char]0x2026   # ellipsis
@@ -58,18 +67,91 @@ $cfg = @{
   opacity        = 0.97
   scale          = 1.0
 }
-$cfgPath = Join-Path $ScriptDir 'config.json'
-if (Test-Path $cfgPath) {
+$stateDir    = Join-Path $env:LOCALAPPDATA 'RGossipsAdminWidget'
+$statePath   = Join-Path $stateDir 'state.json'
+$cfgPath     = Join-Path $ScriptDir 'config.json'   # shipped next to the script (optional)
+$userCfgPath = Join-Path $stateDir 'config.json'    # per-user, written by the token prompt
+foreach ($path in (@($cfgPath, $userCfgPath) | Select-Object -Unique)) {
+  if (-not (Test-Path $path)) { continue }
   try {
-    $fromFile = Get-Content $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $fromFile = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($p in $fromFile.PSObject.Properties) { $cfg[$p.Name] = $p.Value }
   } catch { }
 }
 if ($ApiUrl)               { $cfg.apiUrl         = $ApiUrl }
 if ($RefreshSeconds -gt 0) { $cfg.refreshSeconds = $RefreshSeconds }
 
-$stateDir  = Join-Path $env:LOCALAPPDATA 'RGossipsAdminWidget'
-$statePath = Join-Path $stateDir 'state.json'
+# --- access token: DPAPI-encrypted per Windows user, so a copied config file
+#     (or a shared exe) is useless on another account/PC.
+function Protect-Token ([string]$plain) {
+  $bytes = [Text.Encoding]::UTF8.GetBytes($plain)
+  $enc = [Security.Cryptography.ProtectedData]::Protect($bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+  return [Convert]::ToBase64String($enc)
+}
+function Unprotect-Token ([string]$blob) {
+  try {
+    $dec = [Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String($blob), $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+    return [Text.Encoding]::UTF8.GetString($dec)
+  } catch { return '' }   # encrypted by another user/PC - ask again
+}
+$script:token = ''
+if ($cfg.tokenProtected) { $script:token = Unprotect-Token ([string]$cfg.tokenProtected) }
+if (-not $script:token -and $cfg.token) { $script:token = [string]$cfg.token }   # legacy plain config.json
+
+function Save-Token ([string]$plain) {
+  try {
+    if (-not (Test-Path $stateDir)) { New-Item -ItemType Directory -Path $stateDir -Force | Out-Null }
+    $u = @{}
+    if (Test-Path $userCfgPath) {
+      try { (Get-Content $userCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $u[$_.Name] = $_.Value } } catch { }
+    }
+    $u.Remove('token')
+    $u.tokenProtected = Protect-Token $plain
+    ([pscustomobject]$u | ConvertTo-Json) | Out-File -FilePath $userCfgPath -Encoding utf8 -Force
+  } catch { }
+}
+
+# First-run / "Set access token" dialog. Returns the token, or $null on cancel.
+function Show-TokenDialog {
+  $dx = @'
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RGossips Admin Widget" Width="380" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" Topmost="True" FontFamily="Segoe UI" Background="#FF151922">
+  <StackPanel Margin="18,16,18,16">
+    <TextBlock Text="Access token" FontSize="15" FontWeight="Bold" Foreground="#FFF3F6FB"/>
+    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" FontSize="12" Foreground="#FF9AA3B5"
+               Text="Paste the widget access token your admin shared with you. It's stored encrypted for your Windows account only."/>
+    <PasswordBox x:Name="Tok" Margin="0,12,0,0" Height="30" Padding="6,4,6,4" FontSize="12"
+                 Background="#FF1C2230" Foreground="#FFE6EAF2" BorderBrush="#FF2B3342"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+      <Button x:Name="Cancel" Content="Cancel" Width="80" Height="28" Margin="0,0,8,0" IsCancel="True"/>
+      <Button x:Name="Ok" Content="Save" Width="80" Height="28" IsDefault="True"/>
+    </StackPanel>
+  </StackPanel>
+</Window>
+'@
+  # Script scope, not locals: WPF invokes these handlers after the function's
+  # scope is gone, so function-local variables would read as $null there.
+  $script:tokDlg = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader ([xml]$dx)))
+  $script:tokBox = $script:tokDlg.FindName('Tok')
+  $script:dlgResult = $null
+  $script:tokDlg.FindName('Ok').Add_Click({
+    $v = $script:tokBox.Password.Trim()
+    if ($v.Length -lt 24) { [Windows.MessageBox]::Show('That token looks too short - check you copied all of it.', 'RGossips Admin Widget') | Out-Null; return }
+    $script:dlgResult = $v
+    $script:tokDlg.Close()
+  })
+  $script:tokDlg.FindName('Cancel').Add_Click({ $script:tokDlg.Close() })
+  $script:tokDlg.Add_ContentRendered({ [void]$script:tokBox.Focus() })
+  $script:tokDlg.ShowDialog() | Out-Null
+  return $script:dlgResult
+}
+
+if (-not $script:token) {
+  $entered = Show-TokenDialog
+  if ($entered) { $script:token = $entered; Save-Token $entered }
+}
 $state = @{
   left = $null; top = $null
   opacity        = [double]$cfg.opacity
@@ -362,10 +444,15 @@ if ($null -ne $state.left -and $null -ne $state.top) {
 # ---------------------------------------------------------------- data plumbing
 $http = New-Object System.Net.Http.HttpClient
 $http.Timeout = [TimeSpan]::FromSeconds(20)   # the Razorpay scan can take a few seconds cold
-if ($cfg.token) {
-  $http.DefaultRequestHeaders.Authorization =
-    New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', [string]$cfg.token)
+function Set-AuthHeader {
+  if ($script:token) {
+    $http.DefaultRequestHeaders.Authorization =
+      New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', [string]$script:token)
+  } else {
+    $http.DefaultRequestHeaders.Authorization = $null
+  }
 }
+Set-AuthHeader
 
 $script:task          = $null
 $script:lastCollected = $null
@@ -511,8 +598,8 @@ function Show-Data ($json) {
 
 function Start-Fetch {
   if ($null -ne $script:task -and -not $script:task.IsCompleted) { return }
-  if (-not $cfg.token) {
-    Show-Error ('No token - put "token" in ' + $cfgPath)
+  if (-not $script:token) {
+    Show-Error 'No access token - right-click > Set access token'
     return
   }
   $dot.Fill = $COL_BUSY
@@ -540,7 +627,7 @@ $poll.Add_Tick({
     # GetAsync buffers the body by default, so this read is already complete.
     $body = $resp.Content.ReadAsStringAsync().Result
     $code = [int]$resp.StatusCode
-    if ($code -eq 401) { Show-Error 'Token rejected - check "token" in config.json'; return }
+    if ($code -eq 401) { Show-Error 'Token rejected - right-click > Set access token'; return }
     if ($code -eq 503) { Show-Error 'Widget API disabled - set WIDGET_API_TOKEN on the admin app'; return }
     if (-not $resp.IsSuccessStatusCode) { Show-Error ('Server error ' + $code + ', retrying' + $ELL); return }
     Show-Data ($body | ConvertFrom-Json)
@@ -658,6 +745,20 @@ $miRefresh.Header = 'Refresh now'
 $miRefresh.Add_Click({ Start-Fetch })
 $menu.Items.Add($miRefresh) | Out-Null
 
+$miToken = New-Object Windows.Controls.MenuItem
+$miToken.Header = 'Set access token...'
+$miToken.Add_Click({
+  $entered = Show-TokenDialog
+  if ($entered) {
+    $script:token = $entered
+    Save-Token $entered
+    Set-AuthHeader
+    $script:task = $null   # drop any reply made with the old token
+    Start-Fetch
+  }
+})
+$menu.Items.Add($miToken) | Out-Null
+
 # 30s floor: every refresh asks Razorpay for today's payments.
 $miInterval = New-Object Windows.Controls.MenuItem
 $miInterval.Header = 'Refresh every'
@@ -744,8 +845,14 @@ $miAuto.Add_Click({
     if ($src.IsChecked) {
       $sh  = New-Object -ComObject WScript.Shell
       $lnk = $sh.CreateShortcut($startupLnk)
-      $lnk.TargetPath       = Join-Path $ScriptDir 'Start-Widget.vbs'
-      $lnk.WorkingDirectory = $ScriptDir
+      if ($ExePath) {
+        # packaged build: start the exe itself
+        $lnk.TargetPath       = $ExePath
+        $lnk.WorkingDirectory = Split-Path -Parent $ExePath
+      } else {
+        $lnk.TargetPath       = Join-Path $ScriptDir 'Start-Widget.vbs'
+        $lnk.WorkingDirectory = $ScriptDir
+      }
       $lnk.Description      = 'RGossips admin stats widget'
       $lnk.Save()
     } elseif (Test-Path $startupLnk) {

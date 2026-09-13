@@ -44,6 +44,29 @@ automatically. PowerShell + WPF only — nothing to install. Adapted from
 
 `-NoStartup` skips the Startup shortcut; `-Uninstall` removes both shortcuts.
 
+## Share with teammates (single .exe)
+
+Build once:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\widget\build\Build-WidgetExe.ps1
+```
+
+→ `widget\dist\RGossipsWidget.exe` (~60 KB, gitignored). It uses only what ships with
+Windows 10/11 — the .NET Framework C# compiler and the Windows PowerShell 5.1 engine — and
+hosts this same script in-process (no `powershell.exe -ExecutionPolicy Bypass` child, which
+antivirus tends to flag). Rebuild after editing `RGossipsWidget.ps1`.
+
+**The exe contains no token.** Send teammates the file, and the access token separately
+(e.g. a password manager or a direct message — not in the same place as the exe). On first
+run it asks for the token and stores it DPAPI-encrypted for that Windows account in
+`%LOCALAPPDATA%\RGossipsAdminWidget\config.json`; right-click → **Set access token…** changes
+it. To revoke everyone, change `WIDGET_API_TOKEN` on Netlify and share the new one.
+
+Teammates will see a **"Windows protected your PC"** SmartScreen prompt the first time
+(the exe isn't code-signed): **More info → Run anyway**. Right-click → **Start with Windows**
+makes it launch at sign-in from wherever the exe is saved — put it somewhere permanent first.
+
 ## Using it
 
 | Action | Result |
