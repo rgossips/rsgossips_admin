@@ -32,7 +32,10 @@ export async function getOpsBadges(): Promise<OpsBadges | null> {
   ]);
 
   for (const [name, res] of Object.entries({ quoteRes, disputeRes, payoutRes, reviewRes, campaignRes, deliverRes })) {
-    if (res.error) logError("ops-badges", res.error, { query: name });
+    // head:true counts are HEAD requests — a failure has no body, so the
+    // error's message is empty ('{"message":""}' in error_logs). The HTTP
+    // status is the only clue (e.g. 503/504 = transient Supabase/gateway).
+    if (res.error) logError("ops-badges", res.error, { query: name, httpStatus: res.status, httpStatusText: res.statusText });
   }
 
   return {
