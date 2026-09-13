@@ -7,7 +7,9 @@ import { useTranslations } from "next-intl";
 import { createClient } from "@/utils/supabase/client";
 import { useRole } from "@/components/role-context";
 
-type NavSpec = { label: string; href: string; icon: string; badgeKey?: string };
+// `adminOnly` hides the link from viewers. Set it whenever the page itself
+// redirects non-admins — otherwise a viewer clicks it and silently bounces.
+type NavSpec = { label: string; href: string; icon: string; badgeKey?: string; adminOnly?: boolean };
 // `titleKey` maps to Sidebar.groups.* in the message catalog; `title` is the
 // English fallback used until a group is added to the catalog.
 type NavGroup = { title?: string; titleKey?: string; items: NavSpec[] };
@@ -32,6 +34,7 @@ const navGroups: NavGroup[] = [
       { label: "Influencers", href: "/dashboard/influencers", icon: "users" },
       { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
       { label: "Creator Stories", href: "/dashboard/creator-stories", icon: "video" },
+      { label: "Subscriptions", href: "/dashboard/subscriptions", icon: "card" },
       { label: "Refer & Earn", href: "/dashboard/referrals", icon: "sparkles", badgeKey: "referralReviews" },
     ],
   },
@@ -58,6 +61,9 @@ const navGroups: NavGroup[] = [
       { label: "Quote Requests", href: "/dashboard/quote-requests", icon: "inbox", badgeKey: "pendingQuotes" },
       { label: "Callbacks", href: "/dashboard/callbacks", icon: "phone" },
       { label: "Leads", href: "/dashboard/leads", icon: "phone" },
+      // Errors from every surface (migration 066). Operations rather than
+      // Admin Panel: triaging a failed sign-up or payment is support work.
+      { label: "Errors", href: "/dashboard/errors", icon: "alert", adminOnly: true },
     ],
   },
 ];
@@ -130,6 +136,11 @@ const icons: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
     </svg>
   ),
+  alert: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+    </svg>
+  ),
   scale: (
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
@@ -138,6 +149,11 @@ const icons: Record<string, React.ReactNode> = {
   wallet: (
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2H3V8zm0 4h18v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6zm14 3a1 1 0 100 2 1 1 0 000-2z" />
+    </svg>
+  ),
+  card: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
     </svg>
   ),
   chart: (
@@ -202,7 +218,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isSuperAdmin, role } = useRole();
+  const { isSuperAdmin, isAdmin, role } = useRole();
   const t = useTranslations("Sidebar");
 
   // Live nav-badge counts — shared with the mobile bottom-nav and ops hub via
@@ -272,7 +288,7 @@ export function Sidebar({
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map((item) => (
+                {group.items.filter((item) => !item.adminOnly || isAdmin).map((item) => (
                   <NavItem
                     key={item.href}
                     item={item}

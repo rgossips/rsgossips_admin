@@ -8,6 +8,7 @@ import { updateApplicationStatus } from "../actions";
 import { ButtonSpinner } from "@/components/spinner";
 import { Avatar } from "@/components/avatar";
 import { useRole } from "@/components/role-context";
+import { ExportApplicantsButton } from "./export-applicants-button";
 
 interface Application {
   id: string;
@@ -55,7 +56,7 @@ function formatCount(n: number | null) {
   return String(n);
 }
 
-export function ApplicationsList({ applications, budgetPerInfluencer }: { applications: Application[]; budgetPerInfluencer: number }) {
+export function ApplicationsList({ campaignId, applications, budgetPerInfluencer }: { campaignId: string; applications: Application[]; budgetPerInfluencer: number }) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   if (!applications || applications.length === 0) return null;
 
@@ -64,7 +65,7 @@ export function ApplicationsList({ applications, budgetPerInfluencer }: { applic
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
             <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,6 +78,7 @@ export function ApplicationsList({ applications, budgetPerInfluencer }: { applic
         <div className="flex items-center gap-3 text-xs">
           {pending > 0 && <span className="text-amber-600 dark:text-amber-400 font-semibold">{t("pendingCount", { count: pending })}</span>}
           {approved > 0 && <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{t("approvedCount", { count: approved })}</span>}
+          <ExportApplicantsButton campaignId={campaignId} />
         </div>
       </div>
       <div className="divide-y divide-gray-100 dark:divide-gray-800">

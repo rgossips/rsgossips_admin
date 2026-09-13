@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { getOpsBadges } from "@/app/dashboard/ops-actions";
 
 // The live "needs attention" counts that drive the sidebar badges, the mobile
 // bottom-nav, and the mobile Operations hub. Single source of truth so those
 // three surfaces never drift. Polls every 30s (same cadence the sidebar used)
 // and fails soft — a transient error leaves the previous counts in place.
+//
+// Counts come from a server action on the service-role client. Do NOT move
+// them back to the browser Supabase client: the consumer app's RLS hides
+// non-active campaigns (and more) from an admin's session, so the counts read
+// 0 — that is how the campaign-approval badge silently broke.
 //
 // Keys mirror the sidebar's badgeKey values so it can consume this directly:
 //   pendingQuotes / openDisputes / pendingPayouts / referralReviews /
@@ -35,48 +40,12 @@ export function useOpsBadges(intervalMs = 30_000): OpsBadges {
 
   useEffect(() => {
     let cancelled = false;
-    const supabase = createClient();
 
     const fetchBadges = async () => {
       try {
-        const [quoteRes, disputeRes, payoutRes, reviewRes, campaignRes, deliverRes] = await Promise.all([
-          supabase
-            .from("service_orders")
-            .select("*", { count: "exact", head: true })
-            .in("status", ["pending_quote", "counter_offered"]),
-          supabase
-            .from("escrow_disputes_v")
-            .select("*", { count: "exact", head: true })
-            .eq("escrow_status", "disputed"),
-          supabase
-            .from("campaign_applications")
-            .select("*", { count: "exact", head: true })
-            .in("payout_status", ["scheduled", "pending_creator_info"]),
-          supabase
-            .from("referrals")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "MANUAL_REVIEW"),
-          // A brand published a campaign and it is parked in the review
-          // queue — nothing reaches creators until an admin approves it, so
-          // it is the queue with the most time pressure on it.
-          supabase
-            .from("campaigns")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "under_review"),
-          supabase
-            .from("campaign_applications")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "submitted"),
-        ]);
-        if (cancelled) return;
-        setBadges({
-          pendingQuotes: quoteRes.count ?? 0,
-          openDisputes: disputeRes.count ?? 0,
-          pendingPayouts: payoutRes.count ?? 0,
-          referralReviews: reviewRes.count ?? 0,
-          campaignsUnderReview: campaignRes.count ?? 0,
-          submittedDeliverables: deliverRes.count ?? 0,
-        });
+        const next = await getOpsBadges();
+        if (cancelled || !next) return;
+        setBadges(next);
       } catch {
         // Non-fatal — keep the previous counts.
       }

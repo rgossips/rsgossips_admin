@@ -81,10 +81,14 @@
     "unknownError": "Unknown error",
     "weekLabel": "Week {n}",
     "stats": {
-      "totalInfluencers": "Total Influencers",
+      "totalInfluencers": "All Influencers",
       "totalBrands": "Total Brands",
       "totalCampaigns": "Total Campaigns",
-      "pendingReviews": "Pending Reviews"
+      "pendingReviews": "Pending Reviews",
+      "newInfluencersToday": "New Influencers Today",
+      "newSubscriptionsToday": "New Subscriptions Today",
+      "totalSubscriptions": "All Subscriptions",
+      "newSubscriptionsNotLive": "Awaiting migration 067"
     },
     "welcome": {
       "title": "Welcome to the Admin Panel",
@@ -471,7 +475,8 @@
       "appsClosed": "Applications Closed",
       "paused": "Paused",
       "completed": "Completed",
-      "underReview": "Under review"
+      "underReview": "Under review",
+      "rejected": "Rejected"
     }
   },
   "DashboardCampaignsCampaignsTable": {
@@ -814,7 +819,53 @@
     "paymentReleasedWithAmount": "Payment released — ₹{amount}. Mark as completed after payment is transferred.",
     "paymentReleased": "Payment released. Mark as completed after payment is transferred.",
     "rejectedReason": "Rejected: {reason}",
-    "appliedDate": "Applied {date}"
+    "appliedDate": "Applied {date}",
+    "downloadExcel": "Download Excel",
+    "downloadExcelTitle": "Download the applicant list as an Excel file",
+    "exporting": "Preparing…",
+    "exportFailed": "Couldn't export the applicant list. Please try again."
+  },
+  "DashboardSubscriptions": {
+    "title": "Subscriptions",
+    "subtitle": "Creators on a Starter, Pro or Elite package",
+    "stats": {
+      "total": "All subscribers",
+      "cycleSplit": "{monthly} monthly · {annual} annual"
+    },
+    "filter": {
+      "search": "Search",
+      "searchPlaceholder": "Name, handle or email…",
+      "allPlans": "All plans",
+      "allCycles": "All billing cycles",
+      "allSources": "All sources"
+    },
+    "cycle": {
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "unknown": "Not set"
+    },
+    "source": {
+      "razorpay": "Razorpay",
+      "apple_iap": "App Store",
+      "google_play": "Google Play",
+      "admin": "Set by admin",
+      "stripe": "Stripe (legacy)",
+      "none": "No payment record"
+    },
+    "table": {
+      "creator": "Creator",
+      "contact": "Contact",
+      "plan": "Plan",
+      "billing": "Billing",
+      "source": "Source",
+      "joined": "Joined"
+    },
+    "iapStatus": "{status, select, active {Active} grace {Grace period} expired {Expired} cancelled {Cancelled} other {{status}}} · {renewing, select, yes {renews} other {ends}} {date}",
+    "starterNote": "Note: a cancelled Razorpay or app-store subscription drops back to Starter, so some Starter rows may be lapsed subscribers.",
+    "unnamed": "Unnamed creator",
+    "failedToLoad": "Couldn't load subscribers. Please refresh and try again.",
+    "empty": "No creators have subscribed to a package yet.",
+    "noMatches": "No subscribers match these filters."
   },
   "DashboardCampaignsIdDetailActions": {
     "statuses": {

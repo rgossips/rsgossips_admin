@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { createClient } from "@/utils/supabase/client";
+import { getAwaitingActionFeed } from "@/app/dashboard/ops-actions";
 
 interface Notification {
   id: string;
@@ -47,42 +47,23 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    const supabase = createClient();
     let cancelled = false;
 
     const load = async () => {
       try {
         // Awaiting-action items: pending quotes + counter offers + submitted
-        // applications + revision needed + campaigns parked in the review queue.
-        const [quotesRes, appsRes, reviewRes] = await Promise.all([
-          supabase
-            .from("service_orders")
-            .select("id, order_number, service_title, status, created_at, updated_at")
-            .in("status", ["pending_quote", "counter_offered", "revision_requested"])
-            .order("updated_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("campaign_applications")
-            .select("id, status, campaign_id, created_at, updated_at, campaigns(title)")
-            .in("status", ["submitted"])
-            .order("updated_at", { ascending: false })
-            .limit(10),
-          // A brand published a campaign and it is waiting on an admin. Until
-          // someone approves it, it reaches no creators at all — so it belongs
-          // in the same "awaiting action" list as quotes and deliverables.
-          // Ordered by created_at: the review queue is FIFO, and an admin
-          // editing a pending campaign shouldn't push it back down the list.
-          supabase
-            .from("campaigns")
-            .select("campaign_id, title, created_at, brand_profiles(brand_name)")
-            .eq("status", "under_review")
-            .order("created_at", { ascending: false })
-            .limit(10),
-        ]);
+        // deliverables + campaigns parked in the review queue. Fetched via a
+        // server action — the browser client's RLS hides under_review
+        // campaigns from an admin session (see ops-actions.ts).
+        const feed = await getAwaitingActionFeed();
+        if (!feed) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
 
         const items: Notification[] = [];
 
-        for (const q of quotesRes.data || []) {
+        for (const q of feed.quotes) {
           const labelByStatus: Record<string, string> = {
             pending_quote: t("status.pending_quote"),
             counter_offered: t("status.counter_offered"),
@@ -98,9 +79,8 @@ export function NotificationBell() {
           });
         }
 
-        for (const a of appsRes.data || []) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const campaignTitle = (a as any).campaigns?.title || t("campaignFallback");
+        for (const a of feed.submissions) {
+          const campaignTitle = a.campaign_title || t("campaignFallback");
           items.push({
             id: `app-${a.id}`,
             type: "submission",
@@ -111,9 +91,8 @@ export function NotificationBell() {
           });
         }
 
-        for (const c of reviewRes.data || []) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const brandName = (c as any).brand_profiles?.brand_name;
+        for (const c of feed.reviews) {
+          const brandName = c.brand_name;
           items.push({
             id: `review-${c.campaign_id}`,
             type: "campaign_review",
