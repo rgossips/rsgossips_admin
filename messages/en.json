@@ -212,7 +212,7 @@
     "subtitle": "Manage registered brands and invitations",
     "filters": {
       "search": "Search",
-      "searchPlaceholder": "Search by brand name...",
+      "searchPlaceholder": "Search by brand name, GSTIN or phone...",
       "verification": "Verification",
       "pending": "Pending",
       "verified": "Verified",
@@ -865,7 +865,9 @@
     "unnamed": "Unnamed creator",
     "failedToLoad": "Couldn't load subscribers. Please refresh and try again.",
     "empty": "No creators have subscribed to a package yet.",
-    "noMatches": "No subscribers match these filters."
+    "noMatches": "No subscribers match these filters.",
+    "autoRenewOffUntil": "Auto-renew cancelled · access until {date}",
+    "autoRenewOff": "Auto-renew cancelled"
   },
   "DashboardCampaignsIdDetailActions": {
     "statuses": {
@@ -1223,7 +1225,7 @@
     },
     "filter": {
       "search": "Search",
-      "searchPlaceholder": "Search by name or username...",
+      "searchPlaceholder": "Search by name, username or phone...",
       "allStatuses": "All Statuses",
       "active": "Active",
       "suspended": "Suspended",

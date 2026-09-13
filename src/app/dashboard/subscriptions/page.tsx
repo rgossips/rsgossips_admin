@@ -38,6 +38,9 @@ type SubscriberRow = {
   subscription_plan: string;
   billing_cycle: string | null;
   payment_gateway: string | null;
+  auto_renew: boolean | null;
+  plan_expires_at: string | null;
+  subscription_cancelled_at: string | null;
   razorpay_subscription_id: string | null;
   created_at: string | null;
 };
@@ -100,14 +103,20 @@ export default async function SubscriptionsPage({
   const source = params.source && ((SOURCES as readonly string[]).includes(params.source) || params.source === "none") ? params.source : "";
   const requestedPage = Math.max(1, parseInt(params.page || "1", 10) || 1);
 
-  const buildQuery = (page: number) => {
+  // auto_renew / plan_expires_at / subscription_cancelled_at come from
+  // RS_Gossips migration 069. Until it's applied, selecting them fails the
+  // whole query (42703) and the page showed "Couldn't load subscribers" — so
+  // the list falls back to the base columns and simply omits the
+  // "auto-renew off" note.
+  const BASE_COLS =
+    "influencer_id, full_name, username, instagram_handle, profile_photo_url, email, subscription_plan, billing_cycle, payment_gateway, razorpay_subscription_id, created_at";
+  const LIFECYCLE_COLS = ", auto_renew, plan_expires_at, subscription_cancelled_at";
+
+  const buildQuery = (page: number, withLifecycle: boolean) => {
     const from = (page - 1) * PAGE_SIZE;
     let q = admin
       .from("influencer_profiles")
-      .select(
-        "influencer_id, full_name, username, instagram_handle, profile_photo_url, email, subscription_plan, billing_cycle, payment_gateway, razorpay_subscription_id, created_at",
-        { count: "exact" },
-      )
+      .select(withLifecycle ? BASE_COLS + LIFECYCLE_COLS : BASE_COLS, { count: "exact" })
       .in("subscription_plan", plan ? [plan] : PAID_TIERS)
       .order("updated_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
@@ -123,15 +132,21 @@ export default async function SubscriptionsPage({
     return q;
   };
 
-  const [stats, firstPage] = await Promise.all([loadStats(admin), buildQuery(requestedPage)]);
+  const [stats, attempt] = await Promise.all([loadStats(admin), buildQuery(requestedPage, true)]);
+  // 42703 = undefined column → migration 069 not applied yet. Expected, not
+  // an incident, so it is retried quietly rather than logged on every view.
+  const lifecycleLive = attempt.error?.code !== "42703";
+  const firstPage = lifecycleLive ? attempt : await buildQuery(requestedPage, false);
   const total = firstPage.count ?? 0;
   // FilterBar keeps ?page= when a filter narrows the set — land on the last
   // real page instead of an empty table.
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = !firstPage.error && total > 0 && requestedPage > lastPage ? lastPage : requestedPage;
-  const { data, error } = page === requestedPage ? firstPage : await buildQuery(page);
+  const { data, error } = page === requestedPage ? firstPage : await buildQuery(page, lifecycleLive);
   if (error) logError("subscriptions-list", error, { plan, cycle, source });
-  const rows = (data || []) as SubscriberRow[];
+  // The column list is chosen at runtime, so supabase-js can't infer the row
+  // shape; lifecycle fields are simply undefined when 069 isn't applied.
+  const rows = (data || []) as unknown as SubscriberRow[];
 
   const ids = rows.map((r) => r.influencer_id);
 
@@ -149,8 +164,10 @@ export default async function SubscriptionsPage({
   );
 
   // App-store subscriptions carry a real status + expiry in iap_subscriptions
-  // (RS_Gossips migration 064). Razorpay's live state is only on Razorpay's
-  // side, so for those rows the subscription id is shown instead.
+  // (RS_Gossips migration 064). Gateway subscriptions (Razorpay/Stripe) now
+  // carry theirs on the profile itself — auto_renew / plan_expires_at, added
+  // in migration 069 — so a cancelled-but-still-paid subscription is visible
+  // here rather than only inside the Razorpay dashboard.
   const iapMap = new Map<string, IapRow>();
   const iapIds = rows.filter((r) => r.payment_gateway === "apple_iap" || r.payment_gateway === "google_play").map((r) => r.influencer_id);
   if (iapIds.length > 0) {
@@ -279,7 +296,15 @@ export default async function SubscriptionsPage({
                               renewing: iap.auto_renewing && iap.status === "active" ? "yes" : "no",
                             })}
                           </p>
-                        ) : r.payment_gateway === "razorpay" && r.razorpay_subscription_id ? (
+                        ) : null}
+                        {!iap && r.auto_renew === false ? (
+                          <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                            {r.plan_expires_at
+                              ? t("autoRenewOffUntil", { date: fmtDate(r.plan_expires_at) })
+                              : t("autoRenewOff")}
+                          </p>
+                        ) : null}
+                        {!iap && r.payment_gateway === "razorpay" && r.razorpay_subscription_id ? (
                           <p className="text-[11px] font-mono text-gray-400 mt-0.5">{r.razorpay_subscription_id}</p>
                         ) : null}
                       </td>
