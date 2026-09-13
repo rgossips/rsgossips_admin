@@ -9,6 +9,9 @@
 // component.
 
 const API = "https://api.razorpay.com/v1/payments";
+// Razorpay rejects `from` below 2000-01-01 ("from must be between 946684800
+// and 4765046400") — `from=0` failed the whole all-time scan with a 400.
+const EARLIEST_FROM_SEC = 946684800;
 const PAGE = 100; // Razorpay's max `count`
 const MAX_PAGES = 200; // 20k payments per scan — a guard, not an expected size
 // All-time total before today changes only through refunds, so it is cached
@@ -82,7 +85,7 @@ export async function getRazorpayCollected(todayStartSec: number): Promise<Colle
     const [today, past] = await Promise.all([
       sumRange(auth, todayStartSec, nowSec),
       stale
-        ? sumRange(auth, 0, todayStartSec - 1).then((r) => {
+        ? sumRange(auth, EARLIEST_FROM_SEC, todayStartSec - 1).then((r) => {
             history = { beforeSec: todayStartSec, paise: r.paise, partial: r.partial, at: Date.now() };
             return history;
           })

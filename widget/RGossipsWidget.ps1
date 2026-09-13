@@ -113,6 +113,7 @@ $xaml = @'
         Background="Transparent" Topmost="True" ShowInTaskbar="False"
         SizeToContent="WidthAndHeight" ResizeMode="NoResize"
         WindowStartupLocation="Manual" FontFamily="Segoe UI"
+        UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
   <Window.Resources>
     <Style x:Key="IconBtn" TargetType="Button">
@@ -141,6 +142,12 @@ $xaml = @'
     </Style>
   </Window.Resources>
 
+  <!-- The zoom LayoutTransform lives on this wrapper, NOT on Card. WPF renders an
+       element's Effect in that element's own coordinate space, so a transform on
+       the same element as the DropShadowEffect stretched a 100%-size bitmap of the
+       card (pixelated text when enlarged). Transformed from the parent instead,
+       the effect is rasterised at the final on-screen size. -->
+  <Grid x:Name="Scaler">
   <Border x:Name="Card" Width="216" CornerRadius="12" Background="#FF151922"
           BorderBrush="#FF2B3342" BorderThickness="1" Padding="11,8,11,9" Margin="11">
     <Border.Effect>
@@ -202,6 +209,32 @@ $xaml = @'
         </Border>
       </UniformGrid>
 
+      <!-- attention row: double-click a tile to open that page -->
+      <UniformGrid Columns="2" Margin="-2.5,0,-2.5,0">
+        <Border x:Name="ErrorsTile" Background="#FF1C2230" CornerRadius="8" Padding="8,5,8,6" Margin="2.5"
+                Cursor="Hand" ToolTip="Double-click to open Errors">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="5.5" Height="5.5" Fill="#FFEF4444" VerticalAlignment="Center"/>
+              <TextBlock Text="OPEN ERRORS" Margin="5,0,0,0" FontSize="7.5" FontWeight="Bold" Foreground="#FF868FA3"/>
+            </StackPanel>
+            <TextBlock x:Name="ErrorsTxt" Margin="0,1,0,0" FontSize="15" FontWeight="Bold" Foreground="#FFE6EAF2"/>
+            <TextBlock x:Name="ErrorsSubTxt" FontSize="9" Foreground="#FF868FA3"/>
+          </StackPanel>
+        </Border>
+        <Border x:Name="NotifTile" Background="#FF1C2230" CornerRadius="8" Padding="8,5,8,6" Margin="2.5"
+                Cursor="Hand">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="5.5" Height="5.5" Fill="#FFF59E0B" VerticalAlignment="Center"/>
+              <TextBlock Text="NOTIFICATIONS" Margin="5,0,0,0" FontSize="7.5" FontWeight="Bold" Foreground="#FF868FA3"/>
+            </StackPanel>
+            <TextBlock x:Name="NotifTxt" Margin="0,1,0,0" FontSize="15" FontWeight="Bold" Foreground="#FFE6EAF2"/>
+            <TextBlock x:Name="NotifSubTxt" FontSize="9" Foreground="#FF868FA3"/>
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
       <TextBlock x:Name="FootTxt" Margin="0,7,0,0" FontSize="8.5" Foreground="#FF667085" TextWrapping="Wrap"/>
     </StackPanel>
 
@@ -213,6 +246,7 @@ $xaml = @'
     </Border>
    </Grid>
   </Border>
+  </Grid>
 </Window>
 '@
 
@@ -220,6 +254,7 @@ $reader = New-Object System.Xml.XmlNodeReader ([xml]$xaml)
 $win    = [Windows.Markup.XamlReader]::Load($reader)
 
 $card          = $win.FindName('Card')
+$scaler        = $win.FindName('Scaler')
 $dot           = $win.FindName('Dot')
 $btnRef        = $win.FindName('BtnRefresh')
 $btnClose      = $win.FindName('BtnClose')
@@ -231,6 +266,12 @@ $subsTotalTxt  = $win.FindName('SubsTotalTxt')
 $signTodayTxt  = $win.FindName('SignupsTodayTxt')
 $signTotalTxt  = $win.FindName('SignupsTotalTxt')
 $signupTile    = $win.FindName('SignupTile')
+$errorsTile    = $win.FindName('ErrorsTile')
+$errorsTxt     = $win.FindName('ErrorsTxt')
+$errorsSubTxt  = $win.FindName('ErrorsSubTxt')
+$notifTile     = $win.FindName('NotifTile')
+$notifTxt      = $win.FindName('NotifTxt')
+$notifSubTxt   = $win.FindName('NotifSubTxt')
 $footTxt       = $win.FindName('FootTxt')
 $grip          = $win.FindName('Grip')
 
@@ -248,20 +289,29 @@ $subsTodayTxt.Text = '--'
 $subsTotalTxt.Text = ''
 $signTodayTxt.Text = '--'
 $signTotalTxt.Text = ''
+$errorsTxt.Text    = '--'
+$errorsSubTxt.Text = ''
+$notifTxt.Text     = '--'
+$notifSubTxt.Text  = ''
+
+$TXT_NORMAL = Brush '#FFE6EAF2'
+$TXT_ERROR  = Brush '#FFF87171'
+$TXT_NOTIF  = Brush '#FFFBBF24'
 $footTxt.Text      = ''
 
 $win.Opacity = [double]$state.opacity
 $win.Topmost = [bool]$state.topmost
 
 # ---------------------------------------------------------------- resizing
-# Everything lives inside one Border, so a LayoutTransform on it scales the whole
-# card - text included, vector-crisp - and SizeToContent shrinks the window to fit.
+# The card sits inside one wrapper Grid, so a LayoutTransform on the wrapper
+# scales everything - text included - and SizeToContent shrinks the window to
+# fit. (Not on Card itself: see the XAML note on Scaler.)
 $CARD_W    = 216.0   # design width, used as the drag-sensitivity baseline
 $ZOOM_MIN  = 0.65
 $ZOOM_MAX  = 2.50
 
 $scaleT = New-Object Windows.Media.ScaleTransform (1, 1)
-$card.LayoutTransform = $scaleT
+$scaler.LayoutTransform = $scaleT
 
 $script:zoom = 1.0
 $script:dpi  = 1.0
@@ -274,6 +324,12 @@ function Set-Zoom ([double]$z) {
   $scaleT.ScaleX = $z
   $scaleT.ScaleY = $z
   $state.scale   = $z
+  # "Display" snaps glyphs to the pixel grid at their laid-out size - sharpest
+  # at 100%, but jagged/smeared once scaled. "Ideal" keeps true outlines at any
+  # size, so use it whenever the card isn't at its design size.
+  $mode = [Windows.Media.TextFormattingMode]::Ideal
+  if ([math]::Abs($z - 1.0) -lt 0.001) { $mode = [Windows.Media.TextFormattingMode]::Display }
+  [Windows.Media.TextOptions]::SetTextFormattingMode($win, $mode)
 }
 $z0 = N $state.scale
 if ($z0 -le 0) { $z0 = 1.0 }
@@ -315,6 +371,8 @@ $script:task          = $null
 $script:lastCollected = $null
 $script:lastSubs      = $null
 $script:lastSignups   = $null
+$script:lastErrors    = $null
+$script:lastNotifs    = $null
 $script:lastOk        = $null
 
 function Flash-Card ([string]$hex) {
@@ -397,12 +455,54 @@ function Show-Data ($json) {
   }
   $script:lastSignups = $sgt
 
-  # something new landed since the last poll -> green pulse + chip
+  # -- open errors (Errors page triage queue)
+  $flash = '#FF22C55E'
+  $er = $json.errors
+  if ($null -ne $er -and $null -ne $er.open) {
+    $eo = N $er.open
+    $errorsTxt.Text = Count $eo
+    if ($eo -gt 0) { $errorsTxt.Foreground = $TXT_ERROR } else { $errorsTxt.Foreground = $TXT_NORMAL }
+    $errorsSubTxt.Text = 'open  ' + $SEP + '  ' + (Count (N $er.today)) + ' today'
+    if ($null -ne $script:lastErrors -and $eo -gt $script:lastErrors) {
+      $d = $eo - $script:lastErrors
+      $chips += '+' + (Count $d) + ' ' + (Plural $d 'error' 'errors')
+      $flash = '#FFEF4444'   # a new error outranks good news
+    }
+    $script:lastErrors = $eo
+  } else {
+    $errorsTxt.Text = $DASH
+    $errorsTxt.Foreground = $TXT_NORMAL
+    $errorsSubTxt.Text = 'unavailable'
+  }
+
+  # -- notifications (the admin bell's awaiting-action streams)
+  $nt = $json.notifications
+  if ($null -ne $nt -and $null -ne $nt.total) {
+    $nn = N $nt.total
+    $notifTxt.Text = Count $nn
+    if ($nn -gt 0) { $notifTxt.Foreground = $TXT_NOTIF } else { $notifTxt.Foreground = $TXT_NORMAL }
+    $notifSubTxt.Text = 'awaiting action'
+    $notifTile.ToolTip = 'Campaigns to review: ' + (Count (N $nt.campaignReviews)) + "`n" +
+                         'Deliverables submitted: ' + (Count (N $nt.deliverables)) + "`n" +
+                         'Quote requests: ' + (Count (N $nt.quotes)) + "`n`nDouble-click to open the dashboard"
+    if ($null -ne $script:lastNotifs -and $nn -gt $script:lastNotifs) {
+      $d = $nn - $script:lastNotifs
+      $chips += '+' + (Count $d) + ' ' + (Plural $d 'alert' 'alerts')
+      if ($flash -ne '#FFEF4444') { $flash = '#FFF59E0B' }
+    }
+    $script:lastNotifs = $nn
+  } else {
+    $notifTxt.Text = $DASH
+    $notifTxt.Foreground = $TXT_NORMAL
+    $notifSubTxt.Text = 'unavailable'
+  }
+
+  # something new landed since the last poll -> pulse + chip
   if ($chips.Count -gt 0) {
     $deltaTxt.Text       = ($chips -join ' ')
     $deltaTxt.Tag        = 0
     $deltaTxt.Visibility = 'Visible'
-    Flash-Card '#FF22C55E'
+    Flash-Card $flash
   }
 
   $footTxt.Text = $collectedNote + 'Updated ' + $script:lastOk.ToString('HH:mm:ss') + '  ' + $SEP +
@@ -522,6 +622,20 @@ $card.Add_MouseWheel({
     Save-State
     $e.Handled = $true
   }
+})
+
+# Tiles: double-click jumps to that page. A single click is left unhandled so it
+# bubbles to the card below and still starts a window drag.
+function Open-AdminPage ([string]$subPath) {
+  try { Start-Process (([string]$cfg.dashboardUrl).TrimEnd('/') + $subPath) } catch { }
+}
+$errorsTile.Add_MouseLeftButtonDown({
+  param($s, $e)
+  if ($e.ClickCount -ge 2) { Open-AdminPage '/errors'; $e.Handled = $true }
+})
+$notifTile.Add_MouseLeftButtonDown({
+  param($s, $e)
+  if ($e.ClickCount -ge 2) { Open-AdminPage ''; $e.Handled = $true }
 })
 
 # drag to move; double-click opens the admin dashboard

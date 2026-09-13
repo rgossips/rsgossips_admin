@@ -47,7 +47,10 @@ export async function GET(request: NextRequest) {
   const head = { count: "exact" as const, head: true };
   const paidTiers = SUBSCRIPTION_TIERS.map((t) => t.key);
 
-  const [subsTotal, subsToday, infTotal, infToday, brandTotal, brandToday, collected] = await Promise.all([
+  const [
+    subsTotal, subsToday, infTotal, infToday, brandTotal, brandToday, collected,
+    errorsOpen, errorsToday, notifQuotes, notifDeliverables, notifReviews,
+  ] = await Promise.all([
     admin.from("influencer_profiles").select("influencer_id", head).in("subscription_plan", paidTiers),
     // RS_Gossips migration 067. A head count on a missing table returns
     // { error: null, count: null } — null means "not live", never 0.
@@ -57,6 +60,15 @@ export async function GET(request: NextRequest) {
     admin.from("brand_profiles").select("brand_id", head),
     admin.from("brand_profiles").select("brand_id", head).gte("created_at", startIso),
     getRazorpayCollected(Math.floor(start.getTime() / 1000)),
+    // Errors page triage (RS_Gossips migration 068 adds `status`).
+    admin.from("error_logs").select("id", head).eq("status", "open"),
+    admin.from("error_logs").select("id", head).gte("occurred_at", startIso),
+    // Notifications = the admin bell's "awaiting action" streams (see
+    // getAwaitingActionFeed in dashboard/ops-actions.ts), counted in full —
+    // the bell itself caps each stream at 10.
+    admin.from("service_orders").select("id", head).in("status", ["pending_quote", "counter_offered", "revision_requested"]),
+    admin.from("campaign_applications").select("id", head).eq("status", "submitted"),
+    admin.from("campaigns").select("campaign_id", head).eq("status", "under_review"),
   ]);
 
   const dbFailed = [subsTotal, infTotal, infToday, brandTotal, brandToday].find((r) => r.error);
@@ -66,6 +78,10 @@ export async function GET(request: NextRequest) {
   }
 
   const n = (v: number | null) => v ?? 0;
+  // A failed or not-yet-migrated count is null ("unknown"), never a fake 0.
+  const maybe = (r: { error: unknown; count: number | null }) => (r.error || r.count === null ? null : r.count);
+  const notifParts = { quotes: maybe(notifQuotes), deliverables: maybe(notifDeliverables), campaignReviews: maybe(notifReviews) };
+  const notifKnown = Object.values(notifParts).filter((v): v is number => v !== null);
   return json({
     status: "success",
     generatedAt: new Date().toISOString(),
@@ -81,6 +97,14 @@ export async function GET(request: NextRequest) {
       brandsToday: n(brandToday.count),
       influencersTotal: n(infTotal.count),
       brandsTotal: n(brandTotal.count),
+    },
+    errors: {
+      open: maybe(errorsOpen),
+      today: maybe(errorsToday),
+    },
+    notifications: {
+      total: notifKnown.length ? notifKnown.reduce((a, b) => a + b, 0) : null,
+      ...notifParts,
     },
     collected: collected.ok
       ? {
