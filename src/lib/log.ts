@@ -9,10 +9,35 @@
 
 type Meta = Record<string, unknown>;
 
+// Supabase/PostgREST errors are PLAIN OBJECTS ({ message, code, details,
+// hint }), not Error instances — `String(error)` on one is "[object Object]",
+// which is what every admin row in error_logs said before this existed.
+function describeError(error: unknown): { message: string; stack: string | null; extra: Meta } {
+  if (error instanceof Error) return { message: error.message, stack: error.stack || null, extra: {} };
+  if (error && typeof error === "object") {
+    const e = error as Record<string, unknown>;
+    const extra: Meta = {};
+    for (const k of ["code", "details", "hint", "status"]) {
+      if (e[k] !== undefined && e[k] !== null && e[k] !== "") extra[k] = e[k];
+    }
+    const message = typeof e.message === "string" && e.message ? e.message : JSON.stringify(error).slice(0, 500);
+    return { message, stack: null, extra };
+  }
+  return { message: String(error), stack: null, extra: {} };
+}
+
+// Which deployment wrote the row. Local `next dev` shares the production
+// Supabase project, so without this a developer's flaky connection is
+// indistinguishable from a production incident on the Errors page.
+// Netlify sets CONTEXT (production | deploy-preview | branch-deploy).
+function runtimeEnv(): string {
+  return process.env.CONTEXT || (process.env.NODE_ENV === "production" ? "production" : "local");
+}
+
 // Emit a structured error line. Safe to call from any server context.
 export function logError(scope: string, error: unknown, meta?: Meta): void {
-  const detail =
-    error instanceof Error ? { message: error.message, stack: error.stack } : { value: error };
+  const described = describeError(error);
+  const detail = { message: described.message, stack: described.stack, ...described.extra };
   // Single line, prefixed so `grep '\[scope\]'` finds every occurrence.
   console.error(`[${scope}]`, JSON.stringify({ ...detail, ...meta }));
 
@@ -31,9 +56,9 @@ export function logError(scope: string, error: unknown, meta?: Meta): void {
           area: String(scope).split(".")[0] || "admin",
           event: scope,
           severity: "error",
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? (error.stack || "").slice(0, 2000) : null,
-          context: (meta || {}) as Record<string, unknown>,
+          message: described.message.slice(0, 2000),
+          stack: described.stack ? described.stack.slice(0, 2000) : null,
+          context: { ...described.extra, ...(meta || {}), env: runtimeEnv() } as Record<string, unknown>,
         });
       } catch {
         /* table absent (migration not applied yet) or insert failed */

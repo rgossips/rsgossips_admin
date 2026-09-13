@@ -3,6 +3,15 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { RefreshButton } from "@/components/refresh-button";
+import { ErrorsTable, type ErrorRow } from "./errors-table";
+import { DeleteOldErrorsButton } from "./delete-old-errors-button";
+import { ERROR_RETENTION_DAYS } from "./constants";
+
+// Module scope, not inline in the component: reading the clock during render
+// trips react-hooks/purity.
+function daysAgoIso(days: number) {
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
 
 export const dynamic = "force-dynamic";
 
@@ -16,25 +25,6 @@ export const dynamic = "force-dynamic";
 // payment error is support work, not an ownership decision. The rows carry
 // user ids and messages but no secrets — the logger redacts anything
 // token-shaped before it is written.
-
-type ErrorRow = {
-  id: string;
-  occurred_at: string;
-  source: string;
-  area: string;
-  event: string;
-  severity: string;
-  message: string | null;
-  stack: string | null;
-  status_code: number | null;
-  user_id: string | null;
-  user_role: string | null;
-  request_id: string | null;
-  fn: string | null;
-  path: string | null;
-  ip_hash: string | null;
-  context: Record<string, unknown> | null;
-};
 
 const PAGE_SIZE = 50;
 
@@ -60,22 +50,12 @@ const WINDOWS = [
   { id: "0", label: "All time" },
 ];
 
-const SEVERITY_STYLE: Record<string, string> = {
-  warn: "bg-amber-50 text-amber-700 border-amber-200",
-  error: "bg-rose-50 text-rose-700 border-rose-200",
-  fatal: "bg-red-600 text-white border-red-600",
-};
-
-function fmtTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+// Triage state (RS_Gossips migration 068). The page opens on the open queue.
+const STATUSES = [
+  { id: "open", label: "Open" },
+  { id: "addressed", label: "Addressed" },
+  { id: "all", label: "All" },
+];
 
 // Build a querystring that keeps the current filters and changes one thing —
 // so paging does not silently drop the filter you were looking at.
@@ -98,11 +78,13 @@ export default async function ErrorsPage({
     q?: string;
     days?: string;
     page?: string;
+    status?: string;
   }>;
 }) {
   if (!(await isAdminOrAbove())) redirect("/dashboard");
 
   const sp = await searchParams;
+  const status = STATUSES.some((s) => s.id === sp.status) ? (sp.status as string) : "open";
   const area = sp.area || "";
   const severity = sp.severity || "";
   const source = sp.source || "";
@@ -119,18 +101,24 @@ export default async function ErrorsPage({
 
   const admin = createAdminClient();
 
+  // Is the status column there yet? A cheap probe, so a missing migration
+  // degrades to the old read-only list instead of the "table missing" state.
+  const statusProbe = await admin.from("error_logs").select("status").limit(1);
+  const statusLive = !statusProbe.error;
+  if (statusLive) current.status = status;
+
   let query = admin
     .from("error_logs")
     .select("*", { count: "exact" })
     .order("occurred_at", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
+  if (statusLive && status !== "all") query = query.eq("status", status);
   if (area) query = query.eq("area", area);
   if (severity) query = query.eq("severity", severity);
   if (source) query = query.eq("source", source);
   if (days && days !== "0") {
-    const since = new Date(Date.now() - Number(days) * 86_400_000).toISOString();
-    query = query.gte("occurred_at", since);
+    query = query.gte("occurred_at", daysAgoIso(Number(days)));
   }
   // Free text hits the two fields worth searching. Commas break PostgREST's
   // or() grammar, so they are stripped rather than escaped.
@@ -139,7 +127,12 @@ export default async function ErrorsPage({
     if (safe) query = query.or(`message.ilike.%${safe}%,event.ilike.%${safe}%`);
   }
 
-  const { data, count, error } = await query;
+  const [{ data, count, error }, oldRes] = await Promise.all([
+    query,
+    // How many rows the "Delete old" button would remove.
+    admin.from("error_logs").select("id", { count: "exact", head: true }).lt("occurred_at", daysAgoIso(ERROR_RETENTION_DAYS)),
+  ]);
+  const oldCount = oldRes.count ?? 0;
   const rows: ErrorRow[] = (data as ErrorRow[]) || [];
   const total = count ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -157,7 +150,19 @@ export default async function ErrorsPage({
             Failures from every surface — edge functions, web and mobile.
           </p>
         </div>
-        <RefreshButton />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {!tableMissing && <DeleteOldErrorsButton oldCount={oldCount} />}
+          <Link
+            href="/dashboard/errors/analytics"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-[13px] font-semibold text-white hover:bg-indigo-500"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M8 17V9m5 8V5m5 12v-6" />
+            </svg>
+            See analytics
+          </Link>
+          <RefreshButton />
+        </div>
       </div>
 
       {tableMissing ? (
@@ -177,6 +182,17 @@ export default async function ErrorsPage({
             method="GET"
             className="flex flex-wrap items-end gap-2 rounded-xl border border-gray-100 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
           >
+            {statusLive && (
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Status</span>
+                <select name="status" defaultValue={status} className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-[13px] dark:border-gray-700 dark:bg-gray-800">
+                  {STATUSES.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             <label className="flex flex-col gap-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Area</span>
               <select name="area" defaultValue={area} className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-[13px] dark:border-gray-700 dark:bg-gray-800">
@@ -234,74 +250,20 @@ export default async function ErrorsPage({
             </Link>
           </form>
 
+          {!statusLive && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+              Checkboxes and the Addressed status appear once migration 068 is applied (<code>npx supabase db push</code>).
+            </p>
+          )}
+
           <p className="text-[12px] text-gray-500">
-            {total.toLocaleString("en-IN")} error{total === 1 ? "" : "s"}
+            {total.toLocaleString("en-IN")}
+            {statusLive && status !== "all" ? ` ${status}` : ""} error{total === 1 ? "" : "s"}
             {days !== "0" ? ` in the last ${days} day${days === "1" ? "" : "s"}` : " all time"}
             {pageCount > 1 ? ` · page ${page} of ${pageCount}` : ""}
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
-            <table className="w-full min-w-[900px] text-left text-[12px]">
-              <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400 dark:bg-gray-900">
-                <tr>
-                  <th className="px-3 py-2 font-bold">When</th>
-                  <th className="px-3 py-2 font-bold">Severity</th>
-                  <th className="px-3 py-2 font-bold">Area</th>
-                  <th className="px-3 py-2 font-bold">Event</th>
-                  <th className="px-3 py-2 font-bold">Message</th>
-                  <th className="px-3 py-2 font-bold">Where</th>
-                  <th className="px-3 py-2 font-bold">User</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-gray-400">
-                      Nothing matches these filters.
-                    </td>
-                  </tr>
-                )}
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-t border-gray-100 align-top dark:border-gray-800">
-                    <td className="whitespace-nowrap px-3 py-2 text-gray-500">{fmtTime(r.occurred_at)}</td>
-                    <td className="px-3 py-2">
-                      <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_STYLE[r.severity] || "border-gray-200 bg-gray-50 text-gray-600"}`}>
-                        {r.severity}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-gray-700 dark:text-gray-200">{r.area}</td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-gray-600 dark:text-gray-300">{r.event}</td>
-                    <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
-                      <div className="max-w-[420px] truncate" title={r.message || ""}>{r.message || "—"}</div>
-                      {(r.stack || (r.context && Object.keys(r.context).length > 0)) && (
-                        <details className="mt-1">
-                          <summary className="cursor-pointer text-[11px] text-gray-400">details</summary>
-                          {r.context && Object.keys(r.context).length > 0 && (
-                            <pre className="mt-1 max-w-[520px] overflow-x-auto rounded bg-gray-50 p-2 text-[10px] dark:bg-gray-800">
-                              {JSON.stringify(r.context, null, 2)}
-                            </pre>
-                          )}
-                          {r.stack && (
-                            <pre className="mt-1 max-w-[520px] overflow-x-auto rounded bg-gray-50 p-2 text-[10px] dark:bg-gray-800">
-                              {r.stack}
-                            </pre>
-                          )}
-                        </details>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-[11px] text-gray-500">
-                      <div>{r.source}{r.status_code ? ` · ${r.status_code}` : ""}</div>
-                      <div className="font-mono opacity-70">{r.fn || r.path || "—"}</div>
-                    </td>
-                    <td className="px-3 py-2 font-mono text-[10px] text-gray-400">
-                      {r.user_id ? r.user_id.slice(0, 8) : "—"}
-                      {r.user_role ? <div className="opacity-70">{r.user_role}</div> : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ErrorsTable rows={rows} statusLive={statusLive} />
 
           {pageCount > 1 && (
             <div className="flex items-center justify-between">
