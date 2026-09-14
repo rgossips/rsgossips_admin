@@ -48,8 +48,16 @@ export function NotificationBell() {
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
 
+    // Polls only while the tab is visible. It used to poll every 20s forever,
+    // so a background admin tab kept firing ~5 Supabase requests per tick
+    // (auth + role gate + 3 queries) all day — seen in the API logs as 21
+    // bell polls vs 2 badge polls in the same 8 minutes, because the badges
+    // already paused. Returning to the tab refreshes immediately.
     const load = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
       try {
         // Awaiting-action items: pending quotes + counter offers + submitted
         // deliverables + campaigns parked in the review queue. Fetched via a
@@ -111,14 +119,24 @@ export function NotificationBell() {
         }
       } catch {
         if (!cancelled) setLoading(false);
+      } finally {
+        inFlight = false;
       }
     };
 
-    load();
-    const interval = setInterval(load, 20_000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void load();
+    };
+
+    void load();
+    // 30s, matching the shared ops-badges poll — the bell and the badges show
+    // the same queues, so polling one faster than the other only added load.
+    const interval = setInterval(load, 30_000);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
