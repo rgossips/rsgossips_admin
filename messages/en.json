@@ -88,7 +88,9 @@
       "newInfluencersToday": "New Influencers Today",
       "newSubscriptionsToday": "New Subscriptions Today",
       "totalSubscriptions": "All Subscriptions",
-      "newSubscriptionsNotLive": "Awaiting migration 067"
+      "newSubscriptionsNotLive": "Awaiting migration 067",
+      "instagramStale": "IG analytics stale (7d+)",
+      "instagramNeverRefreshed": "{count} connected, never refreshed"
     },
     "welcome": {
       "title": "Welcome to the Admin Panel",

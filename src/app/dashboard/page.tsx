@@ -88,6 +88,8 @@ async function getStats(t: (key: string, values?: Record<string, string | number
     newInfluencersToday,
     subscriptionsTotal,
     newSubscriptionsToday,
+    instagramStale,
+    instagramNeverRefreshed,
   ] = await Promise.all([
     supabase.from("influencer_profiles").select("*", { count: "exact", head: true }),
     supabase.from("brand_profiles").select("*", { count: "exact", head: true }),
@@ -141,6 +143,25 @@ async function getStats(t: (key: string, values?: Record<string, string | number
       .select("*", { count: "exact", head: true })
       .eq("is_new_purchase", true)
       .gte("occurred_at", todayStart),
+    // Instagram analytics health. refresh-instagram runs on login, so a
+    // connected creator whose row has not refreshed in a week is either
+    // inactive or failing to save. "Never refreshed" is the sharp signal:
+    // that is how an emoji-truncation bug kept a creator's media kit empty
+    // for days with nothing reported anywhere.
+    supabase
+      .from("influencer_profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active")
+      .not("instagram_access_token", "is", null)
+      .or(`instagram_refreshed_at.is.null,instagram_refreshed_at.lt.${new Date(Date.now() - 7 * 86_400_000).toISOString()}`),
+    supabase
+      .from("influencer_profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active")
+      .not("instagram_access_token", "is", null)
+      .is("instagram_refreshed_at", null)
+      // Give a brand-new signup a day to get their first refresh in.
+      .lt("created_at", new Date(Date.now() - 86_400_000).toISOString()),
   ]);
 
   // Migration 067 not applied yet → show "—", not a misleading 0. A head-only
@@ -214,6 +235,8 @@ async function getStats(t: (key: string, values?: Record<string, string | number
     newInfluencersToday: newInfluencersToday.count ?? 0,
     totalSubscriptions: subscriptionsTotal.count ?? 0,
     newSubscriptionsToday: newSubscriptionsLive ? newSubscriptionsToday.count : null,
+    instagramStale: instagramStale.error ? null : instagramStale.count ?? 0,
+    instagramNeverRefreshed: instagramNeverRefreshed.error ? null : instagramNeverRefreshed.count ?? 0,
   };
 }
 
@@ -304,6 +327,20 @@ export default async function DashboardPage() {
       tint: "bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400",
       href: "/dashboard/campaigns?status=under_review",
     },
+    {
+      label: t("stats.instagramStale"),
+      value: stats.instagramStale,
+      hint:
+        stats.instagramNeverRefreshed === null
+          ? undefined
+          : t("stats.instagramNeverRefreshed", { count: stats.instagramNeverRefreshed }),
+      icon: "camera",
+      tint:
+        stats.instagramNeverRefreshed
+          ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400"
+          : "bg-slate-50 text-slate-600 dark:bg-slate-500/10 dark:text-slate-400",
+      href: "/dashboard/errors?area=instagram",
+    },
   ];
 
   const cardIcons: Record<string, React.ReactNode> = {
@@ -345,6 +382,12 @@ export default async function DashboardPage() {
     megaphone: (
       <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+      </svg>
+    ),
+    camera: (
+      <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
     clock: (
@@ -446,7 +489,7 @@ export default async function DashboardPage() {
             <StatCard key={card.label} card={card} icon={cardIcons[card.icon]} />
           ))}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
           {statCards.map((card) => (
             <StatCard key={card.label} card={card} icon={cardIcons[card.icon]} />
           ))}
