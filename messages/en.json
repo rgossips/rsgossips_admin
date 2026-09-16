@@ -1298,6 +1298,12 @@
     }
   },
   "DashboardInfluencersId": {
+    "applications": {
+      "title": "Applied Campaigns",
+      "empty": "This creator hasn't applied to any campaign yet.",
+      "loadError": "Couldn't load this creator's campaign applications.",
+      "untitledCampaign": "Untitled campaign"
+    },
     "unknown": "Unknown",
     "statusUnknown": "unknown",
     "joinedDate": "Joined {date}",

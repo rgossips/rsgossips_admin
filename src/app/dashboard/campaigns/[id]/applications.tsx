@@ -9,6 +9,7 @@ import { ButtonSpinner } from "@/components/spinner";
 import { Avatar } from "@/components/avatar";
 import { useRole } from "@/components/role-context";
 import { ExportApplicantsButton } from "./export-applicants-button";
+import { APPLICATION_STATUS_BADGE } from "@/lib/application-status";
 
 interface Application {
   id: string;
@@ -36,18 +37,11 @@ interface Application {
   } | null;
 }
 
-const statusConfig: Record<string, { bg: string }> = {
-  pending: { bg: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" },
-  approved: { bg: "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400" },
-  submitted: { bg: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400" },
-  revision_needed: { bg: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" },
-  accepted: { bg: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" },
-  live_submitted: { bg: "bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400" },
-  payment: { bg: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" },
-  completed: { bg: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" },
-  rejected: { bg: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400" },
-  withdrawn: { bg: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" },
-};
+// Colours live in lib/application-status.ts — the influencer detail page's
+// "Applied campaigns" card renders the same statuses.
+const statusConfig: Record<string, { bg: string }> = Object.fromEntries(
+  Object.entries(APPLICATION_STATUS_BADGE).map(([k, bg]) => [k, { bg }]),
+);
 
 function formatCount(n: number | null) {
   if (!n) return "0";

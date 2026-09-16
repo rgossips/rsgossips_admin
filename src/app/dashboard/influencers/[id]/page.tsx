@@ -9,7 +9,21 @@ import { ReferralLinkCard } from "./referral-link-card";
 import { Avatar } from "@/components/avatar";
 import { InstagramLink } from "@/components/instagram-link";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
+import { applicationBadge } from "@/lib/application-status";
+import { logError } from "@/lib/log";
 import { getTranslations } from "next-intl/server";
+
+type AppliedCampaign = {
+  id: string;
+  campaign_id: string;
+  status: string;
+  created_at: string;
+  campaigns: {
+    title: string | null;
+    brand_profiles: { brand_name: string | null } | null;
+    brand_invitations: { brand_name: string | null } | null;
+  } | null;
+};
 
 export default async function InfluencerDetailPage({
   params,
@@ -39,6 +53,25 @@ export default async function InfluencerDetailPage({
   }
 
   const [superAdmin, canWrite] = await Promise.all([isSuperAdmin(), isAdminOrAbove()]);
+
+  // Every campaign this creator applied to, newest first. Brand name comes
+  // from the registered profile or, for an admin-created campaign, the
+  // invitation row — same fallback the campaign pages use.
+  const { data: appliedRows, error: appliedError } = await supabase
+    .from("campaign_applications")
+    .select("id, campaign_id, status, created_at, campaigns(title, brand_profiles(brand_name), brand_invitations(brand_name))")
+    .eq("influencer_id", id)
+    .order("created_at", { ascending: false });
+  if (appliedError) logError("influencer-applications", appliedError, { influencerId: id });
+  const applied = (appliedRows || []) as unknown as AppliedCampaign[];
+  const ta = await getTranslations("DashboardCampaignsIdApplications");
+  const statusLabel = (s: string) => {
+    try {
+      return ta(`status.${s}` as never);
+    } catch {
+      return s; // a status the catalog doesn't know yet
+    }
+  };
 
   const formatDate = (d: string | null) => {
     if (!d) return "—";
@@ -125,6 +158,53 @@ export default async function InfluencerDetailPage({
               <InfoItem label={t("info.state")} value={inf.state || "—"} />
             </div>
           </Card>
+
+          {/* Applied campaigns — only the campaign name links out. */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                </svg>
+              </div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("applications.title")}</h2>
+              {applied.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
+                  {applied.length}
+                </span>
+              )}
+            </div>
+            {appliedError ? (
+              <p className="px-6 py-10 text-center text-sm text-gray-400 dark:text-gray-500">{t("applications.loadError")}</p>
+            ) : applied.length === 0 ? (
+              <p className="px-6 py-10 text-center text-sm text-gray-400 dark:text-gray-500">{t("applications.empty")}</p>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {applied.map((a) => {
+                  const brand = a.campaigns?.brand_profiles?.brand_name || a.campaigns?.brand_invitations?.brand_name;
+                  return (
+                    <div key={a.id} className="flex items-center justify-between gap-4 px-6 py-3.5">
+                      <div className="min-w-0">
+                        <Link
+                          href={`/dashboard/campaigns/${a.campaign_id}`}
+                          className="text-sm font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline underline-offset-2 transition-colors truncate block"
+                        >
+                          {a.campaigns?.title || t("applications.untitledCampaign")}
+                        </Link>
+                        {brand && <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">{brand}</p>}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${applicationBadge(a.status)}`}>
+                          {statusLabel(a.status)}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(a.created_at)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <summary className="px-6 py-4 text-sm font-medium text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">{t("rawData")}</summary>
