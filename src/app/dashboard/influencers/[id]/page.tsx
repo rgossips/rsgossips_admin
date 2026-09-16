@@ -101,6 +101,17 @@ export default async function InfluencerDetailPage({
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${st.bg}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{inf.status || t("statusUnknown")}
                 </span>
+                {/* Set by the consumer app's refresh-instagram. A dead token hides the
+                    insights flag — the creator has to reconnect either way. */}
+                {inf.instagram_token_invalid_at ? (
+                  <span title={t("igHealth.tokenInvalidHint", { date: formatDate(inf.instagram_token_invalid_at) })} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400">
+                    {t("igHealth.tokenInvalid")}
+                  </span>
+                ) : inf.instagram_insights_denied_at ? (
+                  <span title={t("igHealth.insightsDeniedHint", { date: formatDate(inf.instagram_insights_denied_at) })} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                    {t("igHealth.insightsDenied")}
+                  </span>
+                ) : null}
               </div>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 {inf.instagram_handle && <InstagramLink handle={inf.instagram_handle} className="text-sm text-gray-500 dark:text-gray-400" />}

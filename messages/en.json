@@ -1304,6 +1304,12 @@
       "loadError": "Couldn't load this creator's campaign applications.",
       "untitledCampaign": "Untitled campaign"
     },
+    "igHealth": {
+      "insightsDenied": "Insights not granted",
+      "insightsDeniedHint": "Since {date}: Instagram connected without the insights permission, so reach and views can't load. The creator needs to reconnect with insights switched on.",
+      "tokenInvalid": "Instagram token invalid",
+      "tokenInvalidHint": "Since {date}: Instagram rejected this creator's token. The creator needs to reconnect Instagram."
+    },
     "unknown": "Unknown",
     "statusUnknown": "unknown",
     "joinedDate": "Joined {date}",
