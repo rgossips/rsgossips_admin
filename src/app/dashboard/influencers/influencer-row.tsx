@@ -18,6 +18,7 @@ interface Influencer {
   followers_count: number | null;
   categories: string[] | null;
   status: string | null;
+  media_kit_published?: boolean | null;
 }
 
 export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string | null }) {
@@ -25,6 +26,11 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(inf.status);
   const { isAdmin } = useRole();
+  // Same rule as the consumer app's brand-side cards: /kit/<handle> 404s
+  // unless the creator has published their kit.
+  const kitHandle = inf.instagram_handle || inf.username;
+  const mediaKitUrl =
+    inf.media_kit_published && kitHandle ? `https://rgossips.com/kit/${encodeURIComponent(kitHandle)}` : null;
 
   const handleToggle = async () => {
     const name = inf.full_name || inf.username || "";
@@ -47,15 +53,32 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
       <td className="px-6 py-4">
-        <Link
-          href={`/dashboard/influencers/${inf.influencer_id}`}
-          className="flex items-center gap-3 group"
-        >
-          <Avatar src={inf.profile_photo_url} name={inf.full_name} size="sm" shape="circle" />
-          <span className="text-sm text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-            {inf.full_name || "—"}
-          </span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/influencers/${inf.influencer_id}`}
+            className="flex items-center gap-3 group"
+          >
+            <Avatar src={inf.profile_photo_url} name={inf.full_name} size="sm" shape="circle" />
+            <span className="text-sm text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+              {inf.full_name || "—"}
+            </span>
+          </Link>
+          {/* Sibling, not nested — an <a> inside the row's <Link> is invalid HTML. */}
+          {mediaKitUrl && (
+            <a
+              href={mediaKitUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={t("viewMediaKit")}
+              aria-label={t("viewMediaKit")}
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </a>
+          )}
+        </div>
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {/* username mirrors the IG handle for every profile; prefer the handle

@@ -1422,6 +1422,7 @@
     "noCode": "No referral code yet — it's generated when the creator first opens the Refer & Earn page."
   },
   "DashboardInfluencersInfluencerRow": {
+    "viewMediaKit": "View media kit",
     "confirmSuspend": "Are you sure you want to suspend {name}?",
     "confirmReactivate": "Are you sure you want to reactivate {name}?",
     "unknown": "unknown",

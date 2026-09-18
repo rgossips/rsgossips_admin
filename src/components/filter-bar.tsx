@@ -155,6 +155,11 @@ export function FilterBar({ fields }: { fields: FilterField[] }) {
   // path look like a distinct URL to the router.
   const pushParams = useCallback(
     (params: URLSearchParams) => {
+      // A new filter is a new result set — drop every page cursor ("page",
+      // "invite_page", …) so it opens on page 1 instead of an empty page N.
+      for (const key of [...params.keys()]) {
+        if (key === "page" || key.endsWith("_page")) params.delete(key);
+      }
       const next = params.toString();
       if (next === searchParams.toString()) return;
       router.push(next ? `${pathname}?${next}` : pathname);

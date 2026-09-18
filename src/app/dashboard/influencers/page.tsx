@@ -12,6 +12,7 @@ import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
 
 const INVITES_PER_PAGE = 12;
+const INFLUENCERS_PER_PAGE = 25;
 
 export default async function InfluencersPage({
   searchParams,
@@ -20,10 +21,11 @@ export default async function InfluencersPage({
 }) {
   const t = await getTranslations("DashboardInfluencers");
   const params = await searchParams;
-  const { search, status, followers, category, tab, invite_page } = params;
+  const { search, status, followers, category, tab, invite_page, page } = params;
   const supabase = createAdminClient();
   const activeTab = tab || "all";
   const invitePage = Math.max(1, parseInt(invite_page || "1", 10) || 1);
+  const influencerPage = Math.max(1, parseInt(page || "1", 10) || 1);
   // Sanitize before it ever reaches a hand-built PostgREST .or() filter
   // (the query runs on the RLS-bypassing service-role client).
   const searchTerm = sanitizeSearchTerm(search);
@@ -56,8 +58,16 @@ export default async function InfluencersPage({
   const phoneInfluencerIds = phoneQuery ? authIdsByPhone(authUsers, phoneQuery) : [];
   const phoneInviteIds = phoneQuery ? await influencerInvitationIdsByPhone(supabase, phoneQuery) : [];
 
-  // Fetch influencers
-  let query = supabase.from("influencer_profiles").select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle").order("updated_at", { ascending: false });
+  // Fetch influencers — one page at a time. `count: exact` gives the filtered
+  // total for the tab badge and the pager; the id tiebreak keeps rows with the
+  // same updated_at from shuffling between pages.
+  const infFrom = (influencerPage - 1) * INFLUENCERS_PER_PAGE;
+  let query = supabase
+    .from("influencer_profiles")
+    .select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle, media_kit_published", { count: "exact" })
+    .order("updated_at", { ascending: false })
+    .order("influencer_id", { ascending: true })
+    .range(infFrom, infFrom + INFLUENCERS_PER_PAGE - 1);
   if (searchTerm) {
     const clauses = [`full_name.ilike.%${searchTerm}%`, `username.ilike.%${searchTerm}%`];
     if (phoneInfluencerIds.length > 0) clauses.push(`influencer_id.in.(${phoneInfluencerIds.join(",")})`);
@@ -66,7 +76,8 @@ export default async function InfluencersPage({
   if (status) query = query.eq("status", status);
   if (followers) { const [min, max] = followers.split("-"); if (min) query = query.gte("followers_count", parseInt(min)); if (max) query = query.lte("followers_count", parseInt(max)); }
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
-  const { data: influencers, error } = await query;
+  const { data: influencers, error, count: influencerCount } = await query;
+  const influencersTotal = influencerCount ?? 0;
 
   const canWrite = await isAdminOrAbove();
 
@@ -94,7 +105,7 @@ export default async function InfluencersPage({
   const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
   const invitesTotal = pendingInviteCount ?? 0;
 
-  const allCount = (influencers?.length || 0) + invitesTotal;
+  const allCount = influencersTotal + invitesTotal;
 
   return (
     <div>
@@ -114,7 +125,7 @@ export default async function InfluencersPage({
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-6 w-fit">
         <TabLink label={t("tabs.all")} value="all" active={activeTab} count={allCount} />
-        <TabLink label={t("tabs.registered")} value="registered" active={activeTab} count={influencers?.length || 0} />
+        <TabLink label={t("tabs.registered")} value="registered" active={activeTab} count={influencersTotal} />
         <TabLink label={t("tabs.invited")} value="invited" active={activeTab} count={invitesTotal} />
       </div>
 
@@ -144,6 +155,14 @@ export default async function InfluencersPage({
             </table>
             </div>
           </div>
+          <Pagination
+            basePath="/dashboard/influencers"
+            pageParam="page"
+            currentParams={params}
+            page={influencerPage}
+            perPage={INFLUENCERS_PER_PAGE}
+            total={influencersTotal}
+          />
         </>
       )}
 
