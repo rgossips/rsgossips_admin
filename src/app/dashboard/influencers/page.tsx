@@ -10,9 +10,16 @@ import { authIdsByPhone, influencerInvitationIdsByPhone, listAllAuthUsers, phone
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
+import { instagramStatus, type IgStatus } from "@/lib/instagram-status";
 
 const INVITES_PER_PAGE = 12;
 const INFLUENCERS_PER_PAGE = 25;
+const IG_STATUSES: IgStatus[] = ["authorized", "insights_denied", "reconnect", "not_connected"];
+
+// Module scope: reading the clock during render trips react-hooks/purity.
+function nowIso() {
+  return new Date().toISOString();
+}
 
 export default async function InfluencersPage({
   searchParams,
@@ -22,6 +29,7 @@ export default async function InfluencersPage({
   const t = await getTranslations("DashboardInfluencers");
   const params = await searchParams;
   const { search, status, followers, category, tab, invite_page, page } = params;
+  const igstatus = IG_STATUSES.includes(params.igstatus as IgStatus) ? (params.igstatus as IgStatus) : "";
   const supabase = createAdminClient();
   const activeTab = tab || "all";
   const invitePage = Math.max(1, parseInt(invite_page || "1", 10) || 1);
@@ -41,6 +49,7 @@ export default async function InfluencersPage({
     { name: "status", label: t("filter.allStatuses"), type: "select" as const, options: [{ label: t("filter.active"), value: "active" }, { label: t("filter.suspended"), value: "suspended" }, { label: t("filter.pending"), value: "pending" }] },
     { name: "followers", label: t("filter.followers"), type: "select" as const, options: [{ label: t("filter.followersUnder1k"), value: "0-1000" }, { label: t("filter.followers1kTo10k"), value: "1000-10000" }, { label: t("filter.followers10kTo100k"), value: "10000-100000" }, { label: t("filter.followers100kPlus"), value: "100000-" }] },
     { name: "category", label: t("filter.allCategories"), type: "multiselect" as const, options: categoryOptions },
+    { name: "igstatus", label: t("filter.allIgStatuses"), type: "select" as const, options: IG_STATUSES.map((s) => ({ label: t(`igStatus.${s}`), value: s })) },
   ];
 
   // Phone numbers live on auth.users, not influencer_profiles — loaded once
@@ -64,7 +73,9 @@ export default async function InfluencersPage({
   const infFrom = (influencerPage - 1) * INFLUENCERS_PER_PAGE;
   let query = supabase
     .from("influencer_profiles")
-    .select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle, media_kit_published", { count: "exact" })
+    // The token and IG health columns are read only to derive igStatus below;
+    // they never reach the client row.
+    .select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle, media_kit_published, instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at", { count: "exact" })
     .order("updated_at", { ascending: false })
     .order("influencer_id", { ascending: true })
     .range(infFrom, infFrom + INFLUENCERS_PER_PAGE - 1);
@@ -76,8 +87,32 @@ export default async function InfluencersPage({
   if (status) query = query.eq("status", status);
   if (followers) { const [min, max] = followers.split("-"); if (min) query = query.gte("followers_count", parseInt(min)); if (max) query = query.lte("followers_count", parseInt(max)); }
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
-  const { data: influencers, error, count: influencerCount } = await query;
+  // Same rules as instagramStatus(), expressed as filters so paging and the
+  // count stay right. Separate .or() params are AND-ed by PostgREST.
+  if (igstatus) {
+    const now = `"${nowIso()}"`;
+    const tokenLive = `instagram_token_expires_at.is.null,instagram_token_expires_at.gte.${now}`;
+    if (igstatus === "not_connected") {
+      query = query.is("instagram_access_token", null);
+    } else if (igstatus === "reconnect") {
+      query = query
+        .not("instagram_access_token", "is", null)
+        .or(`instagram_token_invalid_at.not.is.null,instagram_token_expires_at.lt.${now}`);
+    } else if (igstatus === "insights_denied" || igstatus === "authorized") {
+      query = query.not("instagram_access_token", "is", null).is("instagram_token_invalid_at", null).or(tokenLive);
+      query = igstatus === "insights_denied"
+        ? query.not("instagram_insights_denied_at", "is", null)
+        : query.is("instagram_insights_denied_at", null);
+    }
+  }
+  const { data: influencerRows, error, count: influencerCount } = await query;
   const influencersTotal = influencerCount ?? 0;
+  const influencers = (influencerRows || []).map(
+    ({ instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at, ...rest }) => ({
+      ...rest,
+      igStatus: instagramStatus({ instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at }),
+    }),
+  );
 
   const canWrite = await isAdminOrAbove();
 
@@ -144,11 +179,11 @@ export default async function InfluencersPage({
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.followers")}</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.categories")}</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.status")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.actions")}</th>
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.igStatus")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {influencers && influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />) : (
+                {influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />) : (
                   <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-400 dark:text-gray-500">{t("noRegisteredInfluencers")}</td></tr>
                 )}
               </tbody>

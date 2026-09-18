@@ -1,13 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { formatStatus } from "@/lib/format";
-import { toggleInfluencerStatus } from "./actions";
 import { Avatar } from "@/components/avatar";
-import { useRole } from "@/components/role-context";
 import { InstagramLink } from "@/components/instagram-link";
+import type { IgStatus } from "@/lib/instagram-status";
+
+const IG_STATUS_STYLE: Record<IgStatus, string> = {
+  authorized: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+  insights_denied: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  reconnect: "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400",
+  not_connected: "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
+};
+const IG_STATUS_DOT: Record<IgStatus, string> = {
+  authorized: "bg-emerald-500",
+  insights_denied: "bg-amber-500",
+  reconnect: "bg-red-500",
+  not_connected: "bg-gray-400",
+};
 
 interface Influencer {
   influencer_id: string;
@@ -19,36 +30,18 @@ interface Influencer {
   categories: string[] | null;
   status: string | null;
   media_kit_published?: boolean | null;
+  igStatus: IgStatus;
 }
 
 export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string | null }) {
   const t = useTranslations("DashboardInfluencersInfluencerRow");
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(inf.status);
-  const { isAdmin } = useRole();
+  const tIg = useTranslations("DashboardInfluencers.igStatus");
+  const status = inf.status;
   // Same rule as the consumer app's brand-side cards: /kit/<handle> 404s
   // unless the creator has published their kit.
   const kitHandle = inf.instagram_handle || inf.username;
   const mediaKitUrl =
     inf.media_kit_published && kitHandle ? `https://rgossips.com/kit/${encodeURIComponent(kitHandle)}` : null;
-
-  const handleToggle = async () => {
-    const name = inf.full_name || inf.username || "";
-    const confirmMsg =
-      status === "active"
-        ? t("confirmSuspend", { name })
-        : t("confirmReactivate", { name });
-    if (!confirm(confirmMsg)) return;
-
-    setLoading(true);
-    const result = await toggleInfluencerStatus(inf.influencer_id, status || "");
-    if (result.error) {
-      alert(result.error);
-    } else {
-      setStatus(result.newStatus ?? status);
-    }
-    setLoading(false);
-  };
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -130,39 +123,10 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
         </span>
       </td>
       <td className="px-6 py-4">
-        {isAdmin ? (
-        <button
-          onClick={handleToggle}
-          disabled={loading}
-          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border ${
-            status === "active"
-              ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40"
-              : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-          }`}
-        >
-          {loading ? (
-            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          ) : status === "active" ? (
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          )}
-          {loading
-            ? t("processing")
-            : status === "active"
-            ? t("suspend")
-            : t("reactivate")}
-        </button>
-        ) : (
-          <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
-        )}
+        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${IG_STATUS_STYLE[inf.igStatus]}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${IG_STATUS_DOT[inf.igStatus]}`} />
+          {tIg(inf.igStatus)}
+        </span>
       </td>
     </tr>
   );

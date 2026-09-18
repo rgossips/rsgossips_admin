@@ -1237,7 +1237,8 @@
       "followers1kTo10k": "1K - 10K",
       "followers10kTo100k": "10K - 100K",
       "followers100kPlus": "100K+",
-      "allCategories": "All Categories"
+      "allCategories": "All Categories",
+      "allIgStatuses": "All IG Statuses"
     },
     "table": {
       "name": "Name",
@@ -1246,7 +1247,13 @@
       "followers": "Followers",
       "categories": "Categories",
       "status": "Status",
-      "actions": "Actions"
+      "igStatus": "IG Status"
+    },
+    "igStatus": {
+      "authorized": "Fully authorized",
+      "insights_denied": "Insights not granted",
+      "reconnect": "Reconnect needed",
+      "not_connected": "Not connected"
     },
     "failedToLoadInfluencers": "Failed to load influencers: {message}",
     "noRegisteredInfluencers": "No registered influencers found",
