@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { RefreshButton } from "@/components/refresh-button";
-import { ErrorsTable, type ErrorRow } from "./errors-table";
+import { ErrorsTable, type ErrorRow, type ErrorUser } from "./errors-table";
 import { DeleteOldErrorsButton } from "./delete-old-errors-button";
 import { ERROR_RETENTION_DAYS } from "./constants";
 
@@ -134,6 +134,28 @@ export default async function ErrorsPage({
   ]);
   const oldCount = oldRes.count ?? 0;
   const rows: ErrorRow[] = (data as ErrorRow[]) || [];
+
+  // Resolve each row's user_id to a creator or brand so the User column can
+  // link to their detail page. user_role on the row is the caller's JWT role
+  // (often just "authenticated"), so the profile tables are the authority.
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter((v): v is string => !!v))];
+  const users: Record<string, ErrorUser> = {};
+  if (userIds.length) {
+    const [infRes, brandRes] = await Promise.all([
+      admin.from("influencer_profiles").select("influencer_id, full_name, instagram_handle").in("influencer_id", userIds),
+      admin.from("brand_profiles").select("brand_id, brand_name").in("brand_id", userIds),
+    ]);
+    for (const b of brandRes.data || []) {
+      users[b.brand_id] = { href: `/dashboard/brands/${b.brand_id}`, name: b.brand_name || null, kind: "brand" };
+    }
+    for (const p of infRes.data || []) {
+      users[p.influencer_id] = {
+        href: `/dashboard/influencers/${p.influencer_id}`,
+        name: p.full_name || (p.instagram_handle ? `@${p.instagram_handle}` : null),
+        kind: "creator",
+      };
+    }
+  }
   const total = count ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -263,7 +285,7 @@ export default async function ErrorsPage({
             {pageCount > 1 ? ` · page ${page} of ${pageCount}` : ""}
           </p>
 
-          <ErrorsTable rows={rows} statusLive={statusLive} />
+          <ErrorsTable rows={rows} statusLive={statusLive} users={users} />
 
           {pageCount > 1 && (
             <div className="flex items-center justify-between">

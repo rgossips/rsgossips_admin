@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setErrorLogStatus } from "./actions";
 
@@ -48,7 +49,18 @@ const fmtTime = (iso: string | null | undefined) => (iso ? TIME_FMT.format(new D
 const checkboxClass =
   "h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 cursor-pointer disabled:cursor-not-allowed";
 
-export function ErrorsTable({ rows, statusLive }: { rows: ErrorRow[]; statusLive: boolean }) {
+// A row's user_id resolved server-side to the profile it belongs to.
+export type ErrorUser = { href: string; name: string | null; kind: "creator" | "brand" };
+
+export function ErrorsTable({
+  rows,
+  statusLive,
+  users,
+}: {
+  rows: ErrorRow[];
+  statusLive: boolean;
+  users: Record<string, ErrorUser>;
+}) {
   const router = useRouter();
   const [picked, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -188,6 +200,7 @@ export function ErrorsTable({ rows, statusLive }: { rows: ErrorRow[]; statusLive
                 key={r.id}
                 row={r}
                 statusLive={statusLive}
+                user={r.user_id ? users[r.user_id] : undefined}
                 checked={selected.has(r.id)}
                 busy={busyIds.has(r.id)}
                 disabled={pending}
@@ -207,6 +220,7 @@ export function ErrorsTable({ rows, statusLive }: { rows: ErrorRow[]; statusLive
 function ErrorTableRow({
   row: r,
   statusLive,
+  user,
   checked,
   busy,
   disabled,
@@ -215,6 +229,7 @@ function ErrorTableRow({
 }: {
   row: ErrorRow;
   statusLive: boolean;
+  user?: ErrorUser;
   checked: boolean;
   busy: boolean;
   disabled: boolean;
@@ -295,9 +310,23 @@ function ErrorTableRow({
         </div>
         <div className="font-mono opacity-70">{r.fn || r.path || "—"}</div>
       </td>
-      <td className="px-3 py-2 font-mono text-[10px] text-gray-400">
-        {r.user_id ? r.user_id.slice(0, 8) : "—"}
-        {r.user_role ? <div className="opacity-70">{r.user_role}</div> : null}
+      <td className="px-3 py-2 text-[10px] text-gray-400">
+        {!r.user_id ? (
+          "—"
+        ) : user ? (
+          <Link href={user.href} className="group block w-[150px]" title={`Open ${user.kind}`}>
+            {user.name && (
+              <span className="block truncate text-[11px] font-semibold text-indigo-600 group-hover:underline dark:text-indigo-400">
+                {user.name}
+              </span>
+            )}
+            <span className="block break-all font-mono text-indigo-500 group-hover:underline dark:text-indigo-400">{r.user_id}</span>
+          </Link>
+        ) : (
+          // No creator/brand profile — an admin, or a since-deleted account.
+          <span className="block w-[150px] break-all font-mono">{r.user_id}</span>
+        )}
+        {(user?.kind || r.user_role) && <div className="opacity-70">{user?.kind || r.user_role}</div>}
       </td>
     </tr>
   );
