@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   const [
     subsTotal, subsToday, infTotal, infToday, brandTotal, brandToday, collected,
-    errorsOpen, errorsToday, notifQuotes, notifDeliverables, notifReviews,
+    errorsOpen, errorsToday, notifQuotes, notifDeliverables, notifReviews, notifVerifications,
   ] = await Promise.all([
     admin.from("influencer_profiles").select("influencer_id", head).in("subscription_plan", paidTiers),
     // RS_Gossips migration 067. A head count on a missing table returns
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
     admin.from("service_orders").select("id", head).in("status", ["pending_quote", "counter_offered", "revision_requested"]),
     admin.from("campaign_applications").select("id", head).eq("status", "submitted"),
     admin.from("campaigns").select("campaign_id", head).eq("status", "under_review"),
+    admin.from("brand_profiles").select("brand_id", head).eq("verification_status", "pending"),
   ]);
 
   const dbFailed = [subsTotal, infTotal, infToday, brandTotal, brandToday].find((r) => r.error);
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
   const n = (v: number | null) => v ?? 0;
   // A failed or not-yet-migrated count is null ("unknown"), never a fake 0.
   const maybe = (r: { error: unknown; count: number | null }) => (r.error || r.count === null ? null : r.count);
-  const notifParts = { quotes: maybe(notifQuotes), deliverables: maybe(notifDeliverables), campaignReviews: maybe(notifReviews) };
+  const notifParts = { quotes: maybe(notifQuotes), deliverables: maybe(notifDeliverables), campaignReviews: maybe(notifReviews), brandVerifications: maybe(notifVerifications) };
   const notifKnown = Object.values(notifParts).filter((v): v is number => v !== null);
   return json({
     status: "success",

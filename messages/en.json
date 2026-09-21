@@ -1981,7 +1981,10 @@
       "title": "You're all caught up",
       "subtitle": "No items awaiting action"
     },
-    "campaignAwaitingApproval": "Campaign awaiting approval"
+    "campaignAwaitingApproval": "Campaign awaiting approval",
+    "brandAwaitingVerification": "Brand awaiting verification",
+    "payoutDue": "Payout due",
+    "brandFallback": "Brand"
   },
   "Pagination": {
     "showing": "Showing <b>{range}</b> of <b>{count}</b>",
@@ -2005,7 +2008,8 @@
     "payouts": "Payouts",
     "quotes": "Quote requests",
     "referrals": "Referral reviews",
-    "campaignReview": "Campaign approvals"
+    "campaignReview": "Campaign approvals",
+    "brandVerifications": "Brand verifications"
   },
   "DesktopBestBanner": {
     "message": "This screen is built for desktop. You can still use it here, but it's easier on a larger screen.",

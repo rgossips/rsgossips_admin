@@ -7,7 +7,7 @@ import { getAwaitingActionFeed } from "@/app/dashboard/ops-actions";
 
 interface Notification {
   id: string;
-  type: "quote_request" | "submission" | "application" | "campaign_review";
+  type: "quote_request" | "submission" | "application" | "campaign_review" | "brand_verification" | "payout_due";
   title: string;
   subtitle: string;
   href: string;
@@ -111,6 +111,31 @@ export function NotificationBell() {
           });
         }
 
+        for (const b of feed.verifications) {
+          items.push({
+            id: `verify-${b.brand_id}`,
+            type: "brand_verification",
+            title: t("brandAwaitingVerification"),
+            subtitle: b.brand_name || t("brandFallback"),
+            href: `/dashboard/brands/${b.brand_id}`,
+            time: b.created_at,
+          });
+        }
+
+        for (const p of feed.payouts) {
+          const amount = p.amount_paise != null ? `₹${Math.round(p.amount_paise / 100).toLocaleString("en-IN")}` : null;
+          items.push({
+            id: `payout-${p.id}`,
+            type: "payout_due",
+            title: t("payoutDue"),
+            subtitle: [amount, p.creator_name, p.campaign_title].filter(Boolean).join(" · ") || t("campaignFallback"),
+            // The Payouts page opens on its Scheduled tab by default.
+            href: "/dashboard/payouts",
+            // The due time, so an overdue payout sorts by how long it's waited.
+            time: p.release_at,
+          });
+        }
+
         items.sort((a, b) => parseTimestamp(b.time) - parseTimestamp(a.time));
 
         if (!cancelled) {
@@ -203,6 +228,10 @@ export function NotificationBell() {
                       ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
                       : n.type === "campaign_review"
                       ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
+                      : n.type === "brand_verification"
+                      ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400"
+                      : n.type === "payout_due"
+                      ? "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400"
                       : "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
                   }`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,6 +239,10 @@ export function NotificationBell() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       ) : n.type === "campaign_review" ? (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                      ) : n.type === "payout_due" ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      ) : n.type === "brand_verification" ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       ) : (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                       )}
