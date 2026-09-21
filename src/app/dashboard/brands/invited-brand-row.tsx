@@ -13,6 +13,8 @@ import { CATEGORIES } from "@/lib/categories";
 import { useRole } from "@/components/role-context";
 import { SendInviteEmailModal } from "@/components/send-invite-email-modal";
 import { DeleteWithStepsModal } from "@/components/delete-with-steps-modal";
+import { BrandTypeBadge } from "@/components/brand-type-badge";
+import { toBrandAccountType } from "@/lib/brand-account-type";
 
 interface Invitation {
   id: string;
@@ -22,6 +24,7 @@ interface Invitation {
   notes: string | null;
   status: string;
   created_at: string;
+  account_type?: string | null;
 }
 
 function parseMeta(notes: string | null) {
@@ -70,6 +73,11 @@ export function InvitedBrandRow({ invitation }: { invitation: Invitation }) {
           </span>
           </div>
         </Link>
+
+        {/* Outside the card's <Link>: the badge is a button for admins. */}
+        <div className="mb-3">
+          <BrandTypeBadge kind="invitation" id={invitation.id} value={toBrandAccountType(invitation.account_type)} />
+        </div>
 
         {(text || meta) && (
           <div className="mb-3 space-y-1.5">

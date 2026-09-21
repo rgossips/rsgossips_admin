@@ -4,7 +4,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, adminGate } from "@/lib/require-super-admin";
 import { fetchExistingHandles } from "@/lib/bulk-invite-utils";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { auditLog, enforceRateLimit } from "@/lib/rate-limit";
+import { isBrandAccountType } from "@/lib/brand-account-type";
 import { logError } from "@/lib/log";
 import { isEmail, isHttpUrl, isInstagramHandle, clampLen } from "@/lib/validation";
 import { notifyUser } from "@/lib/notify";
@@ -29,6 +30,37 @@ const VERIFICATION_NOTIFICATIONS: Record<string, { type: string; title: string; 
     text: "We couldn't verify your brand with the details provided. Update your profile and we'll review it again.",
   },
 };
+
+// Brand vs agency label (RS_Gossips migration 075) on a registered brand
+// (`profile`, keyed by brand_id) or a pending invitation (`invitation`, by id).
+// Internal label only — no notification to the brand.
+export async function setBrandAccountType(
+  kind: "profile" | "invitation",
+  id: string,
+  type: string,
+): Promise<{ error?: string; success?: boolean }> {
+  let actorId: string;
+  try {
+    actorId = await requireAdmin();
+  } catch {
+    return { error: "Only admins can change this." };
+  }
+  if (!isBrandAccountType(type)) return { error: "Unknown type." };
+  if (!id || (kind !== "profile" && kind !== "invitation")) return { error: "Unknown brand." };
+
+  const { error } =
+    kind === "profile"
+      ? await createAdminClient().from("brand_profiles").update({ account_type: type }).eq("brand_id", id)
+      : await createAdminClient().from("brand_invitations").update({ account_type: type }).eq("id", id);
+  if (error) {
+    logError("brands.setAccountType", error, { kind, id, type });
+    return { error: error.code === "42703" ? "Apply RS_Gossips migration 075 first." : "Couldn't save the label." };
+  }
+  await auditLog("brand_account_type", actorId, `${kind}:${id} → ${type}`);
+  revalidatePath("/dashboard/brands");
+  revalidatePath("/dashboard/campaigns");
+  return { success: true };
+}
 
 export async function updateBrandVerification(brandId: string, action: "verified" | "rejected" | "pending"): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();

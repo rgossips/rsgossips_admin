@@ -8,6 +8,8 @@ import { Pagination } from "@/components/pagination";
 import { sanitizeSearchTerm } from "@/lib/validation";
 import { authIdsByPhone, brandIdsByContactPhone, listAllAuthUsers, phoneQueryDigits } from "@/lib/phone-search";
 import { getTranslations } from "next-intl/server";
+import { BrandTypeFilter } from "@/components/brand-type-filter";
+import { BRAND_TYPE_PARAM, brandTypeFilter } from "@/lib/brand-account-type";
 
 const INVITES_PER_PAGE = 12;
 
@@ -39,11 +41,13 @@ export default async function BrandsPage({
   // Sanitize before it feeds a hand-built PostgREST .or() on the
   // service-role client (filter-injection guard).
   const searchTerm = sanitizeSearchTerm(search);
+  // Brand / agency checkboxes (migration 075) — applies to both lists.
+  const accountType = brandTypeFilter(params[BRAND_TYPE_PARAM]);
 
   // Fetch registered brands
   let brandQuery = supabase
     .from("brand_profiles")
-    .select("brand_id, brand_name, logo_url, contact_phone, verification_status, gstin, instagram_username")
+    .select("brand_id, brand_name, logo_url, contact_phone, verification_status, gstin, instagram_username, account_type")
     .order("updated_at", { ascending: false });
 
   // A digits-only search also matches the brand's contact phone or the phone
@@ -68,6 +72,7 @@ export default async function BrandsPage({
   if (verification) {
     brandQuery = brandQuery.eq("verification_status", verification);
   }
+  if (accountType) brandQuery = brandQuery.eq("account_type", accountType);
 
   const { data: brands, error: brandsError } = await brandQuery;
 
@@ -77,7 +82,7 @@ export default async function BrandsPage({
   const inviteTo = inviteFrom + INVITES_PER_PAGE - 1;
   let inviteQuery = supabase
     .from("brand_invitations")
-    .select("id, brand_name, instagram_username, logo_url, notes, status, created_at", { count: "exact" })
+    .select("id, brand_name, instagram_username, logo_url, notes, status, created_at, account_type", { count: "exact" })
     .eq("status", "pending")
     .order("created_at", { ascending: false })
     .range(inviteFrom, inviteTo);
@@ -85,6 +90,7 @@ export default async function BrandsPage({
   if (searchTerm) {
     inviteQuery = inviteQuery.or(`brand_name.ilike.%${searchTerm}%,instagram_username.ilike.%${searchTerm}%`);
   }
+  if (accountType) inviteQuery = inviteQuery.eq("account_type", accountType);
 
   const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
   const invitesTotal = pendingInviteCount ?? 0;
@@ -107,6 +113,10 @@ export default async function BrandsPage({
         <TabLink label={t("tabs.all")} value="all" active={activeTab} count={allCount} />
         <TabLink label={t("tabs.registered")} value="registered" active={activeTab} count={brands?.length || 0} />
         <TabLink label={t("tabs.invited")} value="invited" active={activeTab} count={invitesTotal} />
+      </div>
+
+      <div className="mb-4">
+        <BrandTypeFilter />
       </div>
 
       {/* Registered brands table — shown on "all" and "registered" tabs */}

@@ -6,13 +6,17 @@ import { CampaignFilters } from "./campaign-filters";
 import { RefreshButton } from "@/components/refresh-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { sanitizeSearchTerm } from "@/lib/validation";
+import { BrandTypeFilter } from "@/components/brand-type-filter";
+import { BRAND_TYPE_PARAM, brandTypeFilter } from "@/lib/brand-account-type";
 
 export default async function CampaignsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
-  const { search, status, category } = await searchParams;
+  const params = await searchParams;
+  const { search, status, category } = params;
+  const accountType = brandTypeFilter(params[BRAND_TYPE_PARAM]);
   const t = await getTranslations("DashboardCampaigns");
   const supabase = createAdminClient();
   const canWrite = await isAdminOrAbove();
@@ -39,6 +43,31 @@ export default async function CampaignsPage({
     const cats = category.split(",").filter(Boolean);
     if (cats.length > 0) {
       query = query.contains("target_categories", cats);
+    }
+  }
+
+  // Brand / agency (migration 075). A campaign is owned by a registered brand
+  // (brand_id) or, for admin-created ones, an invitation (brand_invitation_id)
+  // — so it counts as an agency's when either owner is labelled agency.
+  // Filtering on the agency id lists keeps the URL short: agencies are the
+  // minority, and "brand" is expressed as "neither owner is an agency".
+  if (accountType) {
+    const [agencyProfiles, agencyInvites] = await Promise.all([
+      supabase.from("brand_profiles").select("brand_id").eq("account_type", "agency"),
+      supabase.from("brand_invitations").select("id").eq("account_type", "agency"),
+    ]);
+    const profileIds = (agencyProfiles.data || []).map((r) => r.brand_id as string);
+    const inviteIds = (agencyInvites.data || []).map((r) => r.id as string);
+    if (accountType === "agency") {
+      const clauses = [
+        ...(profileIds.length ? [`brand_id.in.(${profileIds.join(",")})`] : []),
+        ...(inviteIds.length ? [`brand_invitation_id.in.(${inviteIds.join(",")})`] : []),
+      ];
+      // No agencies labelled yet → nothing matches.
+      query = clauses.length ? query.or(clauses.join(",")) : query.eq("campaign_id", "00000000-0000-0000-0000-000000000000");
+    } else {
+      if (profileIds.length) query = query.or(`brand_id.is.null,brand_id.not.in.(${profileIds.join(",")})`);
+      if (inviteIds.length) query = query.or(`brand_invitation_id.is.null,brand_invitation_id.not.in.(${inviteIds.join(",")})`);
     }
   }
 
@@ -74,6 +103,9 @@ export default async function CampaignsPage({
 
       {/* Filters */}
       <CampaignFilters />
+      <div className="-mt-2 mb-6">
+        <BrandTypeFilter />
+      </div>
 
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">

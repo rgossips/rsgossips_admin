@@ -8,6 +8,8 @@ import { updateBrandVerification } from "./actions";
 import { useTranslations } from "next-intl";
 import { ButtonSpinner } from "@/components/spinner";
 import { useRole } from "@/components/role-context";
+import { BrandTypeBadge } from "@/components/brand-type-badge";
+import { toBrandAccountType } from "@/lib/brand-account-type";
 
 interface Brand {
   brand_id: string;
@@ -16,6 +18,7 @@ interface Brand {
   contact_phone: string | null;
   verification_status: string | null;
   gstin: string | null;
+  account_type?: string | null;
 }
 
 export function BrandRow({ brand }: { brand: Brand }) {
@@ -59,6 +62,7 @@ export function BrandRow({ brand }: { brand: Brand }) {
           <span className="text-sm text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {brand.brand_name || "—"}
           </span>
+          <BrandTypeBadge kind="profile" id={brand.brand_id} value={toBrandAccountType(brand.account_type)} />
         </div>
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
