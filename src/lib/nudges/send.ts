@@ -82,6 +82,30 @@ export async function deliverNudge(
     recipients.map((r) => [r.userId, { userId: r.userId, name: r.name, email: "none", inApp: false }]),
   );
 
+  // Record FIRST, send second. The function can be cut off mid-batch
+  // (Netlify timeout); recording afterwards left creators who got the email
+  // unrecorded, so the next run emailed them again. A creator recorded but
+  // never reached is the lesser failure — the rows are corrected below once
+  // we know what actually went out. No record, no send.
+  const admin = createAdminClient();
+  const { data: claimed, error: claimError } = await admin
+    .from("creator_nudge_sends")
+    .insert(
+      recipients.map((r) => ({
+        user_id: r.userId,
+        nudge_key: key,
+        channels: [...(r.email ? ["email"] : []), "inapp"],
+        mode: opts.mode,
+        sent_by: opts.actorId,
+      })),
+    )
+    .select("id, user_id");
+  if (claimError) {
+    logError("nudges.record", claimError, { key, count: recipients.length });
+    throw new Error("Couldn't record the send, so nothing was sent. Is migration 074 applied?");
+  }
+  const rowId = new Map((claimed || []).map((c) => [c.user_id as string, c.id as number]));
+
   // Emails, a few at a time — the edge function is one SMTP send per call.
   const withEmail = recipients.filter((r) => r.email);
   for (let i = 0; i < withEmail.length; i += EMAIL_CONCURRENCY) {
@@ -111,19 +135,25 @@ export async function deliverNudge(
   );
   for (const r of results.values()) r.inApp = inAppOk;
 
-  // Record every recipient something reached, so they aren't nudged again.
-  const rows = [...results.values()]
-    .filter((r) => r.inApp || r.email === "sent")
-    .map((r) => ({
-      user_id: r.userId,
-      nudge_key: key,
-      channels: [...(r.email === "sent" ? ["email"] : []), ...(r.inApp ? ["inapp"] : [])],
-      mode: opts.mode,
-      sent_by: opts.actorId,
-    }));
-  if (rows.length) {
-    const { error } = await createAdminClient().from("creator_nudge_sends").insert(rows);
-    if (error) logError("nudges.record", error, { key, count: rows.length });
+  // Correct the claimed rows to what actually went out: drop a row that
+  // reached nobody (so they stay eligible for a retry), trim failed channels.
+  const hadEmail = new Set(withEmail.map((r) => r.userId));
+  const unreached: number[] = [];
+  const fixes: { id: number; channels: string[] }[] = [];
+  for (const r of results.values()) {
+    const id = rowId.get(r.userId);
+    if (id == null) continue;
+    const got = [...(r.email === "sent" ? ["email"] : []), ...(r.inApp ? ["inapp"] : [])];
+    if (got.length === 0) unreached.push(id);
+    else if (got.length !== (hadEmail.has(r.userId) ? 2 : 1)) fixes.push({ id, channels: got });
+  }
+  if (unreached.length) {
+    const { error } = await admin.from("creator_nudge_sends").delete().in("id", unreached);
+    if (error) logError("nudges.record.unreached", error, { key, count: unreached.length });
+  }
+  for (const f of fixes) {
+    const { error } = await admin.from("creator_nudge_sends").update({ channels: f.channels }).eq("id", f.id);
+    if (error) logError("nudges.record.fix", error, { key });
   }
 
   return [...results.values()];

@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { logError } from "@/lib/log";
 import { auditLog } from "@/lib/rate-limit";
-import { AUTO_HOURS_IST, AUTO_PRIORITY, AUTO_RUN_LIMIT, type NudgeKey } from "@/lib/nudges/constants";
+import { AUTO_HOURS_IST, AUTO_PRIORITY, AUTO_RUN_LIMIT, AUTO_RUN_TIME_BUDGET_MS, type NudgeKey } from "@/lib/nudges/constants";
 import { loadNudgeContext, segment, type NudgeRecipient } from "@/lib/nudges/segments";
 import { authorizedCron, deliverNudge, readAutoEnabled } from "@/lib/nudges/send";
 
@@ -43,8 +43,12 @@ export async function POST(request: NextRequest) {
       if (batch.length) plan.push([key, batch]);
     }
 
+    // Stop starting new nudges once the time budget is spent — whoever is
+    // left simply qualifies again next hour (nothing was recorded for them).
+    const started = Date.now();
     const summary: Record<string, number> = {};
     for (const [key, batch] of plan) {
+      if (Date.now() - started > AUTO_RUN_TIME_BUDGET_MS) break;
       const results = await deliverNudge(key, batch, { actorId: null, mode: "auto" });
       summary[key] = results.length;
     }

@@ -74,8 +74,16 @@ export const NUDGE_COOLDOWN_HOURS = 48;
 /** Recipients per manual send request (client-chunked, like bulk invite). */
 export const NUDGE_CHUNK_SIZE = 10;
 
-/** Recipients per automatic run (hourly), so a run fits a function timeout. */
-export const AUTO_RUN_LIMIT = 30;
+/**
+ * Recipients per automatic run (hourly). Kept small so one run finishes well
+ * inside Netlify's ~10s function limit even when most have an email (each
+ * email is one SMTP round-trip via send-email, 5 in parallel). 15/hour over
+ * the 10-hour window is still 150 creators a day.
+ */
+export const AUTO_RUN_LIMIT = 15;
+
+/** An automatic run stops starting new nudges after this long (ms). */
+export const AUTO_RUN_TIME_BUDGET_MS = 6_000;
 
 /** Automatic runs only send inside these IST hours (10:00–19:59). */
 export const AUTO_HOURS_IST = { from: 10, to: 20 };
