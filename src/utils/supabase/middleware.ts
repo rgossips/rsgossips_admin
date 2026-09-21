@@ -5,7 +5,9 @@ export const updateSession = async (request: NextRequest) => {
   // Token-authenticated machine endpoints (the desktop widget). They have no
   // browser session, so the login redirect below would break them — and
   // there's no cookie to refresh. The route checks its own bearer token.
-  if (request.nextUrl.pathname.startsWith("/api/widget/")) {
+  // Same for creator nudges: the unsubscribe link (HMAC-signed) and the
+  // scheduled automatic run (bearer NUDGE_SECRET).
+  if (request.nextUrl.pathname.startsWith("/api/widget/") || request.nextUrl.pathname.startsWith("/api/nudges/")) {
     return NextResponse.next({ request });
   }
 
