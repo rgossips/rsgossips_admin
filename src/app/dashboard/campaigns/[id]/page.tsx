@@ -212,7 +212,7 @@ export default async function CampaignDetailPage({
           )}
 
           {/* Applications */}
-          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} />
+          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} />
 
           {/* Content Deliverables */}
           {Object.keys(deliverables).length > 0 && (

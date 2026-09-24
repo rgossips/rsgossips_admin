@@ -50,7 +50,19 @@ function formatCount(n: number | null) {
   return String(n);
 }
 
-export function ApplicationsList({ campaignId, applications, budgetPerInfluencer }: { campaignId: string; applications: Application[]; budgetPerInfluencer: number }) {
+export function ApplicationsList({
+  campaignId,
+  applications,
+  budgetPerInfluencer,
+  campaignType,
+}: {
+  campaignId: string;
+  applications: Application[];
+  budgetPerInfluencer: number;
+  // "barter" | "paid" | "hybrid" — barter pays nothing, so its approval flow
+  // has no amount, no escrow and no payout downstream.
+  campaignType: string;
+}) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   if (!applications || applications.length === 0) return null;
 
@@ -77,14 +89,14 @@ export function ApplicationsList({ campaignId, applications, budgetPerInfluencer
       </div>
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
         {applications.map((app) => (
-          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} />
+          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} isBarter={campaignType === "barter"} />
         ))}
       </div>
     </div>
   );
 }
 
-function ApplicationRow({ application, budgetPerInfluencer }: { application: Application; budgetPerInfluencer: number }) {
+function ApplicationRow({ application, budgetPerInfluencer, isBarter }: { application: Application; budgetPerInfluencer: number; isBarter: boolean }) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   const router = useRouter();
   const { isAdmin } = useRole();
@@ -150,7 +162,10 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
 
   const handleApprove = async () => {
     setLoading(true);
-    const result = await updateApplicationStatus(application.id, "approved", undefined, payAmount ? parseInt(payAmount) : undefined, payNote || undefined);
+    // Barter: no rate at all, so final_agreed_rate stays null and nothing
+    // reaches escrow or the payouts queue.
+    const amount = isBarter ? undefined : payAmount ? parseInt(payAmount) : undefined;
+    const result = await updateApplicationStatus(application.id, "approved", undefined, amount, payNote || undefined);
     if (result.error) alert(result.error);
     else router.refresh();
     setLoading(false);
@@ -316,7 +331,24 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
             )}
           </div>
 
+          {/* Barter: no money changes hands, so the rate, the payment decision
+              and the escrow note below are all skipped. */}
+          {isBarter && (
+            <div className="px-5 pb-4">
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
+                <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <div className="text-[12px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                  <p className="font-semibold mb-1">{t("barterCampaign")}</p>
+                  <p className="text-amber-600 dark:text-amber-400">{t("barterNoPaymentNote")}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Section 2: Proposed Rate */}
+          {!isBarter && (
           <div className="px-5 pb-4">
             <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
               <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t("influencersProposedRate")}</h4>
@@ -328,8 +360,10 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
               )}
             </div>
           </div>
+          )}
 
           {/* Section 3: Admin Payment Decision */}
+          {!isBarter && (
           <div className="px-5 pb-4 space-y-3">
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t("yourPaymentDecision")}</h4>
@@ -347,8 +381,10 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
               </div>
             </div>
           </div>
+          )}
 
           {/* Section 4: Escrow Info */}
+          {!isBarter && (
           <div className="px-5 pb-4">
             <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
               <svg className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,13 +400,14 @@ function ApplicationRow({ application, budgetPerInfluencer }: { application: App
               </div>
             </div>
           </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 px-5 pb-5">
-            <button onClick={handleApprove} disabled={loading || !payAmount || parseInt(payAmount) <= 0}
+            <button onClick={handleApprove} disabled={loading || (!isBarter && (!payAmount || parseInt(payAmount) <= 0))}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-300 disabled:cursor-not-allowed text-white text-sm font-semibold cursor-pointer transition-colors">
               {loading ? <ButtonSpinner /> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
-              {loading ? t("processing") : t("approveAndHold", { amount: parseInt(payAmount || "0").toLocaleString() })}
+              {loading ? t("processing") : isBarter ? t("approveApplication") : t("approveAndHold", { amount: parseInt(payAmount || "0").toLocaleString() })}
             </button>
             <button onClick={() => setShowReview(false)} className="px-5 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium cursor-pointer">
               {t("cancel")}
