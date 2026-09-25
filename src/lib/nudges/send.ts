@@ -43,7 +43,19 @@ export function verifyUnsubscribe(userId: string, sig: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** `base` = getSiteUrl() — the unsubscribe route lives on this admin site. */
+// Where the unsubscribe route lives. A local `next dev` run still sends to
+// REAL creators (it talks to the live database), and NEXT_PUBLIC_SITE_URL is
+// http://localhost:3000 there — which shipped dead unsubscribe links. So a
+// localhost value is ignored in favour of the deployed portal.
+const ADMIN_SITE_URL = "https://rgossipsadmin.netlify.app";
+const isLocal = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url);
+
+export async function unsubscribeBase(): Promise<string> {
+  const configured = await getSiteUrl().catch(() => "");
+  return !configured || isLocal(configured) ? ADMIN_SITE_URL : configured;
+}
+
+/** `base` = unsubscribeBase() — the unsubscribe route lives on the admin site. */
 export function unsubscribeUrl(base: string, userId: string): string {
   const secret = nudgeSecret();
   const sig = secret ? sign(userId, secret) : "unconfigured";
@@ -76,7 +88,7 @@ export async function deliverNudge(
   if (recipients.length === 0) return [];
   if (!nudgeSecret()) throw new Error("NUDGE_SECRET is not set (min 24 characters) — unsubscribe links can't be signed.");
 
-  const base = await getSiteUrl();
+  const base = await unsubscribeBase();
   const rendered = new Map(recipients.map((r) => [r.userId, renderNudge(key, r.vars, unsubscribeUrl(base, r.userId))]));
   const results = new Map<string, NudgeSendResult>(
     recipients.map((r) => [r.userId, { userId: r.userId, name: r.name, email: "none", inApp: false }]),
