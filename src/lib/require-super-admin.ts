@@ -1,27 +1,75 @@
+import { cache } from "react";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
-// Reads the role using the service-role client to bypass RLS — the
+// Every dashboard render used to ask Supabase "who is this user?" three
+// times — middleware, the layout, then each page's gate — and re-read
+// admin_profiles for each gate. The project is in Mumbai and the site runs
+// as functions elsewhere, so each of those was a ~250ms round trip before
+// any page data was fetched.
+//
+// Two fixes, both here:
+//   * getClaims() verifies the session token locally where it can, instead
+//     of a network call to /auth/v1/user. It falls back to getUser() when
+//     the token can't be verified offline, so behaviour is unchanged.
+//   * React's cache() memoises the whole resolution for the lifetime of one
+//     request, so the layout and every gate on the page share one answer.
+
+// The role is read with the service-role client to bypass RLS — the
 // session-bound client would need explicit RLS policies on admin_profiles
 // to allow self-reads, which we don't want to rely on here.
-async function readRoleFor(userId: string): Promise<string | null> {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("admin_profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-  return data?.role || null;
-}
+
+/**
+ * The signed-in user, verified. `getClaims()` checks the JWT signature
+ * locally when the project uses asymmetric keys and only calls the auth
+ * server otherwise — either way it never returns an unverified identity.
+ */
+export const getCurrentUser = cache(async (): Promise<{ id: string; email: string } | null> => {
+  const supabase = await createClient();
+  try {
+    const { data, error } = await supabase.auth.getClaims();
+    const claims = data?.claims as { sub?: string; email?: string } | undefined;
+    if (!error && claims?.sub) return { id: claims.sub, email: claims.email || "" };
+  } catch {
+    /* fall through to the network check */
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  return user ? { id: user.id, email: user.email || "" } : null;
+});
+
+/** The caller's admin row. One lookup per request, shared by every gate. */
+export const getAdminProfile = cache(
+  async (): Promise<{ userId: string | null; role: string | null; fullName: string; email: string; confirmed: boolean }> => {
+    const user = await getCurrentUser();
+    if (!user) return { userId: null, role: null, fullName: "", email: "", confirmed: false };
+    const admin = createAdminClient();
+    // One bounded retry — a transient error must not read as "not an admin",
+    // which is what the dashboard layout fails closed on.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { data, error } = await admin
+        .from("admin_profiles")
+        .select("role, full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!error) {
+        return {
+          userId: user.id,
+          role: (data?.role as string) || null,
+          fullName: data?.full_name || "",
+          email: user.email,
+          confirmed: true,
+        };
+      }
+    }
+    return { userId: user.id, role: null, fullName: "", email: user.email, confirmed: false };
+  },
+);
 
 // Returns the current user's admin role, or null if not logged in / not an admin.
 // Safe to use from server components for conditional rendering.
 export async function getCurrentAdminRole(): Promise<{ userId: string | null; role: string | null }> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { userId: null, role: null };
-  const role = await readRoleFor(user.id);
-  return { userId: user.id, role };
+  const { userId, role } = await getAdminProfile();
+  return { userId, role };
 }
 
 export async function isSuperAdmin(): Promise<boolean> {

@@ -42,15 +42,32 @@ export function phoneMatches(stored: string | null | undefined, query: string): 
 
 export type AuthUserLite = { id: string; phone?: string | null };
 
+// Phones live on auth.users and can't be joined to a profile row, so the
+// influencer and brand lists pull every account and match in memory. That is
+// ~450 accounts and a ~400ms round trip to Mumbai on EVERY page load, paid
+// before the page renders. Cached briefly across requests: a warm function
+// reuses it, and a phone that changed seconds ago is not worth a second a
+// page. Cleared by a redeploy, and short enough that new signups appear fast.
+const AUTH_USERS_TTL_MS = 120_000;
+let authUsersCache: { at: number; users: AuthUserLite[] } | null = null;
+
 // Every auth user, paged — listUsers caps a page at 1000.
 export async function listAllAuthUsers(admin: Admin): Promise<AuthUserLite[]> {
+  if (authUsersCache && Date.now() - authUsersCache.at < AUTH_USERS_TTL_MS) {
+    return authUsersCache.users;
+  }
   const users: AuthUserLite[] = [];
   for (let page = 1; ; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error || !data) break;
+    if (error || !data) {
+      // Never cache a partial read — a failed page would pin an incomplete
+      // phone map for the whole TTL.
+      return authUsersCache?.users ?? users;
+    }
     users.push(...data.users.map((u) => ({ id: u.id, phone: u.phone })));
     if (data.users.length < 1000) break;
   }
+  authUsersCache = { at: Date.now(), users };
   return users;
 }
 

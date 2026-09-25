@@ -11,6 +11,7 @@ import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
 import { instagramStatus, type IgStatus } from "@/lib/instagram-status";
+import { getCreatorCategoryOptions } from "@/lib/creator-categories";
 
 const INVITES_PER_PAGE = 12;
 const INFLUENCERS_PER_PAGE = 25;
@@ -38,11 +39,14 @@ export default async function InfluencersPage({
   // (the query runs on the RLS-bypassing service-role client).
   const searchTerm = sanitizeSearchTerm(search);
 
-  // Fetch all distinct categories
-  const { data: allInfluencers } = await supabase.from("influencer_profiles").select("categories");
-  const allCategories = new Set<string>();
-  allInfluencers?.forEach((inf) => { if (inf.categories && Array.isArray(inf.categories)) inf.categories.forEach((cat: string) => allCategories.add(cat)); });
-  const categoryOptions = Array.from(allCategories).sort().map((cat) => ({ label: cat, value: cat }));
+  // Category options and the phone map are both independent of the row query
+  // and of each other — started together so the page waits once, not three
+  // times (every round trip crosses to the Mumbai project).
+  const [categoryOptions, authUsers, canWrite] = await Promise.all([
+    getCreatorCategoryOptions(),
+    listAllAuthUsers(supabase).catch(() => [] as AuthUserLite[]),
+    isAdminOrAbove(),
+  ]);
 
   const filterFields = [
     { name: "search", label: t("filter.search"), type: "text" as const, placeholder: t("filter.searchPlaceholder") },
@@ -52,15 +56,10 @@ export default async function InfluencersPage({
     { name: "igstatus", label: t("filter.allIgStatuses"), type: "select" as const, options: IG_STATUSES.map((s) => ({ label: t(`igStatus.${s}`), value: s })) },
   ];
 
-  // Phone numbers live on auth.users, not influencer_profiles — loaded once
-  // here for both the phone column and phone search.
-  let authUsers: AuthUserLite[] = [];
-  try {
-    authUsers = await listAllAuthUsers(supabase);
-  } catch {
-    // Non-fatal — the phone column shows "—" and phone search matches nothing.
-  }
-
+  // Phone numbers live on auth.users, not influencer_profiles — the map above
+  // serves both the phone column and phone search. A failed read is
+  // non-fatal: the column shows "—" and phone search matches nothing.
+  //
   // A digits-only search ("98765 43210", "+91…") also matches by phone: the
   // number is resolved to ids here and OR-ed into the name search below.
   const phoneQuery = phoneQueryDigits(search);
@@ -105,8 +104,27 @@ export default async function InfluencersPage({
         : query.is("instagram_insights_denied_at", null);
     }
   }
-  const { data: influencerRows, error, count: influencerCount } = await query;
+  // Pending invitations — paginated. `count: exact` gives the total so paging
+  // stays correct after filtering. Built here so it runs alongside the
+  // creator rows rather than after them.
+  const inviteFrom = (invitePage - 1) * INVITES_PER_PAGE;
+  let inviteQuery = supabase
+    .from("influencer_invitations")
+    .select("id, full_name, instagram_username, profile_photo_url, notes, status, created_at", { count: "exact" })
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .range(inviteFrom, inviteFrom + INVITES_PER_PAGE - 1);
+  if (searchTerm) {
+    const clauses = [`full_name.ilike.%${searchTerm}%`, `instagram_username.ilike.%${searchTerm}%`];
+    if (phoneInviteIds.length > 0) clauses.push(`id.in.(${phoneInviteIds.join(",")})`);
+    inviteQuery = inviteQuery.or(clauses.join(","));
+  }
+  const [
+    { data: influencerRows, error, count: influencerCount },
+    { data: pendingInvites, error: invitesError, count: pendingInviteCount },
+  ] = await Promise.all([query, inviteQuery]);
   const influencersTotal = influencerCount ?? 0;
+  const invitesTotal = pendingInviteCount ?? 0;
   const influencers = (influencerRows || []).map(
     ({ instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at, ...rest }) => ({
       ...rest,
@@ -114,31 +132,11 @@ export default async function InfluencersPage({
     }),
   );
 
-  const canWrite = await isAdminOrAbove();
-
   // id→phone map for the column, without an N+1.
   const phoneMap = new Map<string, string>();
   for (const u of authUsers) {
     if (u.phone) phoneMap.set(u.id, u.phone);
   }
-
-  // Fetch pending invitations — paginated. `count: exact` gives the
-  // total so paging stays correct after filtering.
-  const inviteFrom = (invitePage - 1) * INVITES_PER_PAGE;
-  const inviteTo = inviteFrom + INVITES_PER_PAGE - 1;
-  let inviteQuery = supabase
-    .from("influencer_invitations")
-    .select("id, full_name, instagram_username, profile_photo_url, notes, status, created_at", { count: "exact" })
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .range(inviteFrom, inviteTo);
-  if (searchTerm) {
-    const clauses = [`full_name.ilike.%${searchTerm}%`, `instagram_username.ilike.%${searchTerm}%`];
-    if (phoneInviteIds.length > 0) clauses.push(`id.in.(${phoneInviteIds.join(",")})`);
-    inviteQuery = inviteQuery.or(clauses.join(","));
-  }
-  const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
-  const invitesTotal = pendingInviteCount ?? 0;
 
   const allCount = influencersTotal + invitesTotal;
 

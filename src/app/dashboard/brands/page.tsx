@@ -74,10 +74,10 @@ export default async function BrandsPage({
   }
   if (accountType) brandQuery = brandQuery.eq("account_type", accountType);
 
-  const { data: brands, error: brandsError } = await brandQuery;
-
-  // Fetch only pending invitations — paginated. `count: exact` returns
-  // the matching total so the page count is correct after filtering.
+  // Pending invitations — paginated. `count: exact` returns the matching
+  // total so the page count is correct after filtering. Built before either
+  // query is awaited so the two run together: each round trip goes to the
+  // Mumbai project, so serialising them doubles the wait for nothing.
   const inviteFrom = (invitePage - 1) * INVITES_PER_PAGE;
   const inviteTo = inviteFrom + INVITES_PER_PAGE - 1;
   let inviteQuery = supabase
@@ -92,7 +92,10 @@ export default async function BrandsPage({
   }
   if (accountType) inviteQuery = inviteQuery.eq("account_type", accountType);
 
-  const { data: pendingInvites, error: invitesError, count: pendingInviteCount } = await inviteQuery;
+  const [
+    { data: brands, error: brandsError },
+    { data: pendingInvites, error: invitesError, count: pendingInviteCount },
+  ] = await Promise.all([brandQuery, inviteQuery]);
   const invitesTotal = pendingInviteCount ?? 0;
   const allCount = (brands?.length || 0) + invitesTotal;
 
