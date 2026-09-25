@@ -10,6 +10,7 @@ import { Avatar } from "@/components/avatar";
 import { useRole } from "@/components/role-context";
 import { ExportApplicantsButton } from "./export-applicants-button";
 import { APPLICATION_STATUS_BADGE } from "@/lib/application-status";
+import { InstagramLink } from "@/components/instagram-link";
 
 interface Application {
   id: string;
@@ -196,7 +197,7 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter }: { applic
               {inf?.full_name || t("unknown")}
             </Link>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {inf?.instagram_handle && <span className="text-xs text-gray-400">@{inf.instagram_handle}</span>}
+              {inf?.instagram_handle && <InstagramLink handle={inf.instagram_handle} className="text-xs text-gray-400" />}
               <span className="text-xs text-gray-400">{t("followersMeta", { count: formatCount(inf?.followers_count ?? null) })}</span>
               {inf?.engagement_rate != null && <span className="text-xs text-gray-400">{t("engagementRateMeta", { rate: inf.engagement_rate })}</span>}
               {application.proposed_rate != null && <span className="text-xs font-semibold text-indigo-500">{t("proposedRate", { amount: application.proposed_rate.toLocaleString() })}</span>}
@@ -289,7 +290,11 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter }: { applic
                 <ProfileField icon="mail" label={t("email")} value={inf?.email || t("notSet")} />
                 <ProfileField icon="phone" label={t("phone")} value={t("fromAuth")} />
               </div>
-              <ProfileField icon="instagram" label={t("instagram")} value={inf?.instagram_handle ? `@${inf.instagram_handle}` : t("notConnected")} />
+              <ProfileField
+                icon="instagram"
+                label={t("instagram")}
+                value={inf?.instagram_handle ? <InstagramLink handle={inf.instagram_handle} /> : t("notConnected")}
+              />
               <div className="grid grid-cols-2 gap-2">
                 <ProfileField icon="users" label={t("followers")} value={formatCount(inf?.followers_count ?? null)} />
                 <ProfileField icon="activity" label={t("engagementRate")} value={inf?.engagement_rate ? `${inf.engagement_rate}%` : "—"} />
@@ -662,7 +667,7 @@ const iconColors: Record<string, string> = {
   instagram: "text-pink-500", users: "text-purple-500", activity: "text-emerald-500",
 };
 
-function ProfileField({ icon, label, value }: { icon: string; label: string; value: string }) {
+function ProfileField({ icon, label, value }: { icon: string; label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
       <svg className={`w-4 h-4 shrink-0 ${iconColors[icon] || "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -670,7 +675,7 @@ function ProfileField({ icon, label, value }: { icon: string; label: string; val
       </svg>
       <div className="flex-1 min-w-0">
         <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase">{label}</p>
-        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">{value}</p>
+        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">{value}</div>
       </div>
     </div>
   );
