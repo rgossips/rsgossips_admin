@@ -65,6 +65,8 @@ const navGroups: NavGroup[] = [
       // Errors from every surface (migration 066). Operations rather than
       // Admin Panel: triaging a failed sign-up or payment is support work.
       { label: "Errors", href: "/dashboard/errors", icon: "alert", adminOnly: true },
+      // On-demand pings only — the page never polls (see lib/status/targets.ts).
+      { label: "System Status", href: "/dashboard/status", icon: "pulse", adminOnly: true },
     ],
   },
 ];
@@ -135,6 +137,11 @@ const icons: Record<string, React.ReactNode> = {
   tag: (
     <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
+    </svg>
+  ),
+  pulse: (
+    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 12h3.75l2.25-6 3 12 2.25-6h4.5" />
     </svg>
   ),
   mail: (
