@@ -50,7 +50,7 @@ export default async function InfluencersPage({
 
   const filterFields = [
     { name: "search", label: t("filter.search"), type: "text" as const, placeholder: t("filter.searchPlaceholder") },
-    { name: "status", label: t("filter.allStatuses"), type: "select" as const, options: [{ label: t("filter.active"), value: "active" }, { label: t("filter.suspended"), value: "suspended" }, { label: t("filter.pending"), value: "pending" }] },
+    { name: "status", label: t("filter.allStatuses"), type: "select" as const, options: [{ label: t("filter.active"), value: "active" }, { label: t("filter.suspended"), value: "suspended" }, { label: t("filter.pending"), value: "pending" }, { label: t("filter.pendingDeletion"), value: "pending_deletion" }] },
     { name: "followers", label: t("filter.followers"), type: "select" as const, options: [{ label: t("filter.followersUnder1k"), value: "0-1000" }, { label: t("filter.followers1kTo10k"), value: "1000-10000" }, { label: t("filter.followers10kTo100k"), value: "10000-100000" }, { label: t("filter.followers100kPlus"), value: "100000-" }] },
     { name: "category", label: t("filter.allCategories"), type: "multiselect" as const, options: categoryOptions },
     { name: "igstatus", label: t("filter.allIgStatuses"), type: "select" as const, options: IG_STATUSES.map((s) => ({ label: t(`igStatus.${s}`), value: s })) },

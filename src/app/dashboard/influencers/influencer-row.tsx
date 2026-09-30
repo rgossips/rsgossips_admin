@@ -116,6 +116,8 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
               ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
               : status === "suspended"
               ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+              : status === "pending_deletion"
+              ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
               : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
           }`}
         >

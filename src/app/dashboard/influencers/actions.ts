@@ -3,7 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { requireAdmin, adminGate } from "@/lib/require-super-admin";
+import { requireAdmin, adminGate, requireSuperAdmin } from "@/lib/require-super-admin";
 import { sendMail } from "@/lib/mailer";
 import { renderUserStatusEmail } from "@/lib/email-templates";
 import { normalizeGender, fetchExistingHandles } from "@/lib/bulk-invite-utils";
@@ -163,6 +163,88 @@ export async function toggleInfluencerStatus(influencerId: string, _currentStatu
 
   revalidatePath("/dashboard/influencers");
   return { success: true, newStatus, emailSent, emailError };
+}
+
+// Pull a creator back out of the 30-day deletion grace window.
+//
+// The consumer app's own "delete my account" is a SOFT delete: status flips to
+// 'pending_deletion' with deleted_at set (rgossips_web migration 046), every
+// device session is deactivated, and whatsapp-otp-verifier then refuses to let
+// them sign in — deliberately, because unlike 'deactivated' (where signing in
+// IS the reactivation) only an admin may undo this one. Nothing purges the row
+// automatically; the hard delete is the admin's own multi-step flow. So for 30
+// days the account is recoverable, and a creator who changes their mind has no
+// way to recover it themselves — they email grievance@, which is exactly the
+// request this action serves.
+//
+// Super-admin, matching delete: it re-enables sign-in, and reports/actions.ts
+// uses the same 'pending_deletion' state as a moderation ban, so restoring can
+// also mean un-banning someone.
+export async function restoreInfluencerAccount(
+  influencerId: string,
+): Promise<{ error?: string; success?: boolean; emailSent?: boolean; emailError?: string }> {
+  let actorId: string;
+  try { actorId = await requireSuperAdmin(); }
+  catch (e) { return { error: e instanceof Error ? e.message : "Forbidden" }; }
+
+  const adminClient = createAdminClient();
+
+  // Read the row rather than trusting the caller: only an account that is
+  // actually pending deletion may be "restored", and the prior deleted_at /
+  // reason are needed for the audit trail before we clear them.
+  const { data: profile, error: readErr } = await adminClient
+    .from("influencer_profiles")
+    .select("full_name, username, instagram_handle, email, status, deleted_at, deletion_reason")
+    .eq("influencer_id", influencerId)
+    .maybeSingle();
+  if (readErr) { logError("restore-influencer.read", readErr, { influencerId }); return { error: "Could not load the influencer. Please try again." }; }
+  if (!profile) return { error: "Influencer not found." };
+  if (profile.status !== "pending_deletion") {
+    return { error: `This account is "${profile.status}", not pending deletion — nothing to restore.` };
+  }
+
+  // Clear the whole soft-delete triple. Leaving deleted_at behind would mark
+  // an active account as deleted for anything that reads the column.
+  const { error } = await adminClient
+    .from("influencer_profiles")
+    .update({ status: "active", deleted_at: null, deletion_reason: null, updated_at: new Date().toISOString() })
+    .eq("influencer_id", influencerId)
+    .eq("status", "pending_deletion");
+  if (error) return { error: friendlyDbError("restore-influencer.update", error, "Could not restore the account. Please try again.", { influencerId }) };
+
+  // The reason and date are cleared above, so carry them into the audit row —
+  // otherwise why the account was deleted is gone for good.
+  await auditLog(
+    "influencer_restore",
+    actorId,
+    `${influencerId} ${profile.instagram_handle || profile.username || ""} deleted_at=${profile.deleted_at || "?"} reason="${profile.deletion_reason || ""}"`.trim(),
+  );
+
+  // Tell them it's done — they asked for this by email, so email is the right
+  // channel, and "reactivated" is what happened from their side. Non-fatal and
+  // rate-limited per (admin, creator), like the suspend/reactivate mail.
+  let emailSent = false;
+  let emailError: string | undefined;
+  if (profile.email) {
+    const rl = await enforceRateLimit({ action: "status_email", actorId, limit: 3, windowSec: 60 * 60, target: influencerId });
+    if (rl.allowed) {
+      try {
+        const { html, text, subjectFragment } = renderUserStatusEmail({
+          fullName: profile.full_name || profile.username || "there",
+          action: "reactivated",
+        });
+        await sendMail({ to: profile.email, subject: `Your RecentGossips account has been ${subjectFragment}`, html, text });
+        emailSent = true;
+      } catch (e) {
+        emailError = e instanceof Error ? e.message : "Failed to send notification email";
+        logError("restore-influencer.email", e, { influencerId });
+      }
+    }
+  }
+
+  revalidatePath("/dashboard/influencers");
+  revalidatePath(`/dashboard/influencers/${influencerId}`);
+  return { success: true, emailSent, emailError };
 }
 
 export async function updateInfluencer(influencerId: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {

@@ -5,6 +5,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { EditInfluencerButton } from "./edit-influencer";
 import { ChangePlanButton } from "./change-plan";
 import { DeleteInfluencerButton } from "./delete-influencer";
+import { RestoreInfluencerButton } from "./restore-influencer";
 import { ReferralLinkCard } from "./referral-link-card";
 import { Avatar } from "@/components/avatar";
 import { InstagramLink } from "@/components/instagram-link";
@@ -83,8 +84,17 @@ export default async function InfluencerDetailPage({
     suspended: { bg: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400", dot: "bg-red-500" },
     pending: { bg: "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400", dot: "bg-yellow-500" },
     inactive: { bg: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400", dot: "bg-gray-400" },
+    // The creator asked to be deleted — recoverable, but only for 30 days.
+    pending_deletion: { bg: "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400", dot: "bg-rose-500" },
   };
   const st = statusConfig[inf.status] || statusConfig.inactive;
+
+  // Soft-deleted by the creator themselves (rgossips_web migration 046). The
+  // hard delete is a manual admin step, so "purges on" is the promise made in
+  // the deletion email, not a scheduled job.
+  const pendingDeletion = inf.status === "pending_deletion";
+  const purgeDate = inf.deleted_at ? new Date(new Date(inf.deleted_at).getTime() + 30 * 86_400_000).toISOString() : null;
+  const daysLeft = purgeDate ? Math.ceil((new Date(purgeDate).getTime() - Date.now()) / 86_400_000) : null;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -135,6 +145,37 @@ export default async function InfluencerDetailPage({
           <RefreshButton />
         </div>
       </div>
+
+      {pendingDeletion && (
+        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:p-5 dark:border-rose-900/60 dark:bg-rose-900/20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-rose-800 dark:text-rose-300">{t("restore.bannerTitle")}</h2>
+              <p className="mt-1 max-w-2xl text-[13px] text-rose-700 dark:text-rose-200">
+                {t("restore.bannerBody", {
+                  date: formatDate(inf.deleted_at),
+                  reason: inf.deletion_reason || t("restore.noReason"),
+                })}
+              </p>
+              <p className="mt-1 text-[12px] text-rose-600 dark:text-rose-300/80">
+                {daysLeft !== null && daysLeft > 0
+                  ? t("restore.bannerWindow", { date: formatDate(purgeDate), days: daysLeft })
+                  : t("restore.bannerExpired")}
+              </p>
+            </div>
+            {superAdmin ? (
+              <div className="shrink-0">
+                <RestoreInfluencerButton
+                  influencerId={inf.influencer_id}
+                  displayName={inf.full_name || inf.username || inf.instagram_handle || t("deleteFallbackName")}
+                />
+              </div>
+            ) : (
+              <p className="shrink-0 text-[12px] font-medium text-rose-600 dark:text-rose-300/80">{t("restore.superAdminOnly")}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

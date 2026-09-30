@@ -1241,7 +1241,8 @@
       "followers10kTo100k": "10K - 100K",
       "followers100kPlus": "100K+",
       "allCategories": "All Categories",
-      "allIgStatuses": "All IG Statuses"
+      "allIgStatuses": "All IG Statuses",
+      "pendingDeletion": "Pending deletion"
     },
     "table": {
       "name": "Name",
@@ -1362,6 +1363,21 @@
       "title": "Timeline",
       "joined": "Joined",
       "updated": "Updated"
+    },
+    "restore": {
+      "bannerTitle": "This creator asked for their account to be deleted",
+      "bannerBody": "Requested on {date}. Reason given: {reason}. Their sign-in is blocked and every device was signed out, but nothing has been erased — the profile, media kit, subscription and campaign history are all intact.",
+      "bannerWindow": "Recoverable until {date} ({days} days left), after which it should be permanently deleted.",
+      "bannerExpired": "The 30-day window has passed. Restoring is still possible, but check with the creator before you do.",
+      "noReason": "none given",
+      "superAdminOnly": "Only a super admin can restore an account.",
+      "button": "Restore account",
+      "confirmTitle": "Restore this account?",
+      "confirmBody": "{name} will be able to sign in again and their profile becomes visible to brands. Do this only when the creator has asked for it — they chose to delete the account.",
+      "confirmAction": "Restore",
+      "doneEmailed": "Account restored. We emailed the creator to tell them.",
+      "doneNoEmail": "Account restored. We have no email address for this creator, so tell them yourself — they cannot sign in until they know.",
+      "doneEmailFailed": "Account restored, but the notification email failed to send. Tell the creator yourself."
     }
   },
   "DashboardInfluencersIdChangePlan": {
