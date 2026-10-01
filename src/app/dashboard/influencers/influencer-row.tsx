@@ -6,6 +6,7 @@ import { formatStatus } from "@/lib/format";
 import { Avatar } from "@/components/avatar";
 import { InstagramLink } from "@/components/instagram-link";
 import type { IgStatus } from "@/lib/instagram-status";
+import { ListCard } from "@/components/mobile/list-card";
 
 const IG_STATUS_STYLE: Record<IgStatus, string> = {
   authorized: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
@@ -33,15 +34,77 @@ interface Influencer {
   igStatus: IgStatus;
 }
 
+// Same rule as the consumer app's brand-side cards: /kit/<handle> 404s
+// unless the creator has published their kit.
+function mediaKitUrlOf(inf: Influencer) {
+  const handle = inf.instagram_handle || inf.username;
+  return inf.media_kit_published && handle ? `https://rgossips.com/kit/${encodeURIComponent(handle)}` : null;
+}
+
+// Phone-width twin of InfluencerRow. A seven-column table is unreadable on a
+// phone, so the same fields stack into a card; both live in this file so a
+// change to one is a change in front of the other.
+export function InfluencerCard({ inf, phone }: { inf: Influencer; phone?: string | null }) {
+  const t = useTranslations("DashboardInfluencersInfluencerRow");
+  const tIg = useTranslations("DashboardInfluencers.igStatus");
+  const mediaKitUrl = mediaKitUrlOf(inf);
+  const status = inf.status;
+
+  return (
+    <ListCard
+      href={`/dashboard/influencers/${inf.influencer_id}`}
+      leading={<Avatar src={inf.profile_photo_url} name={inf.full_name} size="sm" shape="circle" />}
+      title={inf.full_name || "—"}
+      subtitle={inf.instagram_handle || inf.username ? `@${inf.instagram_handle || inf.username}` : undefined}
+      badges={
+        <>
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              status === "active"
+                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                : status === "suspended"
+                ? "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                : status === "pending_deletion"
+                ? "bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            {formatStatus(status, t("unknown"))}
+          </span>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${IG_STATUS_STYLE[inf.igStatus]}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${IG_STATUS_DOT[inf.igStatus]}`} />
+            {tIg(inf.igStatus)}
+          </span>
+          {mediaKitUrl && (
+            <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300">
+              {t("viewMediaKit")}
+            </span>
+          )}
+        </>
+      }
+      facts={[
+        { label: t("followersLabel"), value: inf.followers_count?.toLocaleString() ?? "—" },
+        {
+          label: t("phoneLabel"),
+          // tel: stays tappable — the one thing an admin genuinely does from
+          // a phone. It sits outside the card's Link via ListCard's actions
+          // slot? No: a nested anchor would be invalid, so show it as text
+          // and let the detail page own the call action.
+          value: phone ? (phone.startsWith("+") ? phone : `+${phone}`) : "—",
+        },
+        ...(inf.categories && inf.categories.length > 0
+          ? [{ label: t("categoriesLabel"), value: inf.categories.slice(0, 3).join(", ") + (inf.categories.length > 3 ? ` +${inf.categories.length - 3}` : "") }]
+          : []),
+      ]}
+    />
+  );
+}
+
 export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string | null }) {
   const t = useTranslations("DashboardInfluencersInfluencerRow");
   const tIg = useTranslations("DashboardInfluencers.igStatus");
   const status = inf.status;
-  // Same rule as the consumer app's brand-side cards: /kit/<handle> 404s
-  // unless the creator has published their kit.
-  const kitHandle = inf.instagram_handle || inf.username;
-  const mediaKitUrl =
-    inf.media_kit_published && kitHandle ? `https://rgossips.com/kit/${encodeURIComponent(kitHandle)}` : null;
+  const mediaKitUrl = mediaKitUrlOf(inf);
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">

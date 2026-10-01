@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { FilterBar } from "@/components/filter-bar";
-import { InfluencerRow } from "./influencer-row";
+import { InfluencerRow, InfluencerCard } from "./influencer-row";
+import { CardList, CardListItem } from "@/components/mobile/list-card";
 import { InviteInfluencerForm } from "./invite-influencer-form";
 import { InvitedInfluencerRow } from "./invited-influencer-row";
 import { RefreshButton } from "@/components/refresh-button";
@@ -166,7 +167,23 @@ export default async function InfluencersPage({
         <>
           <FilterBar fields={filterFields} />
           {error && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">{t("failedToLoadInfluencers", { message: error.message })}</div>}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+          {/* Phones get cards; the table is a desktop affordance. Same rows,
+              same order, same page — see components/mobile/list-card.tsx. */}
+          <CardList>
+            {influencers.length > 0 ? (
+              influencers.map((inf) => (
+                <CardListItem key={inf.influencer_id}>
+                  <InfluencerCard inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />
+                </CardListItem>
+              ))
+            ) : (
+              <li className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-700">
+                {t("noRegisteredInfluencers")}
+              </li>
+            )}
+          </CardList>
+
+          <div className="hidden lg:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
             <table className="w-full min-w-180">
               <thead>

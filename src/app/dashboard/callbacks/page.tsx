@@ -146,7 +146,70 @@ export default async function CallbacksPage({
       )}
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+          {/* Phones: cards. Calling the person back and marking it done are
+              both one tap, which is the whole job on this page. */}
+          <ul className="space-y-3 p-3 lg:hidden">
+            {rows.length === 0 ? (
+              <li className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-700">
+                {t("empty")}
+              </li>
+            ) : (
+              rows.map((r) => {
+                const name = namesById[r.user_id] || t("unknownName");
+                const dt = formatDate(r.created_at);
+                const isOpen = r.status === "open";
+                return (
+                  <li key={r.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{name}</p>
+                        <p className="mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">{r.topic || "—"}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${isOpen ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}
+                      >
+                        {isOpen ? t("status.open") : t("status.done")}
+                      </span>
+                    </div>
+
+                    {r.user_role && (
+                      <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${ROLE_BADGE[r.user_role] || "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>
+                        {r.user_role === "influencer" ? t("role.influencer") : r.user_role === "brand" ? t("role.brand") : r.user_role}
+                      </span>
+                    )}
+
+                    <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                      <div>
+                        <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.phone")}</dt>
+                        <dd className="mt-0.5">
+                          {r.phone ? (
+                            <a href={`tel:${r.phone.replace(/[^d+]/g, "")}`} className="font-mono text-[13px] font-semibold text-indigo-600 dark:text-indigo-400">
+                              {r.phone}
+                            </a>
+                          ) : (
+                            <span className="text-[13px] text-gray-400">—</span>
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.preferredTime")}</dt>
+                        <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">{r.preferred_time || "—"}</dd>
+                      </div>
+                    </dl>
+
+                    {r.notes && <p className="mt-2 break-words text-[12px] text-gray-600 dark:text-gray-300">{r.notes}</p>}
+
+                    <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
+                      <span className="text-[11px] text-gray-400">{dt.day} · {dt.time}</span>
+                      <StatusToggle id={r.id} status={r.status} canWrite={canWrite} />
+                    </div>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full min-w-200">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">

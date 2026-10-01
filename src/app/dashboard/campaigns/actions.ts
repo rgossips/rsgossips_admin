@@ -6,6 +6,7 @@ import { adminGate, superAdminGate, requireAdmin } from "@/lib/require-super-adm
 import { notifyUser } from "@/lib/notify";
 import { auditLog } from "@/lib/rate-limit";
 import { clampLen } from "@/lib/validation";
+import { sendAdminApplicationStatusEmails } from "@/lib/application-emails";
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ error?: string; url?: string }> {
   const gate = await adminGate();
@@ -264,7 +265,9 @@ export async function updateApplicationStatus(
   // shouldn't push the creator a second time.
   const { data: application } = await adminClient
     .from("campaign_applications")
-    .select("influencer_id, campaign_id, status, campaigns(title)")
+    .select(
+      "influencer_id, campaign_id, status, campaigns(title, brand_id, brand_profiles(brand_name), brand_invitations(brand_name)), influencer_profiles(full_name, username, instagram_handle)",
+    )
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -290,6 +293,32 @@ export async function updateApplicationStatus(
       },
       "application-status",
     );
+  }
+
+  // Email BOTH sides: an admin changed this, so neither of them did it and
+  // neither knows. The creator also gets an in-app push above; the brand has
+  // no notification reader in this portal, so email is all they get.
+  // Best-effort — the decision is committed either way.
+  if (application && application.status !== newStatus) {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const camp = (application as any).campaigns;
+    const creator = (application as any).influencer_profiles;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    await sendAdminApplicationStatusEmails({
+      status: newStatus,
+      campaignId: application.campaign_id,
+      campaignTitle: camp?.title || "your campaign",
+      creatorUserId: application.influencer_id,
+      // An admin-created campaign belongs to a brand_invitations row, which has
+      // no account and therefore nobody to email.
+      brandUserId: camp?.brand_id || null,
+      creatorName:
+        creator?.full_name ||
+        creator?.username ||
+        (creator?.instagram_handle ? `@${creator.instagram_handle}` : "A creator"),
+      brandName: camp?.brand_profiles?.brand_name || camp?.brand_invitations?.brand_name || "The brand",
+      reason: newStatus === "revision_needed" ? revisionNote || null : rejectionReason || null,
+    });
   }
 
   revalidatePath("/dashboard/campaigns");

@@ -2,6 +2,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { FilterBar } from "@/components/filter-bar";
 import { RefreshButton } from "@/components/refresh-button";
 import { getTranslations } from "next-intl/server";
+import { ListCard } from "@/components/mobile/list-card";
 
 export default async function LeadsPage({
   searchParams,
@@ -85,7 +86,49 @@ export default async function LeadsPage({
       </div>
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Phones: cards. The phone number stays a tel: link — ringing a
+            lead back is the entire purpose of this page, and the one thing
+            genuinely better on a phone than a desktop. */}
+        <ul className="space-y-3 p-3 lg:hidden">
+          {leads && leads.length > 0 ? (
+            leads.map((lead: { phone: string; role_attempted: string | null; source: string | null; attempts: number | null; last_attempt_at: string | null; created_at: string | null }) => (
+              <li key={lead.phone}>
+                <ListCard
+                  title={
+                    <a href={`tel:+${lead.phone}`} className="font-mono text-indigo-600 hover:underline dark:text-indigo-400">
+                      {formatPhone(lead.phone)}
+                    </a>
+                  }
+                  badges={
+                    <>
+                      {lead.role_attempted && (
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${roleBadge[lead.role_attempted] || "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}>
+                          {lead.role_attempted}
+                        </span>
+                      )}
+                      {lead.source && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] capitalize bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                          {lead.source.replace(/_/g, " ")}
+                        </span>
+                      )}
+                    </>
+                  }
+                  facts={[
+                    { label: t("columns.attempts"), value: lead.attempts ?? "—" },
+                    { label: t("columns.lastAttempt"), value: formatDate(lead.last_attempt_at) },
+                    { label: t("columns.firstSeen"), value: formatDate(lead.created_at) },
+                  ]}
+                />
+              </li>
+            ))
+          ) : (
+            <li className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-700">
+              {t("empty")}
+            </li>
+          )}
+        </ul>
+
+        <div className="hidden lg:block overflow-x-auto">
         <table className="w-full min-w-180">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">

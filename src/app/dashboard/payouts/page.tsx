@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { MarkPaidForm } from "./_components/mark-paid-form";
 import { FixPayoutDetails } from "./_components/fix-payout-details";
+import { BarterDeliveries } from "./_components/barter-deliveries";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +127,10 @@ export default async function PayoutsPage({
           {t("subtitle")}
         </p>
       </div>
+
+      {/* Product owed, not money owed — same job, so it lives here. Renders
+          nothing when every barter delivery is settled. */}
+      <BarterDeliveries />
 
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">

@@ -15,6 +15,7 @@ import {
   VALID_BILLING_CYCLES,
   VALID_PLAN_KEYS,
 } from "@/lib/subscription-plans";
+import { ListCard } from "@/components/mobile/list-card";
 
 const PAGE_SIZE = 25;
 // PostgREST caps a page at 1000 rows — the stats scan pages past it.
@@ -234,7 +235,69 @@ export default async function SubscriptionsPage({
       )}
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Cards on phones. Same derived values as the row below — tier,
+            cycle, phone and IAP state are computed per row in both. */}
+        <ul className="space-y-3 p-3 lg:hidden">
+          {rows.length > 0 ? (
+            rows.map((r) => {
+              const tier = SUBSCRIPTION_TIERS.find((x) => x.key === r.subscription_plan);
+              const cycleKey = r.billing_cycle && VALID_BILLING_CYCLES.has(r.billing_cycle) ? (r.billing_cycle as (typeof BILLING_CYCLES)[number]) : null;
+              const phone = phoneMap.get(r.influencer_id);
+              const iap = iapMap.get(r.influencer_id);
+              const handle = r.instagram_handle || r.username;
+              return (
+                <li key={r.influencer_id}>
+                  <ListCard
+                    href={`/dashboard/influencers/${r.influencer_id}`}
+                    leading={<Avatar src={r.profile_photo_url} name={r.full_name} size="sm" shape="circle" />}
+                    title={r.full_name || t("unnamed")}
+                    subtitle={handle ? `@${handle}` : undefined}
+                    badges={
+                      <>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${PLAN_BADGE_CLASS[r.subscription_plan] || ""}`}>
+                          {PLAN_LABEL[r.subscription_plan] || r.subscription_plan}
+                        </span>
+                        {cycleKey && (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                            {t(`cycle.${cycleKey}`)}{tier ? ` · ${tier.pricing[cycleKey]}` : ""}
+                          </span>
+                        )}
+                        {!iap && r.auto_renew === false && (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            {r.plan_expires_at ? t("autoRenewOffUntil", { date: fmtDate(r.plan_expires_at) }) : t("autoRenewOff")}
+                          </span>
+                        )}
+                      </>
+                    }
+                    facts={[
+                      { label: t("table.contact"), value: <>{r.email || "—"}<span className="block text-[12px] text-gray-400">{phone ? (phone.startsWith("+") ? phone : `+${phone}`) : "—"}</span></> },
+                      {
+                        label: t("table.source"),
+                        value: (
+                          <>
+                            {sourceLabel(r.payment_gateway)}
+                            {iap && (
+                              <span className="block text-[11px] text-gray-400">
+                                {t("iapStatus", { status: iap.status || "unknown", date: fmtDate(iap.expires_at), renewing: iap.auto_renewing && iap.status === "active" ? "yes" : "no" })}
+                              </span>
+                            )}
+                          </>
+                        ),
+                      },
+                      { label: t("table.joined"), value: fmtDate(r.created_at) },
+                    ]}
+                  />
+                </li>
+              );
+            })
+          ) : (
+            <li className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-700">
+              {searchTerm || plan || cycle || source ? t("noMatches") : t("empty")}
+            </li>
+          )}
+        </ul>
+
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full min-w-180">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">

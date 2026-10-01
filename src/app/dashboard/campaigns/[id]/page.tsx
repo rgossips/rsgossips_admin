@@ -5,6 +5,7 @@ import { CampaignDetailActions } from "./detail-actions";
 import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
+import { normalizeShippingMode, type ShippingMode } from "@/lib/barter-fulfilment";
 import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
 import { CampaignReviewActions } from "./review-actions";
@@ -76,6 +77,7 @@ export default async function CampaignDetailPage({
   let bannerUrl: string | null = null;
   let galleryUrls: string[] = [];
   let engagementRate: number | null = null;
+  let shippingMode: ShippingMode = "no";
 
   const metaSeparator = description.indexOf("\n\n---\n");
   if (metaSeparator !== -1) {
@@ -86,6 +88,7 @@ export default async function CampaignDetailPage({
       bannerUrl = meta.banner_image || null;
       galleryUrls = meta.gallery_images || [];
       engagementRate = meta.min_engagement_rate || null;
+      shippingMode = normalizeShippingMode(meta.shipping_required);
     } catch { /* ignore */ }
   } else if (description.startsWith("{")) {
     try {
@@ -93,6 +96,7 @@ export default async function CampaignDetailPage({
       bannerUrl = meta.banner_image || null;
       galleryUrls = meta.gallery_images || [];
       engagementRate = meta.min_engagement_rate || null;
+      shippingMode = normalizeShippingMode(meta.shipping_required);
       description = "";
     } catch { /* ignore */ }
   }
@@ -212,7 +216,7 @@ export default async function CampaignDetailPage({
           )}
 
           {/* Applications */}
-          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} />
+          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} />
 
           {/* Content Deliverables */}
           {Object.keys(deliverables).length > 0 && (

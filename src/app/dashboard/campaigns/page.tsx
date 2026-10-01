@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CampaignsTable } from "./campaigns-table";
 import { CampaignFilters } from "./campaign-filters";
+import { applicationsClosedBefore } from "@/lib/campaign-deadline";
 import { RefreshButton } from "@/components/refresh-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { sanitizeSearchTerm } from "@/lib/validation";
@@ -30,12 +31,21 @@ export default async function CampaignsPage({
   if (searchTerm) {
     query = query.ilike("title", `%${searchTerm}%`);
   }
+  // Both branches share ONE cutoff with the badge — see lib/campaign-deadline.ts.
+  const closedBefore = applicationsClosedBefore();
   if (status === "apps_closed") {
     // "Applications Closed" isn't a DB status — it's active campaigns whose
     // application window has lapsed. `.lt` on a timestamp excludes NULL
-    // deadlines, so this matches the badge's rule (active + deadline in the
-    // past) exactly.
-    query = query.eq("status", "active").lt("application_deadline", new Date().toISOString());
+    // deadlines, which is right: no deadline means the window never closes.
+    query = query.eq("status", "active").lt("application_deadline", closedBefore);
+  } else if (status === "active") {
+    // ...and because the dropdown offers that as a SIBLING of Active, Active
+    // has to exclude it. Otherwise picking Active listed the closed ones too
+    // (they are `status = 'active'` in the DB) and the rows came back wearing
+    // an "Applications Closed" badge — 70 of 75 of them.
+    query = query
+      .eq("status", "active")
+      .or(`application_deadline.is.null,application_deadline.gte.${closedBefore}`);
   } else if (status) {
     query = query.eq("status", status);
   }

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { formatStatus } from "@/lib/format";
+import { applicationsClosed } from "@/lib/campaign-deadline";
 import { useRouter } from "next/navigation";
 import { deleteCampaigns, reviewCampaign } from "./actions";
 import { RejectCampaignModal } from "./reject-campaign-modal";
@@ -192,7 +193,27 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
         <div className="p-3 mb-3 rounded-xl bg-red-50 dark:bg-red-900/30 text-red-600 text-sm">{error}</div>
       )}
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+      {/* Phones get cards. The bulk-select bar above works with both. */}
+      <div className="space-y-3 lg:hidden">
+        {campaigns.length > 0 ? (
+          campaigns.map((campaign) => (
+            <Row
+              key={campaign.campaign_id}
+              campaign={campaign}
+              showCheck={showChecks}
+              checked={selected.has(campaign.campaign_id)}
+              onToggle={() => toggleOne(campaign.campaign_id)}
+              variant="card"
+            />
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-700">
+            {t("empty.title")}
+          </div>
+        )}
+      </div>
+
+      <div className="hidden lg:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
         <table className="w-full min-w-180">
           <thead>
@@ -255,21 +276,88 @@ function Row({
   showCheck,
   checked,
   onToggle,
+  variant = "row",
 }: {
   campaign: Campaign;
   showCheck: boolean;
   checked: boolean;
   onToggle: () => void;
+  variant?: "row" | "card";
 }) {
   const t = useTranslations("DashboardCampaignsCampaignsTable");
   const brandName = campaign.brand_profiles?.brand_name || campaign.brand_invitations?.brand_name || "—";
   const status = campaign.status || "draft";
   // DB-status "active" with a lapsed application deadline gets its own
   // display status — creators can no longer apply, "active" misleads ops.
-  const appsClosed =
-    status === "active" &&
-    !!campaign.application_deadline &&
-    new Date(campaign.application_deadline).getTime() < Date.now();
+  // The rule lives in lib/campaign-deadline.ts so the status filter cannot
+  // disagree with this badge, and neither can disagree with the creator app.
+  const appsClosed = applicationsClosed(status, campaign.application_deadline);
+
+  const statusBadge = (
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${appsClosed ? statusColors.apps_closed : statusColors[status] || statusColors.draft}`}>
+      {appsClosed ? t("statusApplicationsClosed") : status === "under_review" ? t("statusUnderReview") : formatStatus(status)}
+    </span>
+  );
+
+  if (variant === "card") {
+    return (
+      <div className={`rounded-2xl border p-4 ${checked ? "border-indigo-300 bg-indigo-50/40 dark:border-indigo-700 dark:bg-indigo-900/10" : "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"}`}>
+        <div className="flex items-start gap-3">
+          {showCheck && (
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={onToggle}
+              aria-label={t("selectRow", { title: campaign.title || t("campaignFallback") })}
+              className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <Link href={`/dashboard/campaigns/${campaign.campaign_id}`} className="block text-sm font-semibold text-gray-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
+              {campaign.title || "—"}
+            </Link>
+            <p className="mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
+              {brandName}
+              {campaign.brand_invitation_id && !campaign.brand_id && (
+                <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">{t("invited")}</span>
+              )}
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {statusBadge}
+              {campaign.target_categories?.slice(0, 2).map((cat) => (
+                <span key={cat} className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">{cat}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.slots")}</dt>
+            <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">{campaign.max_influencers ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.dates")}</dt>
+            <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">
+              {formatDate(campaign.campaign_start_date)}
+              {campaign.campaign_end_date && (
+                <span className="block text-[11px] text-gray-400">{t("dateRangeTo", { date: formatDate(campaign.campaign_end_date) })}</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+
+        {/* Approve/reject must be reachable on a phone — it is the one thing
+            an admin opens the campaigns list to do. */}
+        {status === "under_review" && (
+          <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+            <ReviewButtons campaignId={campaign.campaign_id} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <tr className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${checked ? "bg-indigo-50/40 dark:bg-indigo-900/10" : ""}`}>
       {showCheck && (

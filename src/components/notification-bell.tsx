@@ -7,7 +7,7 @@ import { getAwaitingActionFeed } from "@/app/dashboard/ops-actions";
 
 interface Notification {
   id: string;
-  type: "quote_request" | "submission" | "application" | "campaign_review" | "brand_verification" | "payout_due";
+  type: "quote_request" | "submission" | "application" | "campaign_review" | "brand_verification" | "payout_due" | "delivery_stalled";
   title: string;
   subtitle: string;
   href: string;
@@ -136,6 +136,22 @@ export function NotificationBell() {
           });
         }
 
+        // Barter product that never landed. Two different problems, so two
+        // different lines: the creator told us it didn't arrive, or they went
+        // quiet past the date it should have.
+        for (const d of feed.deliveries ?? []) {
+          items.push({
+            id: `delivery-${d.id}`,
+            type: "delivery_stalled",
+            title: d.received === false ? t("deliveryNotReceived") : t("deliveryUnconfirmed"),
+            subtitle: [d.creator_name, d.campaign_title].filter(Boolean).join(" · ") || t("campaignFallback"),
+            href: `/dashboard/campaigns/${d.campaign_id}`,
+            // The date it was due, so the longest-stalled sorts up with the
+            // other overdue items.
+            time: d.expected_at || "",
+          });
+        }
+
         items.sort((a, b) => parseTimestamp(b.time) - parseTimestamp(a.time));
 
         if (!cancelled) {
@@ -232,6 +248,8 @@ export function NotificationBell() {
                       ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400"
                       : n.type === "payout_due"
                       ? "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400"
+                      : n.type === "delivery_stalled"
+                      ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
                       : "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
                   }`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,6 +259,9 @@ export function NotificationBell() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       ) : n.type === "payout_due" ? (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      ) : n.type === "delivery_stalled" ? (
+                        // A parcel.
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       ) : n.type === "brand_verification" ? (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       ) : (

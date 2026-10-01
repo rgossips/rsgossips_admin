@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { FilterBar } from "@/components/filter-bar";
 import { BrandRow } from "./brand-row";
+import { CardList, CardListItem } from "@/components/mobile/list-card";
 import { AddBrandForm } from "./add-brand-form";
 import { InvitedBrandRow } from "./invited-brand-row";
 import { RefreshButton } from "@/components/refresh-button";
@@ -133,7 +134,22 @@ export default async function BrandsPage({
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+          {/* Cards on phones, table from lg up. */}
+          <CardList>
+            {brands && brands.length > 0 ? (
+              brands.map((brand) => (
+                <CardListItem key={brand.brand_id}>
+                  <BrandRow brand={brand} variant="card" />
+                </CardListItem>
+              ))
+            ) : (
+              <li className="rounded-2xl border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-700">
+                {t("noRegisteredBrands")}
+              </li>
+            )}
+          </CardList>
+
+          <div className="hidden lg:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
             <table className="w-full min-w-180">
               <thead>

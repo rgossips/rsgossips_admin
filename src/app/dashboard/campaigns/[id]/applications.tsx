@@ -11,6 +11,8 @@ import { useRole } from "@/components/role-context";
 import { ExportApplicantsButton } from "./export-applicants-button";
 import { APPLICATION_STATUS_BADGE } from "@/lib/application-status";
 import { InstagramLink } from "@/components/instagram-link";
+import { FulfilmentPanel } from "./fulfilment-panel";
+import type { ShippingMode } from "@/lib/barter-fulfilment";
 
 interface Application {
   id: string;
@@ -24,6 +26,18 @@ interface Application {
   rejection_reason: string | null;
   submission_links: Array<{ url: string; type: string; label: string }> | null;
   created_at: string;
+  // Barter fulfilment (rgossips_web migration 076). The page selects *, so
+  // these arrive without widening the query.
+  shipping_address: string | null;
+  shipping_address_updated_at: string | null;
+  shipping_address_requested_at: string | null;
+  shipping_tracking_url: string | null;
+  shipping_carrier: string | null;
+  shipping_tracking_added_at: string | null;
+  shipping_expected_at: string | null;
+  product_received: boolean | null;
+  product_received_at: string | null;
+  product_feedback: string | null;
   influencer_profiles: {
     full_name: string | null;
     username: string | null;
@@ -56,10 +70,13 @@ export function ApplicationsList({
   applications,
   budgetPerInfluencer,
   campaignType,
+  shippingMode,
 }: {
   campaignId: string;
   applications: Application[];
   budgetPerInfluencer: number;
+  // From the campaign's description trailer: does anything physical move?
+  shippingMode: ShippingMode;
   // "barter" | "paid" | "hybrid" — barter pays nothing, so its approval flow
   // has no amount, no escrow and no payout downstream.
   campaignType: string;
@@ -90,14 +107,14 @@ export function ApplicationsList({
       </div>
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
         {applications.map((app) => (
-          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} isBarter={campaignType === "barter"} />
+          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} isBarter={campaignType === "barter"} shippingMode={shippingMode} />
         ))}
       </div>
     </div>
   );
 }
 
-function ApplicationRow({ application, budgetPerInfluencer, isBarter }: { application: Application; budgetPerInfluencer: number; isBarter: boolean }) {
+function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMode }: { application: Application; budgetPerInfluencer: number; isBarter: boolean; shippingMode: ShippingMode }) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   const router = useRouter();
   const { isAdmin } = useRole();
@@ -422,6 +439,12 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter }: { applic
       )}
 
       {/* ====== SUBMISSION REVIEW (when influencer submits deliverables) ====== */}
+      {/* Delivery — only for a campaign that actually ships or is collected.
+          Hidden for pending/rejected rows: nothing moves until someone is in. */}
+      {shippingMode !== "no" && !["pending", "rejected", "withdrawn"].includes(application.status) && (
+        <FulfilmentPanel application={application} shippingMode={shippingMode} />
+      )}
+
       {application.submission_links && application.submission_links.length > 0 && ["submitted", "revision_needed", "accepted", "live_submitted", "payment", "completed"].includes(application.status) && (
         <div className="mt-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-900/30 overflow-hidden">
           <div className="px-5 py-4 border-b border-purple-100 dark:border-purple-800/30 flex items-center gap-2.5">
@@ -471,13 +494,24 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter }: { applic
             </div>
           )}
 
-          {/* Live Links Submitted: Release Payment / Need Revision / Reject */}
+          {/* Live links submitted. A barter deal has no money in it, so there
+              is nothing to release: approving the links IS the completion,
+              and the next thing owed is the product, not a payout. A paid
+              campaign still goes live_submitted -> payment -> completed. */}
           {isAdmin && application.status === "live_submitted" && !showRevision && (
             <div className="px-4 pb-4 flex flex-wrap gap-2">
-              <button onClick={() => handleAction("payment")} disabled={loading}
-                className={`${btnBase} bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100`}>
-                {loading ? <ButtonSpinner /> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                {t("releasePayment")}
+              <button onClick={() => handleAction(isBarter ? "completed" : "payment")} disabled={loading}
+                className={`${btnBase} ${
+                  isBarter
+                    ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100"
+                    : "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100"
+                }`}>
+                {loading ? <ButtonSpinner /> : isBarter ? (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+                {isBarter ? t("approveLinks") : t("releasePayment")}
               </button>
               <button onClick={() => { setShowRevision(true); setShowReject(false); }} disabled={loading}
                 className={`${btnBase} bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100`}>

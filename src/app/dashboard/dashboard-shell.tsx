@@ -37,8 +37,10 @@ export function DashboardShell({
             userEmail={userEmail}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           />
-          {/* pb-24 on mobile clears the fixed bottom-nav; desktop unchanged. */}
-          <main className="p-6 pb-24 lg:pb-6">{children}</main>
+          {/* p-4 on phones: 24px of gutter each side spends 48px of a 360px
+              screen on nothing. pb-24 clears the fixed bottom-nav; desktop
+              spacing is unchanged. */}
+          <main className="p-4 pb-24 sm:p-6 lg:pb-6">{children}</main>
           <BottomNav />
         </div>
       </div>

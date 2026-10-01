@@ -828,7 +828,9 @@
     "downloadExcel": "Download Excel",
     "downloadExcelTitle": "Download the applicant list as an Excel file",
     "exporting": "Preparing…",
-    "exportFailed": "Couldn't export the applicant list. Please try again."
+    "exportFailed": "Couldn't export the applicant list. Please try again.",
+    "approveLinks": "Approve & complete",
+    "barterCompletedNext": "Approved. Add the delivery tracking below once the product ships."
   },
   "DashboardSubscriptions": {
     "title": "Subscriptions",
@@ -1454,7 +1456,10 @@
     "unknown": "unknown",
     "processing": "Processing...",
     "suspend": "Suspend",
-    "reactivate": "Reactivate"
+    "reactivate": "Reactivate",
+    "followersLabel": "Followers",
+    "phoneLabel": "Contact Number",
+    "categoriesLabel": "Categories"
   },
   "DashboardInfluencersInviteInfluencerForm": {
     "tags": "Tags",
@@ -2003,7 +2008,9 @@
     "campaignAwaitingApproval": "Campaign awaiting approval",
     "brandAwaitingVerification": "Brand awaiting verification",
     "payoutDue": "Payout due",
-    "brandFallback": "Brand"
+    "brandFallback": "Brand",
+    "deliveryUnconfirmed": "Delivery unconfirmed",
+    "deliveryNotReceived": "Product never arrived"
   },
   "Pagination": {
     "showing": "Showing <b>{range}</b> of <b>{count}</b>",

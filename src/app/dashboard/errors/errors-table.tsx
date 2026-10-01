@@ -160,7 +160,26 @@ export function ErrorsTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
+      {/* Phones: one card per error. Triage (select + mark addressed) is the
+          point of this page, so both controls come along rather than being
+          desktop-only. */}
+      <ul className="space-y-2.5 lg:hidden">
+        {rows.map((r) => (
+          <ErrorCard
+            key={r.id}
+            row={r}
+            statusLive={statusLive}
+            user={r.user_id ? users[r.user_id] : undefined}
+            checked={selected.has(r.id)}
+            busy={busyIds.has(r.id)}
+            disabled={pending}
+            onToggle={toggleOne}
+            onSetStatus={apply}
+          />
+        ))}
+      </ul>
+
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
         <table className="w-full min-w-[980px] text-left text-[12px]">
           <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400 dark:bg-gray-900">
             <tr>
@@ -212,6 +231,115 @@ export function ErrorsTable({
         </table>
       </div>
     </div>
+  );
+}
+
+// Module scope, same reason as ErrorTableRow below: a component declared
+// inside ErrorsTable is a new identity on every selection change, which
+// remounts every card.
+function ErrorCard({
+  row: r,
+  statusLive,
+  user,
+  checked,
+  busy,
+  disabled,
+  onToggle,
+  onSetStatus,
+}: {
+  row: ErrorRow;
+  statusLive: boolean;
+  user?: ErrorUser;
+  checked: boolean;
+  busy: boolean;
+  disabled: boolean;
+  onToggle: (id: string) => void;
+  onSetStatus: (ids: string[], status: "open" | "addressed") => void;
+}) {
+  const addressed = r.status === "addressed";
+  return (
+    <li
+      className={`rounded-2xl border p-3.5 ${
+        checked
+          ? "border-indigo-300 bg-indigo-50/60 dark:border-indigo-700 dark:bg-indigo-950/30"
+          : "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+      } ${addressed && !checked ? "opacity-60" : ""}`}
+    >
+      <div className="flex items-start gap-2.5">
+        {statusLive && (
+          <input
+            type="checkbox"
+            aria-label={`Select error ${r.event}`}
+            className={checkboxClass + " mt-1 shrink-0"}
+            checked={checked}
+            disabled={disabled}
+            onChange={() => onToggle(r.id)}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_STYLE[r.severity] || "border-gray-200 bg-gray-50 text-gray-600"}`}>
+              {r.severity}
+            </span>
+            <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">{r.area}</span>
+            {statusLive && (
+              <span
+                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                  addressed
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300"
+                    : "border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                }`}
+              >
+                {addressed ? "Addressed" : "Open"}
+              </span>
+            )}
+            <span className="ml-auto text-[10px] text-gray-400">{fmtTime(r.occurred_at)}</span>
+          </div>
+
+          <p className="mt-1.5 font-mono text-[11px] text-gray-600 dark:text-gray-300">{r.event}</p>
+          <p className="mt-1 break-words text-[12px] text-gray-800 dark:text-gray-200">{r.message || "—"}</p>
+
+          <p className="mt-1.5 text-[10px] text-gray-400">
+            {r.source}
+            {r.status_code ? ` · ${r.status_code}` : ""}
+            {(r.fn || r.path) && <span className="font-mono opacity-70"> · {r.fn || r.path}</span>}
+          </p>
+
+          {r.user_id && (
+            <p className="mt-1 text-[10px]">
+              {user ? (
+                <Link href={user.href} className="break-all font-mono text-indigo-600 hover:underline dark:text-indigo-400">
+                  {user.name ? `${user.name} · ` : ""}{r.user_id}
+                </Link>
+              ) : (
+                <span className="break-all font-mono text-gray-400">{r.user_id}</span>
+              )}
+            </p>
+          )}
+
+          {(r.stack || (r.context && Object.keys(r.context).length > 0)) && (
+            <details className="mt-1.5">
+              <summary className="cursor-pointer text-[11px] text-gray-400">details</summary>
+              {r.context && Object.keys(r.context).length > 0 && (
+                <pre className="mt-1 overflow-x-auto rounded bg-gray-50 p-2 text-[10px] dark:bg-gray-800">{JSON.stringify(r.context, null, 2)}</pre>
+              )}
+              {r.stack && <pre className="mt-1 overflow-x-auto rounded bg-gray-50 p-2 text-[10px] dark:bg-gray-800">{r.stack}</pre>}
+            </details>
+          )}
+
+          {statusLive && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onSetStatus([r.id], addressed ? "open" : "addressed")}
+              className="mt-2 cursor-pointer text-[11px] font-semibold text-indigo-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50 dark:text-indigo-400"
+            >
+              {busy ? "Saving…" : addressed ? "Reopen" : "Mark addressed"}
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 

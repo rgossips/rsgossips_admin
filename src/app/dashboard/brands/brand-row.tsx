@@ -10,6 +10,7 @@ import { ButtonSpinner } from "@/components/spinner";
 import { useRole } from "@/components/role-context";
 import { BrandTypeBadge } from "@/components/brand-type-badge";
 import { toBrandAccountType } from "@/lib/brand-account-type";
+import { ListCard } from "@/components/mobile/list-card";
 
 interface Brand {
   brand_id: string;
@@ -21,7 +22,11 @@ interface Brand {
   account_type?: string | null;
 }
 
-export function BrandRow({ brand }: { brand: Brand }) {
+// One component, two shapes. The verification buttons own real state
+// (optimistic status, per-action spinner), so a separate card component would
+// mean two copies of handleVerification and two chances for them to diverge.
+// Only the markup branches.
+export function BrandRow({ brand, variant = "row" }: { brand: Brand; variant?: "row" | "card" }) {
   const t = useTranslations("DashboardBrandsBrandRow");
   const router = useRouter();
   const { isAdmin } = useRole();
@@ -47,6 +52,77 @@ export function BrandRow({ brand }: { brand: Brand }) {
 
   const actionBtnBase =
     "inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-lg transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border";
+
+  const logo = brand.logo_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={brand.logo_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+  ) : (
+    <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+      {brand.brand_name?.[0] || "?"}
+    </div>
+  );
+
+  const verificationBadge = (
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${statusColors[verificationStatus || "pending"] || statusColors.pending}`}>
+      {formatStatus(verificationStatus, "Pending")}
+    </span>
+  );
+
+  if (variant === "card") {
+    return (
+      <ListCard
+        leading={logo}
+        title={
+          <Link href={`/dashboard/brands/${brand.brand_id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400">
+            {brand.brand_name || "—"}
+          </Link>
+        }
+        subtitle={brand.contact_phone || undefined}
+        badges={
+          <>
+            {verificationBadge}
+            <BrandTypeBadge kind="profile" id={brand.brand_id} value={toBrandAccountType(brand.account_type)} />
+          </>
+        }
+        facts={brand.gstin ? [{ label: "GSTIN", value: <span className="font-mono text-[12px]">{brand.gstin}</span> }] : undefined}
+        // The same buttons as the desktop row, not a reduced set: verifying a
+        // brand is the whole reason an admin opens this on a phone.
+        actions={
+          isAdmin ? (
+            verificationStatus === "pending" ? (
+              <>
+                <button
+                  onClick={() => handleVerification("verified")}
+                  disabled={loading !== null}
+                  className={`${actionBtnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800`}
+                >
+                  {loading === "verified" ? <ButtonSpinner /> : null}
+                  {loading === "verified" ? "..." : t("verify")}
+                </button>
+                <button
+                  onClick={() => handleVerification("rejected")}
+                  disabled={loading !== null}
+                  className={`${actionBtnBase} bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800`}
+                >
+                  {loading === "rejected" ? <ButtonSpinner /> : null}
+                  {loading === "rejected" ? "..." : t("reject")}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleVerification("pending")}
+                disabled={loading !== null}
+                className={`${actionBtnBase} bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700`}
+              >
+                {loading ? <ButtonSpinner /> : null}
+                {loading ? "..." : t("reset")}
+              </button>
+            )
+          ) : undefined
+        }
+      />
+    );
+  }
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => router.push(`/dashboard/brands/${brand.brand_id}`)}>

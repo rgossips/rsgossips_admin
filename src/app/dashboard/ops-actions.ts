@@ -58,6 +58,10 @@ export type AwaitingActionFeed = {
   reviews: { campaign_id: string; title: string | null; created_at: string; brand_name: string | null }[];
   verifications: { brand_id: string; brand_name: string | null; created_at: string }[];
   payouts: { id: string; campaign_title: string | null; creator_name: string | null; amount_paise: number | null; release_at: string }[];
+  // Barter product owed to a creator: shipped but never confirmed, or the
+  // creator said it never came. "No address yet" is deliberately NOT here —
+  // that is chased by email from the campaign page, not a bell item.
+  deliveries: { id: string; campaign_id: string; campaign_title: string | null; creator_name: string | null; expected_at: string | null; received: boolean | null }[];
 };
 
 // Module scope: reading the clock during render trips react-hooks/purity.
@@ -68,7 +72,7 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
   if (await viewerGate()) return null;
   const admin = createAdminClient();
 
-  const [quotesRes, appsRes, reviewRes, verifyRes, payoutRes] = await Promise.all([
+  const [quotesRes, appsRes, reviewRes, verifyRes, payoutRes, deliveryRes] = await Promise.all([
     admin
       .from("service_orders")
       .select("id, order_number, service_title, status, created_at, updated_at")
@@ -105,8 +109,19 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
       .lte("payout_release_at", nowIso())
       .order("payout_release_at", { ascending: true })
       .limit(10),
+    // Barter deliveries that stalled. Both halves are filtered in SQL so the
+    // bell never loads the settled ones: dispatched and overdue with no word,
+    // or explicitly reported as not arrived.
+    admin
+      .from("campaign_applications")
+      .select("id, campaign_id, shipping_expected_at, product_received, campaigns(title), influencer_profiles(full_name, instagram_handle)")
+      .not("shipping_tracking_url", "is", null)
+      .or(`and(product_received.is.null,shipping_expected_at.lt.${nowIso()}),product_received.is.false`)
+      .order("shipping_expected_at", { ascending: true })
+      .limit(10),
   ]);
   if (payoutRes.error) logError("ops-feed", payoutRes.error, { query: "payouts" });
+  if (deliveryRes.error) logError("ops-feed", deliveryRes.error, { query: "deliveries" });
 
   if (quotesRes.error) logError("ops-feed", quotesRes.error, { query: "quotes" });
   if (verifyRes.error) logError("ops-feed", verifyRes.error, { query: "verifications" });
@@ -140,6 +155,14 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
       creator_name: p.influencer_profiles?.full_name || (p.influencer_profiles?.instagram_handle ? `@${p.influencer_profiles.instagram_handle}` : null),
       amount_paise: typeof p.escrow_amount === "number" ? p.escrow_amount : null,
       release_at: p.payout_release_at,
+    })),
+    deliveries: (deliveryRes.data || []).map((d: any) => ({
+      id: d.id,
+      campaign_id: d.campaign_id,
+      campaign_title: d.campaigns?.title ?? null,
+      creator_name: d.influencer_profiles?.full_name || (d.influencer_profiles?.instagram_handle ? `@${d.influencer_profiles.instagram_handle}` : null),
+      expected_at: d.shipping_expected_at ?? null,
+      received: typeof d.product_received === "boolean" ? d.product_received : null,
     })),
   };
   /* eslint-enable @typescript-eslint/no-explicit-any */
