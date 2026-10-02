@@ -10,6 +10,7 @@ import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
 import { CampaignReviewActions } from "./review-actions";
 import { getTranslations } from "next-intl/server";
+import { listAllAuthUsers } from "@/lib/phone-search";
 
 export default async function CampaignDetailPage({
   params,
@@ -126,6 +127,22 @@ export default async function CampaignDetailPage({
   const endDate = campaign.campaign_end_date ? new Date(campaign.campaign_end_date) : null;
   const daysRemaining = endDate ? Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
 
+  // Phones live on auth.users, not influencer_profiles, which is why this
+  // panel showed a "(from auth)" placeholder. listAllAuthUsers is cached for
+  // 120s and shared with the influencer list, so this costs nothing extra on
+  // a warm cache.
+  const applicantIds = new Set((applications || []).map((a: { influencer_id: string }) => a.influencer_id).filter(Boolean));
+  const phoneMap = new Map<string, string>();
+  if (applicantIds.size > 0) {
+    try {
+      for (const u of await listAllAuthUsers(supabase)) {
+        if (u.phone && applicantIds.has(u.id)) phoneMap.set(u.id, u.phone);
+      }
+    } catch {
+      /* no phones is a degraded panel, not a broken page */
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
@@ -216,7 +233,7 @@ export default async function CampaignDetailPage({
           )}
 
           {/* Applications */}
-          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} />
+          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} phones={Object.fromEntries(phoneMap)} />
 
           {/* Content Deliverables */}
           {Object.keys(deliverables).length > 0 && (

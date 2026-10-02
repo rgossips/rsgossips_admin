@@ -71,6 +71,7 @@ export function ApplicationsList({
   budgetPerInfluencer,
   campaignType,
   shippingMode,
+  phones = {},
 }: {
   campaignId: string;
   applications: Application[];
@@ -80,6 +81,9 @@ export function ApplicationsList({
   // "barter" | "paid" | "hybrid" — barter pays nothing, so its approval flow
   // has no amount, no escrow and no payout downstream.
   campaignType: string;
+  // influencer_id -> phone. Phones live on auth.users, never on
+  // influencer_profiles, so the page fetches them separately.
+  phones?: Record<string, string>;
 }) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   if (!applications || applications.length === 0) return null;
@@ -107,14 +111,14 @@ export function ApplicationsList({
       </div>
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
         {applications.map((app) => (
-          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} isBarter={campaignType === "barter"} shippingMode={shippingMode} />
+          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} isBarter={campaignType === "barter"} shippingMode={shippingMode} phone={phones[app.influencer_id] || null} />
         ))}
       </div>
     </div>
   );
 }
 
-function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMode }: { application: Application; budgetPerInfluencer: number; isBarter: boolean; shippingMode: ShippingMode }) {
+function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMode, phone }: { application: Application; budgetPerInfluencer: number; isBarter: boolean; shippingMode: ShippingMode; phone?: string | null }) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   const router = useRouter();
   const { isAdmin } = useRole();
@@ -305,7 +309,7 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMo
               <ProfileField icon="user" label={t("fullName")} value={inf?.full_name || t("notSet")} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <ProfileField icon="mail" label={t("email")} value={inf?.email || t("notSet")} />
-                <ProfileField icon="phone" label={t("phone")} value={t("fromAuth")} />
+                <ProfileField icon="phone" label={t("phone")} value={phone ? (phone.startsWith("+") ? phone : `+${phone}`) : t("notSet")} />
               </div>
               <ProfileField
                 icon="instagram"
@@ -441,7 +445,7 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMo
       {/* ====== SUBMISSION REVIEW (when influencer submits deliverables) ====== */}
       {/* Delivery — only for a campaign that actually ships or is collected.
           Hidden for pending/rejected rows: nothing moves until someone is in. */}
-      {shippingMode !== "no" && !["pending", "rejected", "withdrawn"].includes(application.status) && (
+      {shippingMode !== "no" && !["rejected", "withdrawn"].includes(application.status) && (
         <FulfilmentPanel application={application} shippingMode={shippingMode} />
       )}
 

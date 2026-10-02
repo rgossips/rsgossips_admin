@@ -77,6 +77,17 @@ export async function getCampaignApplicantsForExport(
     );
   }
 
+  // Mirrors lib/barter-fulfilment.ts in words a brand can read in a cell.
+  // Not imported from it: that module answers "what can an admin do next",
+  // this answers "where is the parcel", and a spreadsheet wants the latter.
+  const deliveryStatusOf = (app: { shipping_address?: string | null; shipping_tracking_url?: string | null; product_received?: boolean | null }) => {
+    if (app.product_received === true) return "Delivered";
+    if (app.product_received === false) return "Not received";
+    if (app.shipping_tracking_url) return "Shipped";
+    if (app.shipping_address) return "Ready to ship";
+    return "";
+  };
+
   const rows: ApplicantExportRow[] = (applications || []).map((app, idx) => {
     const inf = app.influencer_profiles || {};
     const handle = inf.instagram_handle || "";
@@ -96,6 +107,11 @@ export async function getCampaignApplicantsForExport(
       engagementRate: typeof inf.engagement_rate === "number" ? inf.engagement_rate : null,
       categories: Array.isArray(inf.categories) ? inf.categories.join(", ") : "",
       location,
+      // The address the creator gave at apply time. This is a home address,
+      // which is why the whole export is audit-logged.
+      deliveryAddress: app.shipping_address || "",
+      deliveryStatus: deliveryStatusOf(app),
+      trackingUrl: app.shipping_tracking_url || "",
       gender: inf.gender || "",
       plan: inf.subscription_plan || "",
       status: app.status || "",

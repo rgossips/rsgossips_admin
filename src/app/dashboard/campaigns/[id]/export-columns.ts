@@ -13,6 +13,11 @@ export type ApplicantExportRow = {
   engagementRate: number | null;
   categories: string;
   location: string;
+  // Barter fulfilment (migration 076). Empty on a campaign that ships
+  // nothing, which is most of them.
+  deliveryAddress: string;
+  deliveryStatus: string;
+  trackingUrl: string;
   gender: string;
   plan: string;
   status: string;
@@ -38,6 +43,9 @@ export const APPLICANT_EXPORT_COLUMNS: { key: keyof ApplicantExportRow; header: 
   { key: "engagementRate", header: "Engagement Rate (%)", width: 18 },
   { key: "categories", header: "Categories", width: 28 },
   { key: "location", header: "Location", width: 22 },
+  { key: "deliveryAddress", header: "Delivery Address", width: 40 },
+  { key: "deliveryStatus", header: "Delivery Status", width: 18 },
+  { key: "trackingUrl", header: "Tracking URL", width: 34 },
   { key: "gender", header: "Gender", width: 12 },
   { key: "plan", header: "Plan", width: 10 },
   { key: "status", header: "Application Status", width: 20 },
