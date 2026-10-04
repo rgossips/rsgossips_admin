@@ -127,6 +127,11 @@
         "title": "Weekly New Campaigns",
         "subtitle": "Campaign creation over the last 4 weeks"
       }
+    },
+    "callbacks": {
+      "heading": "{count, plural, one {# callback requested — someone is waiting for a call} other {# callbacks requested — people are waiting for a call}}",
+      "viewAll": "View all",
+      "topicFallback": "Support callback"
     }
   },
   "DashboardAdmins": {
@@ -2010,7 +2015,12 @@
     "payoutDue": "Payout due",
     "brandFallback": "Brand",
     "deliveryUnconfirmed": "Delivery unconfirmed",
-    "deliveryNotReceived": "Product never arrived"
+    "deliveryNotReceived": "Product never arrived",
+    "callbackRequested": "Callback requested",
+    "newApplicationOnOurCampaign": "New application on our campaign",
+    "statusChangedOnOurCampaign": "Application {status} on our campaign",
+    "markAllRead": "Mark all read",
+    "markRead": "Mark as read"
   },
   "Pagination": {
     "showing": "Showing <b>{range}</b> of <b>{count}</b>",

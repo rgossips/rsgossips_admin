@@ -90,6 +90,7 @@ async function getStats(t: (key: string, values?: Record<string, string | number
     newSubscriptionsToday,
     instagramStale,
     instagramNeverRefreshed,
+    openCallbacks,
   ] = await Promise.all([
     supabase.from("influencer_profiles").select("*", { count: "exact", head: true }),
     supabase.from("brand_profiles").select("*", { count: "exact", head: true }),
@@ -162,6 +163,14 @@ async function getStats(t: (key: string, values?: Record<string, string | number
       .is("instagram_refreshed_at", null)
       // Give a brand-new signup a day to get their first refresh in.
       .lt("created_at", new Date(Date.now() - 86_400_000).toISOString()),
+    // Somebody asked us to ring them. Highest-priority thing on this page:
+    // every other queue is work waiting, this one is a person waiting.
+    supabase
+      .from("support_callbacks")
+      .select("id, topic, topic_path, phone, preferred_time, notes, user_role, user_id, created_at")
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   // Migration 067 not applied yet → show "—", not a misleading 0. A head-only
@@ -237,6 +246,7 @@ async function getStats(t: (key: string, values?: Record<string, string | number
     newSubscriptionsToday: newSubscriptionsLive ? newSubscriptionsToday.count : null,
     instagramStale: instagramStale.error ? null : instagramStale.count ?? 0,
     instagramNeverRefreshed: instagramNeverRefreshed.error ? null : instagramNeverRefreshed.count ?? 0,
+    openCallbacks: openCallbacks.error ? [] : openCallbacks.data || [],
   };
 }
 
@@ -432,6 +442,53 @@ export default async function DashboardPage() {
         <div className="absolute right-16 -bottom-12 w-32 h-32 rounded-full bg-white/5" />
         <div className="absolute right-48 top-4 w-20 h-20 rounded-full bg-white/10" />
       </div>
+
+      {/* Callback requests. Above disputes deliberately: a dispute is money
+          sitting still, a callback is a human who asked us to telephone them
+          and is waiting for it to ring. */}
+      {stats.openCallbacks.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-800 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 bg-amber-100/60 dark:bg-amber-900/30">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-amber-700 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                {t("callbacks.heading", { count: stats.openCallbacks.length })}
+              </h3>
+            </div>
+            <a href="/dashboard/callbacks" className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline">
+              {t("callbacks.viewAll")}
+            </a>
+          </div>
+          <ul className="divide-y divide-amber-100 dark:divide-amber-900/40">
+            {stats.openCallbacks.map((c: any) => (
+              <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    {c.topic || t("callbacks.topicFallback")}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate">
+                    {[c.user_role, c.preferred_time, c.notes].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                {/* The number is the whole point — one tap to return the call. */}
+                {c.phone && (
+                  <a
+                    href={`tel:${String(c.phone).replace(/[^d+]/g, "")}`}
+                    className="shrink-0 font-mono text-sm font-bold text-amber-800 dark:text-amber-300 hover:underline"
+                  >
+                    {c.phone}
+                  </a>
+                )}
+                <span className="shrink-0 text-[10px] text-gray-500">
+                  {new Date(c.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* High-priority disputes — surfaced front and centre because brand
           escrow funds are held while these are open. */}

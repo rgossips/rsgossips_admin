@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { getAwaitingActionFeed } from "@/app/dashboard/ops-actions";
+import { getAwaitingActionFeed, markNotificationsRead } from "@/app/dashboard/ops-actions";
+import { formatStatus } from "@/lib/format";
 
 interface Notification {
   id: string;
-  type: "quote_request" | "submission" | "application" | "campaign_review" | "brand_verification" | "payout_due" | "delivery_stalled";
+  type: "quote_request" | "submission" | "application" | "campaign_review" | "brand_verification" | "payout_due" | "delivery_stalled" | "callback" | "admin_campaign_update";
   title: string;
   subtitle: string;
   href: string;
@@ -35,6 +36,11 @@ export function NotificationBell() {
   const t = useTranslations("NotificationBell");
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Dismissed items, by the bell's own synthetic id. Server-held (migration
+  // 082) so the same admin on their phone sees what they already cleared at
+  // their desk, and so one admin reading something does not clear it for
+  // everyone else.
+  const [readKeys, setReadKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -152,9 +158,39 @@ export function NotificationBell() {
           });
         }
 
+        // Somebody asked us to telephone them. Unlike everything else here,
+        // a person is sitting waiting for the phone to ring.
+        for (const c of feed.callbacks ?? []) {
+          items.push({
+            id: `callback-${c.id}`,
+            type: "callback",
+            title: t("callbackRequested"),
+            subtitle: [c.phone, c.topic, c.role].filter(Boolean).join(" · ") || t("campaignFallback"),
+            href: "/dashboard/callbacks",
+            time: c.created_at,
+          });
+        }
+
+        // Our own campaigns: there is no brand account behind them, so these
+        // changes would otherwise reach nobody at all.
+        for (const u of feed.adminCampaignUpdates ?? []) {
+          items.push({
+            id: `adminupd-${u.id}`,
+            type: "admin_campaign_update",
+            // "new -> pending" is somebody applying; everything else is a move.
+            title: !u.from_status
+              ? t("newApplicationOnOurCampaign")
+              : t("statusChangedOnOurCampaign", { status: formatStatus(u.to_status) }),
+            subtitle: [u.creator_name, u.campaign_title].filter(Boolean).join(" · ") || t("campaignFallback"),
+            href: `/dashboard/campaigns/${u.campaign_id}`,
+            time: u.created_at,
+          });
+        }
+
         items.sort((a, b) => parseTimestamp(b.time) - parseTimestamp(a.time));
 
         if (!cancelled) {
+          setReadKeys(new Set(feed.readKeys ?? []));
           setNotifications(items);
           setLoading(false);
         }
@@ -198,6 +234,17 @@ export function NotificationBell() {
     return new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
+  const unread = notifications.filter((n) => !readKeys.has(n.id));
+
+  // Optimistic: the row greys out immediately and the server catches up. A
+  // failed write just means it comes back on the next poll, which is a
+  // better outcome than blocking the click.
+  const dismiss = async (keys: string[]) => {
+    if (keys.length === 0) return;
+    setReadKeys((prev) => new Set([...prev, ...keys]));
+    await markNotificationsRead(keys).catch(() => {});
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -207,9 +254,9 @@ export function NotificationBell() {
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        {notifications.length > 0 && (
+        {unread.length > 0 && (
           <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-            {notifications.length > 9 ? "9+" : notifications.length}
+            {unread.length > 9 ? "9+" : unread.length}
           </span>
         )}
       </button>
@@ -218,7 +265,20 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden z-50">
           <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">{t("title")}</h3>
-            <span className="text-[10px] font-semibold text-gray-400">{notifications.length}</span>
+            <div className="flex items-center gap-3">
+              {unread.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => dismiss(unread.map((n) => n.id))}
+                  className="text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400 cursor-pointer"
+                >
+                  {t("markAllRead")}
+                </button>
+              )}
+              <span className="text-[10px] font-semibold text-gray-400">
+                {unread.length}/{notifications.length}
+              </span>
+            </div>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
@@ -233,11 +293,34 @@ export function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => (
-                <Link
+                <div
                   key={n.id}
+                  className={`group relative border-b border-gray-50 last:border-0 dark:border-gray-800 ${readKeys.has(n.id) ? "opacity-50" : ""}`}
+                >
+                {/* Marking one read without opening it. Outside the Link: a
+                    button inside an anchor is invalid, and on touch the two
+                    targets fight. */}
+                {!readKeys.has(n.id) && (
+                  <button
+                    type="button"
+                    aria-label={t("markRead")}
+                    title={t("markRead")}
+                    onClick={() => dismiss([n.id])}
+                    className="absolute right-2 top-2 z-10 hidden rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-600 group-hover:block dark:hover:bg-gray-800 cursor-pointer"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                )}
+                <Link
                   href={n.href}
-                  onClick={() => setOpen(false)}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-50 dark:border-gray-800 last:border-0"
+                  onClick={() => {
+                    // Opening it counts as reading it.
+                    dismiss([n.id]);
+                    setOpen(false);
+                  }}
+                  className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 >
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                     n.type === "quote_request"
@@ -250,6 +333,10 @@ export function NotificationBell() {
                       ? "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400"
                       : n.type === "delivery_stalled"
                       ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
+                      : n.type === "callback"
+                      ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                      : n.type === "admin_campaign_update"
+                      ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
                       : "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
                   }`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,6 +346,12 @@ export function NotificationBell() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       ) : n.type === "payout_due" ? (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      ) : n.type === "admin_campaign_update" ? (
+                        // A megaphone: our own campaign moved.
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                      ) : n.type === "callback" ? (
+                        // A telephone handset.
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       ) : n.type === "delivery_stalled" ? (
                         // A parcel.
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -275,6 +368,7 @@ export function NotificationBell() {
                     <p className="text-[10px] text-gray-400 mt-1">{formatTime(n.time)}</p>
                   </div>
                 </Link>
+                </div>
               ))
             )}
           </div>

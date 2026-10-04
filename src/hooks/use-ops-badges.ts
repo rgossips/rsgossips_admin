@@ -33,6 +33,7 @@ export type OpsBadges = {
   submittedDeliverables: number;
   /** Registered brands with verification_status = "pending" (Brands badge). */
   brandVerifications: number;
+  openCallbacks: number;
 };
 
 const EMPTY: OpsBadges = {
@@ -43,6 +44,7 @@ const EMPTY: OpsBadges = {
   campaignsUnderReview: 0,
   submittedDeliverables: 0,
   brandVerifications: 0,
+  openCallbacks: 0,
 };
 
 const POLL_MS = 30_000;
