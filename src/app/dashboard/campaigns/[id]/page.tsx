@@ -199,6 +199,15 @@ export default async function CampaignDetailPage({
               applicationCount={applications?.length || 0}
             />
           )}
+          {/* The second intake path. Same seats, different door. */}
+          {canWrite && (
+            <Link
+              href={`/dashboard/campaigns/${campaign.campaign_id}/sourcing`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-[13px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+            >
+              Sourcing
+            </Link>
+          )}
           <RefreshButton />
         </div>
       </div>
