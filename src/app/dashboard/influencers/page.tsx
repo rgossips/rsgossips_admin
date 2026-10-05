@@ -13,10 +13,26 @@ import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
 import { instagramStatus, type IgStatus } from "@/lib/instagram-status";
 import { getCreatorCategoryOptions } from "@/lib/creator-categories";
+import { INDIAN_CITIES } from "@/lib/cities";
+import { INDIAN_LANGUAGES } from "@/lib/languages";
+import { SUBSCRIPTION_TIERS } from "@/lib/subscription-plans";
 import { SortBar, SortLink } from "@/components/sort-controls";
 import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
 
 const BASE = "/dashboard/influencers";
+
+// Only fields with real variety on the live table get a filter. Measured
+// over 493 profiles: gender 3 values (50% filled), media_kit_published
+// 56 true / 437 false, subscription_plan 5 values, engagement_rate on every
+// row. Deliberately NOT offered: `is_verified`, `tier` and
+// `notifications_enabled` (one value each across the whole base, so the
+// control would be decoration) and `creator_type` (never populated).
+const GENDERS = ["female", "male", "non_binary", "prefer_not_to_say"] as const;
+// "paid" is the question an admin actually asks — `trial` and `free` are
+// column defaults rather than purchases (see CLAUDE.md, Subscriptions).
+const PAID_PLANS = SUBSCRIPTION_TIERS.map((tier) => tier.key as string);
+const PLAN_FILTERS = ["paid", ...PAID_PLANS, "trial", "free"] as const;
+const ER_BANDS = ["0-1", "1-3", "3-6", "6-"] as const;
 
 // Registered creators. Paginated, so the sort MUST go to PostgREST — an
 // in-memory sort would only reorder the 25 rows on the current page, which
@@ -55,6 +71,15 @@ export default async function InfluencersPage({
   const params = await searchParams;
   const { search, status, followers, category, tab, invite_page, page } = params;
   const igstatus = IG_STATUSES.includes(params.igstatus as IgStatus) ? (params.igstatus as IgStatus) : "";
+  // Each validated against its allowlist before it reaches a query.
+  const gender = (GENDERS as readonly string[]).includes(params.gender || "") ? params.gender! : "";
+  const plan = (PLAN_FILTERS as readonly string[]).includes(params.plan || "") ? params.plan! : "";
+  const mediakit = params.mediakit === "yes" || params.mediakit === "no" ? params.mediakit : "";
+  const er = (ER_BANDS as readonly string[]).includes(params.er || "") ? params.er! : "";
+  // Cities and languages come from the shared owners, so a value that isn't
+  // one of ours can't be used to build the ilike / contains below.
+  const city = INDIAN_CITIES.includes(params.city || "") ? params.city! : "";
+  const language = INDIAN_LANGUAGES.includes(params.language || "") ? params.language! : "";
   const supabase = createAdminClient();
   const activeTab = tab || "all";
   const invitePage = Math.max(1, parseInt(invite_page || "1", 10) || 1);
@@ -82,6 +107,12 @@ export default async function InfluencersPage({
     { name: "followers", label: t("filter.followers"), type: "select" as const, options: [{ label: t("filter.followersUnder1k"), value: "0-1000" }, { label: t("filter.followers1kTo10k"), value: "1000-10000" }, { label: t("filter.followers10kTo100k"), value: "10000-100000" }, { label: t("filter.followers100kPlus"), value: "100000-" }] },
     { name: "category", label: t("filter.allCategories"), type: "multiselect" as const, options: categoryOptions },
     { name: "igstatus", label: t("filter.allIgStatuses"), type: "select" as const, options: IG_STATUSES.map((s) => ({ label: t(`igStatus.${s}`), value: s })) },
+    { name: "gender", label: t("filter.allGenders"), type: "select" as const, options: GENDERS.map((g) => ({ label: t(`gender.${g}`), value: g })) },
+    { name: "plan", label: t("filter.allPlans"), type: "select" as const, options: PLAN_FILTERS.map((p) => ({ label: t(`plan.${p}`), value: p })) },
+    { name: "er", label: t("filter.allEngagement"), type: "select" as const, options: ER_BANDS.map((b) => ({ label: t(`engagement.${b}`), value: b })) },
+    { name: "city", label: t("filter.allCities"), type: "select" as const, options: INDIAN_CITIES.map((c) => ({ label: c, value: c })) },
+    { name: "language", label: t("filter.allLanguages"), type: "select" as const, options: INDIAN_LANGUAGES.map((l) => ({ label: l, value: l })) },
+    { name: "mediakit", label: t("filter.allMediaKits"), type: "select" as const, options: [{ label: t("mediakit.yes"), value: "yes" }, { label: t("mediakit.no"), value: "no" }] },
   ];
 
   // Phone numbers live on auth.users, not influencer_profiles — the map above
@@ -112,6 +143,19 @@ export default async function InfluencersPage({
   if (status) query = query.eq("status", status);
   if (followers) { const [min, max] = followers.split("-"); if (min) query = query.gte("followers_count", parseInt(min)); if (max) query = query.lte("followers_count", parseInt(max)); }
   if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
+  if (gender) query = query.eq("gender", gender);
+  if (plan) query = plan === "paid" ? query.in("subscription_plan", PAID_PLANS) : query.eq("subscription_plan", plan);
+  if (mediakit) query = query.eq("media_kit_published", mediakit === "yes");
+  // Engagement bands. `engagement_rate` is a percentage, populated on every
+  // row, and the floors match how briefs are written ("3%+ creators").
+  if (er) { const [min, max] = er.split("-"); if (min) query = query.gte("engagement_rate", Number(min)); if (max) query = query.lte("engagement_rate", Number(max)); }
+  // `location` is a comma-joined scalar, not an array (see CLAUDE.md,
+  // "Cities / location"), so this is a substring match — the same thing the
+  // consumer app's matcher does. Only 14% of profiles have one set, so this
+  // narrows hard by design: it answers "who do we have in Delhi", not
+  // "everyone except Delhi".
+  if (city) query = query.ilike("location", `%${city}%`);
+  if (language) query = query.contains("content_languages", [language]);
   // Same rules as instagramStatus(), expressed as filters so paging and the
   // count stay right. Separate .or() params are AND-ed by PostgREST.
   if (igstatus) {

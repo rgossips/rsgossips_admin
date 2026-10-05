@@ -29,6 +29,22 @@ const PAID_TIERS = SUBSCRIPTION_TIERS.map((t) => t.key as string);
 
 const BASE = "/dashboard/subscriptions";
 
+// What counts as "expiring soon". A month is the useful window: it is one
+// billing cycle for a monthly plan, so a creator in this bucket will lapse
+// before the next natural touchpoint unless someone calls them.
+const EXPIRING_SOON_DAYS = 30;
+
+const LIFECYCLES = ["renewing", "cancelled", "expiring", "expired"] as const;
+type Lifecycle = (typeof LIFECYCLES)[number];
+
+// Module scope: reading the clock during render trips react-hooks/purity.
+function nowIso() {
+  return new Date().toISOString();
+}
+function inDaysIso(days: number) {
+  return new Date(Date.now() + days * 86_400_000).toISOString();
+}
+
 // Paginated, so the sort goes to PostgREST — sorting 25 loaded rows in
 // memory would reorder the page rather than the list.
 function subscriptionSorts(label: (k: string) => string): SortOption[] {
@@ -120,6 +136,11 @@ export default async function SubscriptionsPage({
   const plan = params.plan && VALID_PLAN_KEYS.has(params.plan) ? params.plan : "";
   const cycle = params.cycle && VALID_BILLING_CYCLES.has(params.cycle) ? params.cycle : "";
   const source = params.source && ((SOURCES as readonly string[]).includes(params.source) || params.source === "none") ? params.source : "";
+  // Validated against the allowlist, like every other filter here, so the
+  // value can never reach a query as-is.
+  const lifecycle: Lifecycle | "" = LIFECYCLES.includes(params.lifecycle as Lifecycle)
+    ? (params.lifecycle as Lifecycle)
+    : "";
   const requestedPage = Math.max(1, parseInt(params.page || "1", 10) || 1);
 
   // auto_renew / plan_expires_at / subscription_cancelled_at come from
@@ -144,6 +165,28 @@ export default async function SubscriptionsPage({
       .in("subscription_plan", plan ? [plan] : PAID_TIERS);
     q = applySort(q, sort).range(from, from + PAGE_SIZE - 1);
     if (cycle) q = q.eq("billing_cycle", cycle);
+    // Lifecycle. Only applied on the withLifecycle pass — these columns
+    // arrive with migration 069 and the page probes for them, so on an
+    // un-migrated database the retry drops the filter rather than 400ing,
+    // and the field below isn't offered at all.
+    //
+    // This is the cohort the page could not surface before: a creator who
+    // paid, turned auto-renew off the same evening, and is still inside a
+    // paid window. They read as a healthy subscriber in every other view.
+    if (withLifecycle && lifecycle) {
+      if (lifecycle === "renewing") {
+        q = q.eq("auto_renew", true).is("subscription_cancelled_at", null);
+      } else if (lifecycle === "cancelled") {
+        // Either signal counts: auto_renew off, or a recorded cancellation.
+        // Separate .or() calls AND together (see CLAUDE.md), so this stays
+        // one clause.
+        q = q.or("auto_renew.is.false,subscription_cancelled_at.not.is.null");
+      } else if (lifecycle === "expiring") {
+        q = q.not("plan_expires_at", "is", null).gte("plan_expires_at", nowIso()).lte("plan_expires_at", inDaysIso(EXPIRING_SOON_DAYS));
+      } else if (lifecycle === "expired") {
+        q = q.not("plan_expires_at", "is", null).lt("plan_expires_at", nowIso());
+      }
+    }
     if (source === "none") q = q.is("payment_gateway", null);
     else if (source) q = q.eq("payment_gateway", source);
     // Sanitized above — this hand-built .or() runs on the service-role client.
@@ -214,6 +257,16 @@ export default async function SubscriptionsPage({
     { name: "plan", label: t("filter.allPlans"), type: "select" as const, options: SUBSCRIPTION_TIERS.map((tier) => ({ label: tier.label, value: tier.key })) },
     { name: "cycle", label: t("filter.allCycles"), type: "select" as const, options: BILLING_CYCLES.map((c) => ({ label: t(`cycle.${c}`), value: c })) },
     { name: "source", label: t("filter.allSources"), type: "select" as const, options: [...SOURCES.map((s) => ({ label: t(`source.${s}`), value: s })), { label: t("source.none"), value: "none" }] },
+    // Offered only once the lifecycle columns are known to exist, so the
+    // control never appears on a database that would reject it.
+    ...(lifecycleLive
+      ? [{
+          name: "lifecycle",
+          label: t("filter.allLifecycles"),
+          type: "select" as const,
+          options: LIFECYCLES.map((l) => ({ label: t(`lifecycle.${l}`), value: l })),
+        }]
+      : []),
   ];
 
   const th = "text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5";

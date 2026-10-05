@@ -224,7 +224,10 @@
       "pending": "Pending",
       "verified": "Verified",
       "rejected": "Rejected",
-      "notApplied": "Not Applied"
+      "notApplied": "Not Applied",
+      "allSources": "All sources",
+      "allGstin": "GSTIN",
+      "allInviteStatuses": "Invite status"
     },
     "tabs": {
       "all": "All",
@@ -251,6 +254,18 @@
       "verification": "Verification",
       "contactNumber": "Phone",
       "gstin": "GSTIN"
+    },
+    "source": {
+      "direct_signup": "Signed up",
+      "admin_invited": "Admin invited"
+    },
+    "gstin": {
+      "yes": "Has GSTIN",
+      "no": "No GSTIN"
+    },
+    "inviteStatus": {
+      "pending": "Not claimed",
+      "claimed": "Claimed"
     }
   },
   "DashboardBrandsAddBrandForm": {
@@ -480,6 +495,39 @@
       "slots": "Slots",
       "start": "Start date",
       "deadline": "Apply by"
+    },
+    "filter": {
+      "allTypes": "All types",
+      "allOfferings": "Product or service",
+      "allShipping": "All shipping",
+      "allGenders": "Any gender brief",
+      "allFollowers": "All follower floors",
+      "type": {
+        "barter": "Barter",
+        "paid": "Paid",
+        "hybrid": "Hybrid"
+      },
+      "offering": {
+        "product": "Product",
+        "service": "Service"
+      },
+      "shipping": {
+        "yes": "We ship it",
+        "no": "Nothing to ship",
+        "pickup": "Pickup required"
+      },
+      "gender": {
+        "any": "Open to all",
+        "male": "Male only",
+        "female": "Female only"
+      },
+      "followers": {
+        "0": "From 0",
+        "1000": "1k and up",
+        "5000": "5k and up",
+        "10000": "10k and up",
+        "100000": "100k and up"
+      }
     }
   },
   "DashboardCampaignsCampaignFilters": {
@@ -868,7 +916,8 @@
       "searchPlaceholder": "Name, handle or email…",
       "allPlans": "All plans",
       "allCycles": "All billing cycles",
-      "allSources": "All sources"
+      "allSources": "All sources",
+      "allLifecycles": "All lifecycles"
     },
     "cycle": {
       "monthly": "Monthly",
@@ -906,6 +955,12 @@
       "billing": "Billing",
       "source": "Source",
       "joined": "Joined"
+    },
+    "lifecycle": {
+      "renewing": "Auto-renewing",
+      "cancelled": "Cancelled — still active",
+      "expiring": "Expiring in 30 days",
+      "expired": "Expired"
     }
   },
   "DashboardCampaignsIdDetailActions": {
@@ -1302,7 +1357,13 @@
       "followers100kPlus": "100K+",
       "allCategories": "All Categories",
       "allIgStatuses": "All IG Statuses",
-      "pendingDeletion": "Pending deletion"
+      "pendingDeletion": "Pending deletion",
+      "allGenders": "Any gender",
+      "allPlans": "All plans",
+      "allEngagement": "Any engagement",
+      "allCities": "All cities",
+      "allLanguages": "All languages",
+      "allMediaKits": "Media kit"
     },
     "table": {
       "name": "Name",
@@ -1332,6 +1393,30 @@
       "username": "Username",
       "followers": "Followers",
       "status": "Status"
+    },
+    "gender": {
+      "female": "Female",
+      "male": "Male",
+      "non_binary": "Non-binary",
+      "prefer_not_to_say": "Not stated"
+    },
+    "plan": {
+      "paid": "Any paid plan",
+      "starter": "Starter",
+      "pro": "Pro",
+      "elite": "Elite",
+      "trial": "Trial",
+      "free": "Free"
+    },
+    "engagement": {
+      "0-1": "Under 1%",
+      "1-3": "1–3%",
+      "3-6": "3–6%",
+      "6-": "6% and up"
+    },
+    "mediakit": {
+      "yes": "Published",
+      "no": "Not published"
     }
   },
   "DashboardInfluencersBulkInviteInfluencers": {

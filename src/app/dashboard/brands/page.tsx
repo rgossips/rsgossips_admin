@@ -16,6 +16,16 @@ import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
 
 const BASE = "/dashboard/brands";
 
+// Kept short on purpose. There are SIX registered brands and 141
+// invitations, so most columns here have one value or six distinct ones —
+// a filter over that is decoration. These three earn their place: how the
+// brand arrived, whether it has the GSTIN that verification depends on,
+// and (on the invited tab, where the rows actually are) whether an
+// invitation has been claimed, which nothing in the portal could show
+// before.
+const BRAND_SOURCES = ["direct_signup", "admin_invited"] as const;
+const INVITE_STATUSES = ["pending", "claimed"] as const;
+
 // Registered brands. `contact_phone` is sortable here (unlike the creator
 // list) because brands store their own phone on the profile rather than
 // only on auth.users.
@@ -52,6 +62,9 @@ export default async function BrandsPage({
         { label: t("filters.notApplied"), value: "not_applied" },
       ],
     },
+    { name: "source", label: t("filters.allSources"), type: "select" as const, options: BRAND_SOURCES.map((s) => ({ label: t(`source.${s}`), value: s })) },
+    { name: "hasgst", label: t("filters.allGstin"), type: "select" as const, options: [{ label: t("gstin.yes"), value: "yes" }, { label: t("gstin.no"), value: "no" }] },
+    { name: "istatus", label: t("filters.allInviteStatuses"), type: "select" as const, options: INVITE_STATUSES.map((s) => ({ label: t(`inviteStatus.${s}`), value: s })) },
   ];
   const params = await searchParams;
   const { search, verification, tab, invite_page } = params;
@@ -63,6 +76,10 @@ export default async function BrandsPage({
   const searchTerm = sanitizeSearchTerm(search);
   // Brand / agency checkboxes (migration 075) — applies to both lists.
   const accountType = brandTypeFilter(params[BRAND_TYPE_PARAM]);
+  // Validated against their allowlists before reaching a query.
+  const source = (BRAND_SOURCES as readonly string[]).includes(params.source || "") ? params.source! : "";
+  const hasgst = params.hasgst === "yes" || params.hasgst === "no" ? params.hasgst : "";
+  const istatus = (INVITE_STATUSES as readonly string[]).includes(params.istatus || "") ? params.istatus! : "";
   const SORTS = brandSorts((k) => t(`sort.${k}`));
   // `recent` is the fallback, so a page with no ?sort keeps the
   // most-recently-updated-first order it had before sorting existed.
@@ -97,6 +114,15 @@ export default async function BrandsPage({
     brandQuery = brandQuery.eq("verification_status", verification);
   }
   if (accountType) brandQuery = brandQuery.eq("account_type", accountType);
+  if (source) brandQuery = brandQuery.eq("source", source);
+  // GSTIN presence rather than its value: it is what verification turns on,
+  // so "which brands can't be verified yet" is the real question.
+  //
+  // Empty string counts as absent. Three of the six rows store `''` rather
+  // than NULL, so `.is("gstin", null)` alone reported zero brands without a
+  // GSTIN while half of them have none — the filter looked like it worked.
+  if (hasgst === "yes") brandQuery = brandQuery.not("gstin", "is", null).neq("gstin", "");
+  else if (hasgst === "no") brandQuery = brandQuery.or("gstin.is.null,gstin.eq.");
 
   // Pending invitations — paginated. `count: exact` returns the matching
   // total so the page count is correct after filtering. Built before either
@@ -107,7 +133,10 @@ export default async function BrandsPage({
   let inviteQuery = supabase
     .from("brand_invitations")
     .select("id, brand_name, instagram_username, logo_url, notes, status, created_at, account_type", { count: "exact" })
-    .eq("status", "pending")
+    // Pending by default, which is what this tab has always shown — but
+    // claimed invitations were previously unreachable from the portal
+    // entirely, so the filter can now ask for them.
+    .eq("status", istatus || "pending")
     .order("created_at", { ascending: false })
     .range(inviteFrom, inviteTo);
 
