@@ -11,6 +11,8 @@ import { RejectCampaignModal } from "./reject-campaign-modal";
 import { useRole } from "@/components/role-context";
 import { ConfirmDialog, useConfirmDialog } from "@/components/confirm-dialog";
 import { ButtonSpinner } from "@/components/spinner";
+import { SortLink, SortMenu } from "@/components/sort-controls";
+import type { ResolvedSort, SortOption } from "@/lib/sorting";
 
 interface Campaign {
   campaign_id: string;
@@ -99,7 +101,22 @@ function formatDate(d: string | null) {
 //    selected (calls [[deleteCampaigns]], super-admin gated server-side)
 // Non-super-admins see exactly the table they saw before (no checkboxes,
 // no action bar), so the UI doesn't suggest an action they can't perform.
-export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
+export function CampaignsTable({
+  campaigns,
+  sortOptions = [],
+  sort,
+  params = {},
+  basePath = "/dashboard/campaigns",
+}: {
+  campaigns: Campaign[];
+  // Sorting is passed in rather than read from useSearchParams: SortLink is
+  // link-only and server-safe, so the same component works here and in the
+  // server-rendered tables.
+  sortOptions?: SortOption[];
+  sort?: ResolvedSort;
+  params?: Record<string, string | string[] | undefined>;
+  basePath?: string;
+}) {
   const t = useTranslations("DashboardCampaignsCampaignsTable");
   const router = useRouter();
   const { isSuperAdmin } = useRole();
@@ -193,6 +210,14 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
         <div className="p-3 mb-3 rounded-xl bg-red-50 dark:bg-red-900/30 text-red-600 text-sm">{error}</div>
       )}
 
+      {/* Cards have no headers to click, so the sort menu is the only way
+          to reorder on a phone. */}
+      {sort && sortOptions.length > 0 && (
+        <div className="mb-3 lg:hidden">
+          <SortMenu options={sortOptions} current={sort} basePath={basePath} params={params} />
+        </div>
+      )}
+
       {/* Phones get cards. The bulk-select bar above works with both. */}
       <div className="space-y-3 lg:hidden">
         {campaigns.length > 0 ? (
@@ -230,11 +255,24 @@ export function CampaignsTable({ campaigns }: { campaigns: Campaign[] }) {
                   />
                 </th>
               )}
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.title")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.brand")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.status")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.slots")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.dates")}</th>
+              {(["title", "brand", "status", "slots", "dates"] as const).map((c) => {
+                // The Dates cell shows the start date, so its header sorts
+                // by that; the application deadline is offered in the sort
+                // menu, which has room to name both.
+                const option = sort && sortOptions.find((o) => o.key === (c === "dates" ? "start" : c));
+                return (
+                  <th
+                    key={c}
+                    className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5"
+                  >
+                    {option && sort ? (
+                      <SortLink option={option} current={sort} basePath={basePath} params={params} />
+                    ) : (
+                      t(`columns.${c}`)
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">

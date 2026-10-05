@@ -9,6 +9,24 @@ import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { sanitizeSearchTerm } from "@/lib/validation";
 import { BrandTypeFilter } from "@/components/brand-type-filter";
 import { BRAND_TYPE_PARAM, brandTypeFilter } from "@/lib/brand-account-type";
+import { applySort, compareBy, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/campaigns";
+
+// `brand` is derived — the name comes from brand_profiles OR brand_invitations
+// depending on who owns the campaign — so it is sorted in memory. Everything
+// else is a real column and goes to PostgREST.
+function campaignSorts(label: (k: string) => string): SortOption[] {
+  return [
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc" },
+    { key: "title", column: "title", label: label("title"), defaultDir: "asc" },
+    { key: "brand", column: "created_at", label: label("brand"), defaultDir: "asc" },
+    { key: "status", column: "status", label: label("status"), defaultDir: "asc" },
+    { key: "slots", column: "max_influencers", label: label("slots"), defaultDir: "desc", nullsLast: true },
+    { key: "start", column: "campaign_start_date", label: label("start"), defaultDir: "desc", nullsLast: true },
+    { key: "deadline", column: "application_deadline", label: label("deadline"), defaultDir: "asc", nullsLast: true },
+  ];
+}
 
 export default async function CampaignsPage({
   searchParams,
@@ -23,10 +41,15 @@ export default async function CampaignsPage({
   const canWrite = await isAdminOrAbove();
   const searchTerm = sanitizeSearchTerm(search);
 
+  const SORTS = campaignSorts((k) => t(`sort.${k}`));
+  // `created` is the fallback, so a page with no ?sort keeps the
+  // newest-first order it had before sorting existed.
+  const sort = resolveSort(params.sort, SORTS, "created");
+
   let query = supabase
     .from("campaigns")
-    .select("campaign_id, title, status, max_influencers, campaign_start_date, campaign_end_date, application_deadline, target_categories, brand_id, brand_invitation_id, created_by_admin, brand_profiles(brand_name), brand_invitations(brand_name)")
-    .order("created_at", { ascending: false });
+    .select("campaign_id, title, status, max_influencers, campaign_start_date, campaign_end_date, application_deadline, target_categories, brand_id, brand_invitation_id, created_by_admin, brand_profiles(brand_name), brand_invitations(brand_name)");
+  query = applySort(query, sort);
 
   if (searchTerm) {
     query = query.ilike("title", `%${searchTerm}%`);
@@ -83,7 +106,19 @@ export default async function CampaignsPage({
 
   const { data: campaigns, error } = await query;
 
-  const totalCount = campaigns?.length ?? 0;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+  let rows = (campaigns as any[]) ?? [];
+  // The brand name lives on one of two embedded resources, so PostgREST
+  // cannot order by it. Sorted here instead; this page loads the whole
+  // filtered set rather than a page of it, so nothing is missed.
+  if (sort.key === "brand") {
+    rows = compareBy(
+      rows,
+      (c) => c.brand_profiles?.brand_name || c.brand_invitations?.brand_name || "",
+      sort.ascending,
+    );
+  }
+  const totalCount = rows.length;
 
   return (
     <div>
@@ -131,7 +166,7 @@ export default async function CampaignsPage({
       </div>
 
       {/* Table — checkboxes + bulk delete appear for super admins only */}
-      <CampaignsTable campaigns={(campaigns as any[]) ?? []} />
+      <CampaignsTable campaigns={rows} sortOptions={SORTS} sort={sort} params={params} basePath={BASE} />
     </div>
   );
 }

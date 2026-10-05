@@ -13,6 +13,29 @@ import { UpdateMissingDetails } from "./update-missing-details";
 import { getTranslations } from "next-intl/server";
 import { instagramStatus, type IgStatus } from "@/lib/instagram-status";
 import { getCreatorCategoryOptions } from "@/lib/creator-categories";
+import { SortBar, SortLink } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/influencers";
+
+// Registered creators. Paginated, so the sort MUST go to PostgREST — an
+// in-memory sort would only reorder the 25 rows on the current page, which
+// looks like sorting and isn't.
+//
+// Every column here is selected by the query above. `influencer_id` is the
+// tiebreak throughout: without a stable second key, rows with equal values
+// shuffle between pages and a creator can appear twice or not at all.
+function influencerSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "influencer_id", ascending: true };
+  return [
+    { key: "recent", column: "updated_at", label: label("recent"), defaultDir: "desc", tiebreak },
+    { key: "joined", column: "created_at", label: label("joined"), defaultDir: "desc", tiebreak },
+    { key: "name", column: "full_name", label: label("name"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "username", column: "username", label: label("username"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "followers", column: "followers_count", label: label("followers"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "status", column: "status", label: label("status"), defaultDir: "asc", tiebreak },
+  ];
+}
 
 const INVITES_PER_PAGE = 12;
 const INFLUENCERS_PER_PAGE = 25;
@@ -39,6 +62,10 @@ export default async function InfluencersPage({
   // Sanitize before it ever reaches a hand-built PostgREST .or() filter
   // (the query runs on the RLS-bypassing service-role client).
   const searchTerm = sanitizeSearchTerm(search);
+  const SORTS = influencerSorts((k) => t(`sort.${k}`));
+  // `recent` is the fallback, so a page with no ?sort keeps the
+  // most-recently-updated-first order it had before sorting existed.
+  const sort = resolveSort(params.sort, SORTS, "recent");
 
   // Category options and the phone map are both independent of the row query
   // and of each other — started together so the page waits once, not three
@@ -75,10 +102,8 @@ export default async function InfluencersPage({
     .from("influencer_profiles")
     // The token and IG health columns are read only to derive igStatus below;
     // they never reach the client row.
-    .select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle, media_kit_published, instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at", { count: "exact" })
-    .order("updated_at", { ascending: false })
-    .order("influencer_id", { ascending: true })
-    .range(infFrom, infFrom + INFLUENCERS_PER_PAGE - 1);
+    .select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle, media_kit_published, instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at", { count: "exact" });
+  query = applySort(query, sort).range(infFrom, infFrom + INFLUENCERS_PER_PAGE - 1);
   if (searchTerm) {
     const clauses = [`full_name.ilike.%${searchTerm}%`, `username.ilike.%${searchTerm}%`];
     if (phoneInfluencerIds.length > 0) clauses.push(`influencer_id.in.(${phoneInfluencerIds.join(",")})`);
@@ -166,6 +191,9 @@ export default async function InfluencersPage({
       {(activeTab === "all" || activeTab === "registered") && (
         <>
           <FilterBar fields={filterFields} />
+          {/* Cards have no headers to click, so this is the only way to
+              reorder on a phone. */}
+          <SortBar options={SORTS} current={sort} basePath={BASE} params={params} className="mb-4" />
           {error && <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">{t("failedToLoadInfluencers", { message: error.message })}</div>}
           {/* Phones get cards; the table is a desktop affordance. Same rows,
               same order, same page — see components/mobile/list-card.tsx. */}
@@ -188,12 +216,24 @@ export default async function InfluencersPage({
             <table className="w-full min-w-180">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.name")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.username")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.contactNumber")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.followers")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.categories")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.status")}</th>
+                  {(["name", "username", "contactNumber", "followers", "categories", "status"] as const).map((c) => {
+                    // No sort on contactNumber (the phone lives on
+                    // auth.users, which can't be joined — see CLAUDE.md) or
+                    // on categories (an array, with no meaningful order).
+                    const option = SORTS.find((o) => o.key === c);
+                    return (
+                      <th
+                        key={c}
+                        className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5"
+                      >
+                        {option ? (
+                          <SortLink option={option} current={sort} basePath={BASE} params={params} />
+                        ) : (
+                          t(`table.${c}`)
+                        )}
+                      </th>
+                    );
+                  })}
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.igStatus")}</th>
                 </tr>
               </thead>

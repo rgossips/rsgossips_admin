@@ -243,7 +243,15 @@
     "noRegisteredBrands": "No registered brands found",
     "pendingInvitations": "Pending Invitations",
     "noPendingInvitations": "No pending invitations",
-    "inviteHint": "Click \"Invite Brand\" above to create one"
+    "inviteHint": "Click \"Invite Brand\" above to create one",
+    "sort": {
+      "recent": "Last active",
+      "joined": "Joined",
+      "brandName": "Brand name",
+      "verification": "Verification",
+      "contactNumber": "Phone",
+      "gstin": "GSTIN"
+    }
   },
   "DashboardBrandsAddBrandForm": {
     "uploadingIcon": "Uploading brand icon...",
@@ -427,6 +435,7 @@
     "title": "Callback Requests",
     "description": "Callback requests submitted from the in-app support chats",
     "openBadge": "{count} open",
+    "sort": "Sort",
     "filters": {
       "all": "All",
       "open": "Open",
@@ -461,7 +470,17 @@
     "subtitle": "Track and manage influencer campaigns",
     "newCampaign": "New Campaign",
     "loadError": "Failed to load campaigns: {message}",
-    "count": "{count, plural, one {# campaign} other {# campaigns}}"
+    "count": "{count, plural, one {# campaign} other {# campaigns}}",
+    "sortLabel": "Sort",
+    "sort": {
+      "created": "Created",
+      "title": "Title",
+      "brand": "Brand",
+      "status": "Status",
+      "slots": "Slots",
+      "start": "Start date",
+      "deadline": "Apply by"
+    }
   },
   "DashboardCampaignsCampaignFilters": {
     "searchPlaceholder": "Search campaigns or brands...",
@@ -879,7 +898,15 @@
     "empty": "No creators have subscribed to a package yet.",
     "noMatches": "No subscribers match these filters.",
     "autoRenewOffUntil": "Auto-renew cancelled · access until {date}",
-    "autoRenewOff": "Auto-renew cancelled"
+    "autoRenewOff": "Auto-renew cancelled",
+    "sort": {
+      "recent": "Last active",
+      "creator": "Creator",
+      "plan": "Plan",
+      "billing": "Billing",
+      "source": "Source",
+      "joined": "Joined"
+    }
   },
   "DashboardCampaignsIdDetailActions": {
     "statuses": {
@@ -1271,7 +1298,15 @@
     "pendingInvitations": "Pending Invitations",
     "failedToLoadInvitations": "Failed to load invitations: {message}",
     "noPendingInvitations": "No pending invitations",
-    "clickInviteToCreate": "Click \"Invite Influencer\" above to create one"
+    "clickInviteToCreate": "Click \"Invite Influencer\" above to create one",
+    "sort": {
+      "recent": "Last active",
+      "joined": "Joined",
+      "name": "Name",
+      "username": "Username",
+      "followers": "Followers",
+      "status": "Status"
+    }
   },
   "DashboardInfluencersBulkInviteInfluencers": {
     "fullName": {

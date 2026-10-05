@@ -11,6 +11,25 @@ import { authIdsByPhone, brandIdsByContactPhone, listAllAuthUsers, phoneQueryDig
 import { getTranslations } from "next-intl/server";
 import { BrandTypeFilter } from "@/components/brand-type-filter";
 import { BRAND_TYPE_PARAM, brandTypeFilter } from "@/lib/brand-account-type";
+import { SortBar, SortLink } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/brands";
+
+// Registered brands. `contact_phone` is sortable here (unlike the creator
+// list) because brands store their own phone on the profile rather than
+// only on auth.users.
+function brandSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "brand_id", ascending: true };
+  return [
+    { key: "recent", column: "updated_at", label: label("recent"), defaultDir: "desc", tiebreak },
+    { key: "joined", column: "created_at", label: label("joined"), defaultDir: "desc", tiebreak },
+    { key: "brandName", column: "brand_name", label: label("brandName"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "verification", column: "verification_status", label: label("verification"), defaultDir: "asc", tiebreak },
+    { key: "contactNumber", column: "contact_phone", label: label("contactNumber"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "gstin", column: "gstin", label: label("gstin"), defaultDir: "asc", nullsLast: true, tiebreak },
+  ];
+}
 
 const INVITES_PER_PAGE = 12;
 
@@ -44,12 +63,16 @@ export default async function BrandsPage({
   const searchTerm = sanitizeSearchTerm(search);
   // Brand / agency checkboxes (migration 075) — applies to both lists.
   const accountType = brandTypeFilter(params[BRAND_TYPE_PARAM]);
+  const SORTS = brandSorts((k) => t(`sort.${k}`));
+  // `recent` is the fallback, so a page with no ?sort keeps the
+  // most-recently-updated-first order it had before sorting existed.
+  const sort = resolveSort(params.sort, SORTS, "recent");
 
   // Fetch registered brands
   let brandQuery = supabase
     .from("brand_profiles")
-    .select("brand_id, brand_name, logo_url, contact_phone, verification_status, gstin, instagram_username, account_type")
-    .order("updated_at", { ascending: false });
+    .select("brand_id, brand_name, logo_url, contact_phone, verification_status, gstin, instagram_username, account_type");
+  brandQuery = applySort(brandQuery, sort);
 
   // A digits-only search also matches the brand's contact phone or the phone
   // they sign in with (auth.users). Invited brands have no phone stored, so
@@ -127,6 +150,9 @@ export default async function BrandsPage({
       {(activeTab === "all" || activeTab === "registered") && (
         <>
           <FilterBar fields={filterFields} />
+          {/* Cards have no headers to click, so this is the only way to
+              reorder on a phone. */}
+          <SortBar options={SORTS} current={sort} basePath={BASE} params={params} className="mb-4" />
 
           {brandsError && (
             <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
@@ -154,10 +180,21 @@ export default async function BrandsPage({
             <table className="w-full min-w-180">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.brandName")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.contactNumber")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.verification")}</th>
-                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.gstin")}</th>
+                  {(["brandName", "contactNumber", "verification", "gstin"] as const).map((c) => {
+                    const option = SORTS.find((o) => o.key === c);
+                    return (
+                      <th
+                        key={c}
+                        className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5"
+                      >
+                        {option ? (
+                          <SortLink option={option} current={sort} basePath={BASE} params={params} />
+                        ) : (
+                          t(`columns.${c}`)
+                        )}
+                      </th>
+                    );
+                  })}
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.actions")}</th>
                 </tr>
               </thead>

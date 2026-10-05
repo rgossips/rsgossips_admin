@@ -7,6 +7,8 @@ import { RefreshButton } from "@/components/refresh-button";
 import { Avatar } from "@/components/avatar";
 import { sanitizeSearchTerm } from "@/lib/validation";
 import { logError } from "@/lib/log";
+import { SortBar, SortLink } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
 import {
   BILLING_CYCLES,
   PLAN_BADGE_CLASS,
@@ -24,6 +26,22 @@ const STATS_PAGE = 1000;
 // Only starter/pro/elite are entitlements (see subscription-plans.ts); the
 // legacy "trial"/"free" defaults are not subscriptions and are excluded.
 const PAID_TIERS = SUBSCRIPTION_TIERS.map((t) => t.key as string);
+
+const BASE = "/dashboard/subscriptions";
+
+// Paginated, so the sort goes to PostgREST — sorting 25 loaded rows in
+// memory would reorder the page rather than the list.
+function subscriptionSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "influencer_id", ascending: true };
+  return [
+    { key: "recent", column: "updated_at", label: label("recent"), defaultDir: "desc", tiebreak },
+    { key: "creator", column: "full_name", label: label("creator"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "plan", column: "subscription_plan", label: label("plan"), defaultDir: "asc", tiebreak },
+    { key: "billing", column: "billing_cycle", label: label("billing"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "source", column: "payment_gateway", label: label("source"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "joined", column: "created_at", label: label("joined"), defaultDir: "desc", tiebreak },
+  ];
+}
 
 // payment_gateway values written by the consumer app's webhooks, plus the
 // "admin" marker updateInfluencerPlan() writes for a comped plan.
@@ -109,6 +127,11 @@ export default async function SubscriptionsPage({
   // whole query (42703) and the page showed "Couldn't load subscribers" — so
   // the list falls back to the base columns and simply omits the
   // "auto-renew off" note.
+  const SORTS = subscriptionSorts((k) => t(`sort.${k}`));
+  // `recent` is the fallback, so a page with no ?sort keeps the
+  // most-recently-updated-first order it had before sorting existed.
+  const sort = resolveSort(params.sort, SORTS, "recent");
+
   const BASE_COLS =
     "influencer_id, full_name, username, instagram_handle, profile_photo_url, email, subscription_plan, billing_cycle, payment_gateway, razorpay_subscription_id, created_at";
   const LIFECYCLE_COLS = ", auto_renew, plan_expires_at, subscription_cancelled_at";
@@ -118,9 +141,8 @@ export default async function SubscriptionsPage({
     let q = admin
       .from("influencer_profiles")
       .select(withLifecycle ? BASE_COLS + LIFECYCLE_COLS : BASE_COLS, { count: "exact" })
-      .in("subscription_plan", plan ? [plan] : PAID_TIERS)
-      .order("updated_at", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
+      .in("subscription_plan", plan ? [plan] : PAID_TIERS);
+    q = applySort(q, sort).range(from, from + PAGE_SIZE - 1);
     if (cycle) q = q.eq("billing_cycle", cycle);
     if (source === "none") q = q.is("payment_gateway", null);
     else if (source) q = q.eq("payment_gateway", source);
@@ -225,6 +247,9 @@ export default async function SubscriptionsPage({
       </div>
 
       <FilterBar fields={filterFields} />
+      {/* Cards have no headers to click, so this is the only way to reorder
+          on a phone. */}
+      <SortBar options={SORTS} current={sort} basePath={BASE} params={params} className="mb-4" />
 
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">{t("starterNote")}</p>
 
@@ -301,12 +326,20 @@ export default async function SubscriptionsPage({
           <table className="w-full min-w-180">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                <th className={th}>{t("table.creator")}</th>
-                <th className={th}>{t("table.contact")}</th>
-                <th className={th}>{t("table.plan")}</th>
-                <th className={th}>{t("table.billing")}</th>
-                <th className={th}>{t("table.source")}</th>
-                <th className={th}>{t("table.joined")}</th>
+                {(["creator", "contact", "plan", "billing", "source", "joined"] as const).map((c) => {
+                  // `contact` renders whichever of email / handle exists, so
+                  // there is no single column to order by.
+                  const option = SORTS.find((o) => o.key === c);
+                  return (
+                    <th key={c} className={th}>
+                      {option ? (
+                        <SortLink option={option} current={sort} basePath={BASE} params={params} />
+                      ) : (
+                        t(`table.${c}`)
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">

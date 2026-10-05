@@ -4,10 +4,27 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { StatusToggle } from "./_components/status-toggle";
+import { SortBar, SortLink } from "@/components/sort-controls";
+import { applySort, compareBy, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
 
 export const dynamic = "force-dynamic";
 
 const FILTERS = ["all", "open", "done"] as const;
+const BASE = "/dashboard/callbacks";
+
+// Sortable columns, keyed to the `columns.*` labels the table already uses.
+// `requester` is derived from a second lookup rather than stored, so it is
+// the one sorted in memory (see below).
+function sortOptions(label: (k: string) => string): SortOption[] {
+  return [
+    { key: "requestedAt", column: "created_at", label: label("requestedAt"), defaultDir: "desc" },
+    { key: "requester", column: "created_at", label: label("requester"), defaultDir: "asc" },
+    { key: "topic", column: "topic", label: label("topic"), defaultDir: "asc", nullsLast: true },
+    { key: "phone", column: "phone", label: label("phone"), defaultDir: "asc", nullsLast: true },
+    { key: "preferredTime", column: "preferred_time", label: label("preferredTime"), defaultDir: "asc", nullsLast: true },
+    { key: "status", column: "status", label: label("status"), defaultDir: "asc" },
+  ];
+}
 
 type CallbackRow = {
   id: string;
@@ -40,7 +57,7 @@ const formatDate = (iso: string) => {
 export default async function CallbacksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const t = await getTranslations("DashboardCallbacks");
   const sp = (await searchParams) || {};
@@ -48,17 +65,20 @@ export default async function CallbacksPage({
     ? (sp.status as (typeof FILTERS)[number])
     : "open";
 
+  const SORTS = sortOptions((k) => t(`columns.${k}`));
+  // `requestedAt` is the fallback, so a page with no ?sort keeps the
+  // newest-first order it had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "requestedAt");
+
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
 
-  let q = admin
-    .from("support_callbacks")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let q = admin.from("support_callbacks").select("*");
+  q = applySort(q, sort);
   if (filter !== "all") q = q.eq("status", filter);
 
   const { data, error } = await q;
-  const rows = (data || []) as CallbackRow[];
+  let rows = (data || []) as CallbackRow[];
 
   // Requester display names — two batched lookups keyed by role, no N+1.
   const infIds = [
@@ -90,6 +110,14 @@ export default async function CallbacksPage({
     namesById[b.brand_id] = b.brand_name || "";
   }
 
+  // The requester's name is not a column on support_callbacks — it comes
+  // from the two lookups above — so PostgREST cannot order by it. Sorted
+  // here instead, once the names exist. Safe to do in memory because this
+  // page loads the whole filtered set rather than a page of it.
+  if (sort.key === "requester") {
+    rows = compareBy(rows, (r) => namesById[r.user_id] || "", sort.ascending);
+  }
+
   // Counts for the filter tabs (open drives the badge).
   const { data: allStatuses } = await admin
     .from("support_callbacks")
@@ -114,11 +142,13 @@ export default async function CallbacksPage({
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("description")}</p>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         {FILTERS.map((f) => (
           <Link
             key={f}
-            href={`/dashboard/callbacks?status=${f}`}
+            // Carries the sort through. Hard-coding `?status=` dropped it,
+            // so changing the filter silently reset the order.
+            href={sortHref(BASE, { ...sp, status: f }, sort.token)}
             className={`text-[12px] font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 ${
               filter === f
                 ? "bg-indigo-600 text-white"
@@ -137,6 +167,10 @@ export default async function CallbacksPage({
             </span>
           </Link>
         ))}
+        {/* Cards have no column headers to click, so sorting would be
+            missing entirely on a phone. Hidden from lg up, where the
+            headers take over. */}
+        <SortBar options={SORTS} current={sort} basePath={BASE} params={sp} label={t("sort")} className="ml-auto" />
       </div>
 
       {error && (
@@ -213,14 +247,23 @@ export default async function CallbacksPage({
           <table className="w-full min-w-200">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                {(["requester", "topic", "phone", "preferredTime", "notes", "requestedAt", "status"] as const).map((c) => (
-                  <th
-                    key={c}
-                    className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-5 py-3.5"
-                  >
-                    {t(`columns.${c}`)}
-                  </th>
-                ))}
+                {(["requester", "topic", "phone", "preferredTime", "notes", "requestedAt", "status"] as const).map((c) => {
+                  // `notes` is free text with no useful order, so it stays a
+                  // plain label. Everything else gets a sort link.
+                  const option = SORTS.find((o) => o.key === c);
+                  return (
+                    <th
+                      key={c}
+                      className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-5 py-3.5"
+                    >
+                      {option ? (
+                        <SortLink option={option} current={sort} basePath={BASE} params={sp} />
+                      ) : (
+                        t(`columns.${c}`)
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
