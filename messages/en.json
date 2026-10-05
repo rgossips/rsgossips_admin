@@ -946,7 +946,13 @@
     "edit": "Edit",
     "hide": "Hide",
     "show": "Show",
-    "delete": "Delete"
+    "delete": "Delete",
+    "sort": {
+      "position": "Display order",
+      "active": "Visible first",
+      "created": "Added"
+    },
+    "sortNote": "Reordering is only available in display order — switch back to rearrange."
   },
   "DashboardCreatorStoriesComponentsSectionTitleEditor": {
     "label": "Section title (marketing home)",
@@ -1078,7 +1084,14 @@
     "hide": "Hide",
     "show": "Show",
     "delete": "Delete",
-    "noInstagram": "No Instagram link"
+    "noInstagram": "No Instagram link",
+    "sort": {
+      "position": "Display order",
+      "name": "Name",
+      "active": "Visible first",
+      "created": "Added"
+    },
+    "sortNote": "Reordering is only available in display order — switch back to rearrange."
   },
   "DashboardFeaturedBrandsComponentsAddFeaturedBrand": {
     "featureABrand": "Feature a brand",
@@ -1110,7 +1123,12 @@
     "hidden": "Hidden",
     "hide": "Hide",
     "show": "Show",
-    "delete": "Delete"
+    "delete": "Delete",
+    "sort": {
+      "position": "Display order",
+      "active": "Visible first"
+    },
+    "sortNote": "Reordering is only available in display order — switch back to rearrange."
   },
   "DashboardFeaturedCampaignsComponentsAddFeaturedCampaign": {
     "featureCampaign": "Feature a campaign",
@@ -1148,7 +1166,15 @@
     "edit": "Edit",
     "hide": "Hide",
     "show": "Show",
-    "delete": "Delete"
+    "delete": "Delete",
+    "sort": {
+      "position": "Display order",
+      "name": "Name",
+      "active": "Visible first",
+      "rating": "Rating",
+      "created": "Added"
+    },
+    "sortNote": "Reordering is only available in display order — switch back to rearrange."
   },
   "DashboardFeaturedCreatorsCreate": {
     "backLink": "← Featured Creators",
@@ -1868,7 +1894,15 @@
   },
   "DashboardServices": {
     "title": "Services",
-    "subtitle": "Catalogue shown to influencers. Edits go live immediately."
+    "subtitle": "Catalogue shown to influencers. Edits go live immediately.",
+    "sort": {
+      "order": "Display order",
+      "title": "Title",
+      "price": "Starting price",
+      "delivery": "Delivery days",
+      "sla": "Quote SLA",
+      "created": "Created"
+    }
   },
   "DashboardServicesCreate": {
     "backToServices": "← Services",

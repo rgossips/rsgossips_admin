@@ -1,5 +1,23 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/creator-stories";
+
+// A curation list: `position` is hand-set with the up/down buttons and IS
+// the order the consumer app renders, so it stays the default. The other
+// options are for FINDING a row in a long list, not rearranging it — and
+// while one is active the move buttons are hidden, because they would be
+// shifting a position no longer on screen.
+function creatorStorySorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "created_at", ascending: false };
+  return [
+    { key: "position", column: "position", label: label("position"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "active", column: "is_active", label: label("active"), defaultDir: "desc", tiebreak },
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc" },
+  ];
+}
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
   deleteCreatorStory,
@@ -13,14 +31,23 @@ import { CreatorStoriesSectionTitleEditor } from "./_components/section-title-ed
 
 export const dynamic = "force-dynamic";
 
-export default async function CreatorStoriesPage() {
+export default async function CreatorStoriesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ sort?: string }>;
+}) {
   const t = await getTranslations("DashboardCreatorStories");
+  const sp = (await searchParams) || {};
+  const SORTS = creatorStorySorts((k) => t(`sort.${k}`));
+  // `position` is the fallback, so the page opens in the curated order it
+  // had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "position");
+  const inDisplayOrder = sort.key === "position";
   const admin = createAdminClient();
-  const { data: stories, error } = await admin
-    .from("creator_stories")
-    .select("*")
-    .order("position", { ascending: true })
-    .order("created_at", { ascending: false });
+  const { data: stories, error } = await applySort(
+    admin.from("creator_stories").select("*"),
+    sort,
+  );
   const canWrite = await isAdminOrAbove();
   const sectionTitle = await getCreatorStoriesSectionTitle();
 
@@ -56,6 +83,15 @@ export default async function CreatorStoriesPage() {
         <StatPill label={t("stats.hidden")} value={(stories || []).length - activeCount} accent="text-gray-400" />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} />
+        {!inDisplayOrder && (
+          // Says out loud why the up/down buttons have gone, rather than
+          // leaving the admin to wonder whether they broke it.
+          <p className="text-[12px] text-amber-700 dark:text-amber-400">{t("sortNote")}</p>
+        )}
+      </div>
+
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
           {error.message}
@@ -71,7 +107,9 @@ export default async function CreatorStoriesPage() {
             <p className="text-[11px] text-gray-300 mt-2">{t("empty.line2")}</p>
           </div>
         ) : (
-          (stories || []).map((s) => <StoryRow key={s.id} story={s} canWrite={canWrite} />)
+          (stories || []).map((s) => (
+            <StoryRow key={s.id} story={s} canWrite={canWrite} inDisplayOrder={inDisplayOrder} />
+          ))
         )}
       </div>
     </div>
@@ -95,7 +133,7 @@ function StatPill({
   );
 }
 
-async function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) {
+async function StoryRow({ story, canWrite, inDisplayOrder }: { story: any; canWrite: boolean; inDisplayOrder: boolean }) {
   const t = await getTranslations("DashboardCreatorStories");
   return (
     <div className="flex items-center gap-4 p-4">
@@ -126,7 +164,10 @@ async function StoryRow({ story, canWrite }: { story: any; canWrite: boolean }) 
         </a>
       </div>
 
-      {canWrite && (
+      {/* Reordering only makes sense while the list IS the display order.
+          Sorted by anything else, "move up" would shift a position the
+          admin cannot see, so the pair is hidden rather than lying. */}
+      {canWrite && inDisplayOrder && (
         <>
           <form
             action={async () => {

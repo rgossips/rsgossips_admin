@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { ReportRow } from "./report-row";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,21 @@ export const dynamic = "force-dynamic";
 // Oldest-first inside the open filter on purpose: a moderation queue worked
 // newest-first quietly starves the oldest complaints, which is exactly the
 // metric a store asks about.
+
+const BASE = "/dashboard/reports";
+
+// Moderation queue. Like payouts, each tab has its own natural default:
+// the open queues are OLDEST first (the longest-waiting report is the most
+// overdue) while Resolved is a history and reads newest-resolved first.
+function reportSorts(): SortOption[] {
+  const tiebreak = { column: "id", ascending: true };
+  return [
+    { key: "created", column: "created_at", label: "Reported", defaultDir: "asc", tiebreak },
+    { key: "resolved", column: "resolved_at", label: "Resolved", defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "reason", column: "reason", label: "Reason", defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "status", column: "status", label: "Status", defaultDir: "asc", tiebreak },
+  ];
+}
 
 const FILTERS = [
   { id: "open", label: "Open" },
@@ -41,18 +58,23 @@ const STATUS_CLASS: Record<string, string> = {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const sp = (await searchParams) || {};
   const filter = sp.status || "open";
 
   const db = createAdminClient();
 
+  const SORTS = reportSorts();
+  // The fallback follows the tab, so each one opens the way it did before
+  // sorting existed; an explicit ?sort overrides either.
+  const sort = resolveSort(sp.sort, SORTS, filter === "resolved" ? "resolved" : "created");
+
   let q = db.from("content_reports").select("*");
-  if (filter === "open") q = q.eq("status", "open").order("created_at", { ascending: true });
-  else if (filter === "reviewing") q = q.eq("status", "reviewing").order("created_at", { ascending: true });
-  else if (filter === "resolved") q = q.in("status", ["actioned", "dismissed"]).order("resolved_at", { ascending: false });
-  else q = q.order("created_at", { ascending: false });
+  if (filter === "open") q = q.eq("status", "open");
+  else if (filter === "reviewing") q = q.eq("status", "reviewing");
+  else if (filter === "resolved") q = q.in("status", ["actioned", "dismissed"]);
+  q = applySort(q, sort);
 
   const { data: reports, error } = await q.limit(200);
 
@@ -97,7 +119,7 @@ export default async function ReportsPage({
           return (
             <a
               key={f.id}
-              href={`/dashboard/reports?status=${f.id}`}
+              href={sortHref(BASE, { ...sp, status: f.id }, sort.token)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
                 active
                   ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
@@ -109,6 +131,8 @@ export default async function ReportsPage({
             </a>
           );
         })}
+        {/* Always visible: this page has no table header to click. */}
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} className="ml-auto" />
       </div>
 
       {error && (

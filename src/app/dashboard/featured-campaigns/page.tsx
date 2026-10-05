@@ -11,10 +11,35 @@ import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 import { ActionButton } from "@/components/action-button";
 import { getTranslations } from "next-intl/server";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/featured-campaigns";
+
+// A curation list, so `position` stays the default. The campaign title and
+// brand live on a SEPARATE query (campaignsById below), so they are not
+// offered — ordering by a field this query does not select would be a hard
+// 400, and sorting the ids in memory would not match what the rows show.
+function featuredCampaignSorts(label: (k: string) => string): SortOption[] {
+  return [
+    { key: "position", column: "position", label: label("position"), defaultDir: "asc", nullsLast: true },
+    { key: "active", column: "is_active", label: label("active"), defaultDir: "desc" },
+  ];
+}
 export const dynamic = "force-dynamic";
 
-export default async function FeaturedCampaignsPage() {
+export default async function FeaturedCampaignsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ sort?: string }>;
+}) {
   const t = await getTranslations("DashboardFeaturedCampaigns");
+  const sp = (await searchParams) || {};
+  const SORTS = featuredCampaignSorts((k) => t(`sort.${k}`));
+  // `position` is the fallback, so the page opens in the curated order it
+  // had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "position");
+  const inDisplayOrder = sort.key === "position";
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
   const sectionTitle = await getFeaturedSectionTitle();
@@ -23,11 +48,13 @@ export default async function FeaturedCampaignsPage() {
   // from whichever side has it (registered brand or invitation).
   // section='campaign' filters out Plan Your Stay picks (those live in
   // /dashboard/featured-stay).
-  const { data: featured, error } = await admin
-    .from("featured_campaigns")
-    .select("id, campaign_id, position, is_active")
-    .eq("section", "campaign")
-    .order("position", { ascending: true });
+  const { data: featured, error } = await applySort(
+    admin
+      .from("featured_campaigns")
+      .select("id, campaign_id, position, is_active")
+      .eq("section", "campaign"),
+    sort,
+  );
 
   let campaignsById: Record<string, any> = {};
   if (featured && featured.length > 0) {
@@ -88,6 +115,15 @@ export default async function FeaturedCampaignsPage() {
         <StatPill label={t("stat.hidden")} value={(featured || []).length - activeCount} accent="text-gray-400" />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} />
+        {!inDisplayOrder && (
+          // Says out loud why the up/down buttons have gone, rather than
+          // leaving the admin to wonder whether they broke it.
+          <p className="text-[12px] text-amber-700 dark:text-amber-400">{t("sortNote")}</p>
+        )}
+      </div>
+
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
           {error.message}
@@ -105,7 +141,9 @@ export default async function FeaturedCampaignsPage() {
         ) : (
           (featured || []).map((f) => {
             const c = campaignsById[f.campaign_id];
-            return <FeaturedRow key={f.id} row={f} campaign={c} canWrite={canWrite} />;
+            return (
+              <FeaturedRow key={f.id} row={f} campaign={c} canWrite={canWrite} inDisplayOrder={inDisplayOrder} />
+            );
           })
         )}
       </div>
@@ -130,7 +168,7 @@ function StatPill({
   );
 }
 
-async function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: any; canWrite: boolean }) {
+async function FeaturedRow({ row, campaign, canWrite, inDisplayOrder }: { row: any; campaign: any; canWrite: boolean; inDisplayOrder: boolean }) {
   const t = await getTranslations("DashboardFeaturedCampaigns");
   const brandName = campaign?.brand?.name || t("unknownBrand");
   const brandLogo = campaign?.brand?.logo || "";
@@ -160,7 +198,10 @@ async function FeaturedRow({ row, campaign, canWrite }: { row: any; campaign: an
         </p>
       </div>
 
-      {canWrite && (
+      {/* Reordering only makes sense while the list IS the display order.
+          Sorted by anything else, "move up" would shift a position the
+          admin cannot see, so the pair is hidden rather than lying. */}
+      {canWrite && inDisplayOrder && (
         <>
           <form
             action={async () => {

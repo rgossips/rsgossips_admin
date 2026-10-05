@@ -5,6 +5,42 @@ import { isSuperAdmin } from "@/lib/require-super-admin";
 import { RefreshButton } from "@/components/refresh-button";
 import { DEFAULT_MODEL_PRICING, resolvePricing, costOf, formatUsd, type ModelPrice } from "@/lib/ai-pricing";
 import { PricingEditor } from "./pricing-editor";
+import { SortLink } from "@/components/sort-controls";
+import { compareBy, resolveSort, type ResolvedSort, type SortOption } from "@/lib/sorting";
+
+// One allowlist shared by all four rollup tables: they have the same shape
+// (a group key plus gens / tokens / cost), so the keys are the same and only
+// the param name differs.
+//
+// `column` is unused here — nothing reaches PostgREST, because these rows
+// are aggregates this page computed. The allowlist still does its job:
+// it bounds which keys the URL can select.
+const ROLLUP_SORTS: SortOption[] = [
+  { key: "name", column: "name", label: "Name", defaultDir: "asc" },
+  { key: "gens", column: "gens", label: "Gens", defaultDir: "desc" },
+  { key: "tokens", column: "tokens", label: "Tokens", defaultDir: "desc" },
+  { key: "cost", column: "cost", label: "Est. cost", defaultDir: "desc" },
+];
+
+type RollupValue = { gens: number; tin: number; tout: number; cost: number };
+
+// Sorts the [key, totals] pairs the rollups are kept in. Cost falls back to
+// generations on a tie, which is what the old fixed sort did.
+function sortRollup(entries: [string, RollupValue][], sort: ResolvedSort): [string, RollupValue][] {
+  const pick = (e: [string, RollupValue]) => {
+    switch (sort.key) {
+      case "name":
+        return e[0];
+      case "gens":
+        return e[1].gens;
+      case "tokens":
+        return e[1].tin + e[1].tout;
+      default:
+        return e[1].cost;
+    }
+  };
+  return compareBy(entries, pick, sort.ascending);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -51,11 +87,12 @@ const fmtTok = (n: number) => (n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M"
 export default async function AiUsagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; psort?: string; tsort?: string; msort?: string; usort?: string }>;
 }) {
   if (!(await isSuperAdmin())) redirect("/dashboard");
 
-  const { period = "current" } = await searchParams;
+  const sp = await searchParams;
+  const { period = "current" } = sp;
   const { from, to, label } = periodRange(period);
   const admin = createAdminClient();
 
@@ -121,9 +158,34 @@ export default async function AiUsagePage({
     }
   }
 
-  const providerRows = [...byProvider.entries()].sort((a, b) => b[1].cost - a[1].cost || b[1].gens - a[1].gens);
-  const toolRows = [...byTool.entries()].sort((a, b) => b[1].gens - a[1].gens);
-  const modelRows = [...byModel.entries()].sort((a, b) => b[1].cost - a[1].cost);
+  // Each table keeps the default it had before sorting existed — cost for
+  // provider and model, generations for features — and an explicit param
+  // overrides just that one table.
+  const providerSort = resolveSort(sp.psort, ROLLUP_SORTS, "cost");
+  const toolSort = resolveSort(sp.tsort, ROLLUP_SORTS, "gens");
+  const modelSort = resolveSort(sp.msort, ROLLUP_SORTS, "cost");
+  const userSort = resolveSort(sp.usort, ROLLUP_SORTS, "gens");
+
+  // The user rollup is already ranked by generations from the RPC, so only
+  // a non-default sort needs to touch it. Cost here is the same blended
+  // estimate the cells show (the user rollup carries no model dimension),
+  // so sorting by it matches what is on screen.
+  const userRows = compareBy(
+    users,
+    (u) =>
+      userSort.key === "name"
+        ? (u.user_id ? nameMap.get(u.user_id)?.name : "") || ""
+        : userSort.key === "tokens"
+          ? u.tokens_in + u.tokens_out
+          : userSort.key === "cost"
+            ? u.tokens_in * rateIn + u.tokens_out * rateOut
+            : u.gens,
+    userSort.ascending,
+  );
+
+  const providerRows = sortRollup([...byProvider.entries()], providerSort);
+  const toolRows = sortRollup([...byTool.entries()], toolSort);
+  const modelRows = sortRollup([...byModel.entries()], modelSort);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -183,6 +245,7 @@ export default async function AiUsagePage({
             <Panel title="By provider">
               <Table
                 head={["Provider", "Gens", "Tokens", "Est. cost"]}
+                sortKeys={["name", "gens", "tokens", "cost"]} sortOptions={ROLLUP_SORTS} params={sp} sort={providerSort} sortParam="psort"
                 rows={providerRows.map(([k, v]) => [
                   <span key="p" className="font-semibold capitalize">{k}</span>,
                   fmtInt(v.gens),
@@ -196,6 +259,7 @@ export default async function AiUsagePage({
             <Panel title="By feature (tool)">
               <Table
                 head={["Feature", "Gens", "Tokens", "Est. cost"]}
+                sortKeys={["name", "gens", "tokens", "cost"]} sortOptions={ROLLUP_SORTS} params={sp} sort={toolSort} sortParam="tsort"
                 rows={toolRows.map(([k, v]) => [
                   <span key="t" className="font-mono text-[12px]">{k}</span>,
                   fmtInt(v.gens),
@@ -209,6 +273,7 @@ export default async function AiUsagePage({
             <Panel title="By model">
               <Table
                 head={["Model", "Gens", "Tokens", "Est. cost"]}
+                sortKeys={["name", "gens", "tokens", "cost"]} sortOptions={ROLLUP_SORTS} params={sp} sort={modelSort} sortParam="msort"
                 rows={modelRows.map(([k, v]) => [
                   <span key="m" className="font-mono text-[11px]">{k}</span>,
                   fmtInt(v.gens),
@@ -222,7 +287,8 @@ export default async function AiUsagePage({
             <Panel title="Top influencers" subtitle="Ranked by generations · cost is a blended estimate">
               <Table
                 head={["Influencer", "Gens", "Tokens", "Est. cost"]}
-                rows={users.map((u) => {
+                sortKeys={["name", "gens", "tokens", "cost"]} sortOptions={ROLLUP_SORTS} params={sp} sort={userSort} sortParam="usort"
+                rows={userRows.map((u) => {
                   const info = u.user_id ? nameMap.get(u.user_id) : null;
                   const cost = u.tokens_in * rateIn + u.tokens_out * rateOut;
                   return [
@@ -275,7 +341,27 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
   );
 }
 
-function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
+// Each rollup table carries its OWN sort param (psort / tsort / msort /
+// usort) so the four can be ordered independently — that is what the
+// configurable sortParam on sortHref is for. Sorting is in memory because
+// these are aggregates computed here, not rows a query could order.
+function Table({
+  head,
+  rows,
+  sortKeys,
+  sort,
+  sortOptions,
+  params,
+  sortParam,
+}: {
+  head: string[];
+  rows: React.ReactNode[][];
+  sortKeys?: (string | null)[];
+  sort?: ResolvedSort;
+  sortOptions?: SortOption[];
+  params?: Record<string, string | string[] | undefined>;
+  sortParam?: string;
+}) {
   // min-w-full + nowrap cells: fills the panel when there's room, and when a
   // long value (e.g. a model id) exceeds it, the panel's overflow-x-auto
   // scrolls rather than the column wrapping or the page overflowing.
@@ -283,9 +369,26 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
     <table className="min-w-full text-[13px]">
       <thead>
         <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-gray-800">
-          {head.map((h, i) => (
-            <th key={i} className={`py-2 whitespace-nowrap ${i === 0 ? "pr-3" : "text-right pl-3"}`}>{h}</th>
-          ))}
+          {head.map((h, i) => {
+            const key = sortKeys?.[i];
+            const option = key && sort && sortOptions ? sortOptions.find((o) => o.key === key) : undefined;
+            return (
+              <th key={i} className={`py-2 whitespace-nowrap ${i === 0 ? "pr-3" : "text-right pl-3"}`}>
+                {option && sort ? (
+                  <SortLink
+                    option={option}
+                    current={sort}
+                    basePath="/dashboard/ai-usage"
+                    params={params || {}}
+                    sortParam={sortParam}
+                    align={i === 0 ? "left" : "right"}
+                  />
+                ) : (
+                  h
+                )}
+              </th>
+            );
+          })}
         </tr>
       </thead>
       <tbody>

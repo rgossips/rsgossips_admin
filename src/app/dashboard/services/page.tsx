@@ -5,12 +5,32 @@ import { toggleServiceActive } from "./actions";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 
 import { ActionButton } from "@/components/action-button";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
 export const dynamic = "force-dynamic";
+
+const BASE = "/dashboard/services";
+
+// `display_order` is the hand-set order these cards are arranged in, so it
+// stays the DEFAULT — an admin who dragged them into place should still see
+// that arrangement when the page opens. The other options are additional
+// views, not a replacement for it.
+function serviceSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "created_at", ascending: false };
+  return [
+    { key: "order", column: "display_order", label: label("order"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "title", column: "title", label: label("title"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "price", column: "price_starting", label: label("price"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "delivery", column: "delivery_days", label: label("delivery"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "sla", column: "quote_sla_hours", label: label("sla"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc" },
+  ];
+}
 
 export default async function ServicesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const t = await getTranslations("DashboardServices");
   const sp = (await searchParams) || {};
@@ -18,11 +38,12 @@ export default async function ServicesPage({
 
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
-  let q = admin
-    .from("services")
-    .select("*")
-    .order("display_order", { ascending: true })
-    .order("created_at", { ascending: false });
+  const SORTS = serviceSorts((k) => t(`sort.${k}`));
+  // `order` is the fallback, so the page opens in the hand-set arrangement
+  // it had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "order");
+  let q = admin.from("services").select("*");
+  q = applySort(q, sort);
   if (status === "active") q = q.eq("is_active", true);
   else if (status === "inactive") q = q.eq("is_active", false);
   const { data: services, error } = await q;
@@ -80,7 +101,7 @@ export default async function ServicesPage({
         {(["all", "active", "inactive"] as const).map((s) => (
           <Link
             key={s}
-            href={`/dashboard/services?status=${s}`}
+            href={sortHref(BASE, { ...sp, status: s }, sort.token)}
             className={`text-[12px] font-semibold px-3 py-1.5 rounded-full ${
               status === s
                 ? "bg-indigo-600 text-white"
@@ -90,6 +111,9 @@ export default async function ServicesPage({
             {s.charAt(0).toUpperCase() + s.slice(1)}
           </Link>
         ))}
+        {/* Always visible: these are cards at every width, so there is no
+            header to click. */}
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} className="ml-auto" />
       </div>
 
       {error && (

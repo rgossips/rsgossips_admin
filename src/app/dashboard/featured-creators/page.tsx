@@ -4,13 +4,47 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { deleteFeaturedCreator, moveFeaturedCreator, toggleFeaturedCreatorActive } from "./actions";
 import { ActionButton } from "./_components/action-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
 
 export const dynamic = "force-dynamic";
 
-export default async function FeaturedCreatorsPage() {
+const BASE = "/dashboard/featured-creators";
+
+// A curation list: `position` is hand-set with the ↑ / ↓ buttons and IS the
+// order the consumer app renders, so it stays the default. The other
+// options are for finding someone in a long list, not for rearranging it —
+// and while one of them is active the move buttons are hidden, because they
+// would be shifting a position that is no longer on screen.
+function featuredCreatorSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "created_at", ascending: false };
+  return [
+    { key: "position", column: "position", label: label("position"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "name", column: "display_name", label: label("name"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "active", column: "is_active", label: label("active"), defaultDir: "desc", tiebreak },
+    { key: "rating", column: "rating", label: label("rating"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc" },
+  ];
+}
+
+export default async function FeaturedCreatorsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ sort?: string }>;
+}) {
   const t = await getTranslations("DashboardFeaturedCreators");
   const admin = createAdminClient();
-  const { data: creators, error } = await admin.from("featured_creators").select("*").order("position", { ascending: true }).order("created_at", { ascending: false });
+  const sp = (await searchParams) || {};
+  const SORTS = featuredCreatorSorts((k) => t(`sort.${k}`));
+  // `position` is the fallback, so the page opens in the curated order it
+  // had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "position");
+  const inDisplayOrder = sort.key === "position";
+
+  const { data: creators, error } = await applySort(
+    admin.from("featured_creators").select("*"),
+    sort,
+  );
   const canWrite = await isAdminOrAbove();
 
   const activeCount = (creators || []).filter((c) => c.is_active).length;
@@ -41,6 +75,17 @@ export default async function FeaturedCreatorsPage() {
         <StatPill label={t("stats.hidden")} value={(creators || []).length - activeCount} accent="text-gray-400" />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} />
+        {!inDisplayOrder && (
+          // Says out loud why the ↑ / ↓ buttons have gone, rather than
+          // leaving the admin to wonder whether they broke.
+          <p className="text-[12px] text-amber-700 dark:text-amber-400">
+            {t("sortNote")}
+          </p>
+        )}
+      </div>
+
       {error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">{error.message}</div>}
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
@@ -52,7 +97,9 @@ export default async function FeaturedCreatorsPage() {
             <p className="text-[11px] text-gray-300 mt-2">{t("emptyFallbackNote")}</p>
           </div>
         ) : (
-          (creators || []).map((c) => <CreatorRow key={c.id} creator={c} canWrite={canWrite} />)
+          (creators || []).map((c) => (
+            <CreatorRow key={c.id} creator={c} canWrite={canWrite} inDisplayOrder={inDisplayOrder} />
+          ))
         )}
       </div>
     </div>
@@ -68,7 +115,7 @@ function StatPill({ label, value, accent }: { label: string; value: number; acce
   );
 }
 
-async function CreatorRow({ creator, canWrite }: { creator: any; canWrite: boolean }) {
+async function CreatorRow({ creator, canWrite, inDisplayOrder }: { creator: any; canWrite: boolean; inDisplayOrder: boolean }) {
   const t = await getTranslations("DashboardFeaturedCreators");
   return (
     <div className="flex items-center gap-4 p-4">
@@ -97,7 +144,10 @@ async function CreatorRow({ creator, canWrite }: { creator: any; canWrite: boole
         </a>
       </div>
 
-      {canWrite && (
+      {/* Reordering only makes sense while the list IS the display order.
+          Sorted by name, "move up" would shuffle a position the admin
+          cannot see, so the pair is hidden rather than lying. */}
+      {canWrite && inDisplayOrder && (
         <>
           <form
             action={async () => {
