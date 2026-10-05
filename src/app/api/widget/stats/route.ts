@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { SUBSCRIPTION_TIERS } from "@/lib/subscription-plans";
 import { getRazorpayCollected } from "@/lib/razorpay-collected";
+import { countOpsStreams, totalOpsCount } from "@/lib/ops-streams";
 
 // Read-only stats feed for the Windows desktop widget (widget/ in this repo).
 //
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
   const [
     subsTotal, subsToday, infTotal, infToday, brandTotal, brandToday, collected,
-    errorsOpen, errorsToday, notifQuotes, notifDeliverables, notifReviews, notifVerifications,
+    errorsOpen, errorsToday, notifCounts,
   ] = await Promise.all([
     admin.from("influencer_profiles").select("influencer_id", head).in("subscription_plan", paidTiers),
     // RS_Gossips migration 067. A head count on a missing table returns
@@ -63,13 +64,14 @@ export async function GET(request: NextRequest) {
     // Errors page triage (RS_Gossips migration 068 adds `status`).
     admin.from("error_logs").select("id", head).eq("status", "open"),
     admin.from("error_logs").select("id", head).gte("occurred_at", startIso),
-    // Notifications = the admin bell's "awaiting action" streams (see
-    // getAwaitingActionFeed in dashboard/ops-actions.ts), counted in full —
-    // the bell itself caps each stream at 10.
-    admin.from("service_orders").select("id", head).in("status", ["pending_quote", "counter_offered", "revision_requested"]),
-    admin.from("campaign_applications").select("id", head).eq("status", "submitted"),
-    admin.from("campaigns").select("campaign_id", head).eq("status", "under_review"),
-    admin.from("brand_profiles").select("brand_id", head).eq("verification_status", "pending"),
+    // Notifications = the admin bell's "awaiting action" streams, counted in
+    // full (the bell itself caps each stream at 10 for display).
+    //
+    // Read from OPS_STREAMS rather than rewritten here. This route used to
+    // carry its own four queries, the bell grew to eight streams, and the
+    // widget then reported 0 while the portal showed 9 — every one of those 9
+    // sat in a stream this file had never heard of.
+    countOpsStreams(admin, new Date().toISOString()),
   ]);
 
   const dbFailed = [subsTotal, infTotal, infToday, brandTotal, brandToday].find((r) => r.error);
@@ -81,8 +83,9 @@ export async function GET(request: NextRequest) {
   const n = (v: number | null) => v ?? 0;
   // A failed or not-yet-migrated count is null ("unknown"), never a fake 0.
   const maybe = (r: { error: unknown; count: number | null }) => (r.error || r.count === null ? null : r.count);
-  const notifParts = { quotes: maybe(notifQuotes), deliverables: maybe(notifDeliverables), campaignReviews: maybe(notifReviews), brandVerifications: maybe(notifVerifications) };
-  const notifKnown = Object.values(notifParts).filter((v): v is number => v !== null);
+  // Every stream, each one null when it could not be read. The widget shows
+  // the total; the parts are there so a reader can see WHICH queue is full.
+  const notifParts = notifCounts;
   return json({
     status: "success",
     generatedAt: new Date().toISOString(),
@@ -104,7 +107,7 @@ export async function GET(request: NextRequest) {
       today: maybe(errorsToday),
     },
     notifications: {
-      total: notifKnown.length ? notifKnown.reduce((a, b) => a + b, 0) : null,
+      total: totalOpsCount(notifParts),
       ...notifParts,
     },
     collected: collected.ok

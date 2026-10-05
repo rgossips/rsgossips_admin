@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { viewerGate, getCurrentUser } from "@/lib/require-super-admin";
 import { logError } from "@/lib/log";
 import type { OpsBadges } from "@/hooks/use-ops-badges";
+import { applyStream } from "@/lib/ops-streams";
 
 // Server-side reads for the live "needs attention" surfaces (sidebar badges,
 // mobile nav/hub, notification bell).
@@ -96,74 +97,70 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
   if (await viewerGate()) return null;
   const admin = createAdminClient();
 
-  const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  // One instant for the whole pass, shared with the widget's counts so the
+  // two can never straddle a tick.
+  const now = nowIso();
+  // Each stream's FILTERS come from OPS_STREAMS (lib/ops-streams.ts) — the
+  // bell adds the select it needs to render and its own order/limit. The
+  // widget head-counts the same filters. Before this they were two separate
+  // sets of queries, and the four streams added after the widget shipped
+  // were missing from it entirely.
   const [quotesRes, appsRes, reviewRes, verifyRes, payoutRes, deliveryRes, callbackFeedRes, adminUpdatesRes, readsRes] = await Promise.all([
-    admin
+    applyStream("quotes", admin
       .from("service_orders")
-      .select("id, order_number, service_title, status, created_at, updated_at")
-      .in("status", ["pending_quote", "counter_offered", "revision_requested"])
+      .select("id, order_number, service_title, status, created_at, updated_at"), now)
       .order("updated_at", { ascending: false })
       .limit(10),
-    admin
+    applyStream("deliverables", admin
       .from("campaign_applications")
-      .select("id, campaign_id, created_at, updated_at, campaigns(title)")
-      .eq("status", "submitted")
+      .select("id, campaign_id, created_at, updated_at, campaigns(title)"), now)
       .order("updated_at", { ascending: false })
       .limit(10),
     // Invited-brand campaigns have no brand_profiles row, so fall back to the
     // invitation's name rather than showing a nameless entry.
-    admin
+    applyStream("campaignReviews", admin
       .from("campaigns")
-      .select("campaign_id, title, created_at, brand_profiles(brand_name), brand_invitations(brand_name)")
-      .eq("status", "under_review")
+      .select("campaign_id, title, created_at, brand_profiles(brand_name), brand_invitations(brand_name)"), now)
       .order("created_at", { ascending: false })
       .limit(10),
     // Brands waiting on verification — they can't publish until an admin acts.
-    admin
+    applyStream("brandVerifications", admin
       .from("brand_profiles")
-      .select("brand_id, brand_name, gstin_trade_name, created_at")
-      .eq("verification_status", "pending")
+      .select("brand_id, brand_name, gstin_trade_name, created_at"), now)
       .order("created_at", { ascending: false })
       .limit(10),
     // Payouts are manual now (RazorpayX was removed): a scheduled payout whose
     // release time has passed is money an admin owes a creator today.
-    admin
+    applyStream("payoutsDue", admin
       .from("campaign_applications")
-      .select("id, escrow_amount, payout_release_at, campaigns(title), influencer_profiles(full_name, instagram_handle)")
-      .eq("payout_status", "scheduled")
-      .lte("payout_release_at", nowIso())
+      .select("id, escrow_amount, payout_release_at, campaigns(title), influencer_profiles(full_name, instagram_handle)"), now)
       .order("payout_release_at", { ascending: true })
       .limit(10),
-    // Barter deliveries that stalled. Both halves are filtered in SQL so the
-    // bell never loads the settled ones: dispatched and overdue with no word,
-    // or explicitly reported as not arrived.
-    admin
+    // Barter deliveries that stalled: dispatched and overdue with no word, or
+    // explicitly reported as not arrived. Filtered in SQL so the bell never
+    // loads the settled ones.
+    applyStream("barterDeliveries", admin
       .from("campaign_applications")
-      .select("id, campaign_id, shipping_expected_at, product_received, campaigns(title), influencer_profiles(full_name, instagram_handle)")
-      .not("shipping_tracking_url", "is", null)
-      .or(`and(product_received.is.null,shipping_expected_at.lt.${nowIso()}),product_received.is.false`)
+      .select("id, campaign_id, shipping_expected_at, product_received, campaigns(title), influencer_profiles(full_name, instagram_handle)"), now)
       .order("shipping_expected_at", { ascending: true })
       .limit(10),
-    admin
+    applyStream("callbacks", admin
       .from("support_callbacks")
-      .select("id, topic, phone, user_role, created_at, user_id")
-      .eq("status", "open")
+      .select("id, topic, phone, user_role, created_at, user_id"), now)
       .order("created_at", { ascending: false })
       .limit(10),
-    // One query, inner-joined down to the campaign so only admin-owned ones
-    // come back: brand_id IS NULL means there is no registered brand, which
-    // is exactly the case where nobody else gets told.
+    // Inner-joined down to the campaign so only admin-owned ones come back:
+    // brand_id IS NULL means there is no registered brand, which is exactly
+    // the case where nobody else gets told.
     //
     // application_status_history only ever carries 'influencer' and 'brand'
     // changes — the admin portal writes the status without a history row —
     // so there is no need to filter out an admin's own clicks.
-    admin
+    applyStream("adminCampaignUpdates", admin
       .from("application_status_history")
       .select(
         "id, created_at, from_status, to_status, application_id, campaign_applications!inner(campaign_id, influencer_profiles(full_name, instagram_handle), campaigns!inner(title, brand_id))",
-      )
-      .is("campaign_applications.campaigns.brand_id", null)
-      .gte("created_at", threeDaysAgo)
+      ), now)
       .order("created_at", { ascending: false })
       .limit(10),
     // Dismissed items for whoever is asking. A missing table (migration 082

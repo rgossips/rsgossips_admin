@@ -569,9 +569,28 @@ function Show-Data ($json) {
     $notifTxt.Text = Count $nn
     if ($nn -gt 0) { $notifTxt.Foreground = $TXT_NOTIF } else { $notifTxt.Foreground = $TXT_NORMAL }
     $notifSubTxt.Text = 'awaiting action'
-    $notifTile.ToolTip = 'Campaigns to review: ' + (Count (N $nt.campaignReviews)) + "`n" +
-                         'Deliverables submitted: ' + (Count (N $nt.deliverables)) + "`n" +
-                         'Quote requests: ' + (Count (N $nt.quotes)) + "`n`nDouble-click to open the dashboard"
+    # Every stream the API reports, not a hand-picked three. The tooltip used
+    # to name only reviews / deliverables / quotes, so when the work sat in
+    # callbacks or payouts it read "0, 0, 0" beside a non-zero total. Only
+    # the queues that actually have something are listed, newest concern
+    # first; an unreadable stream is named rather than silently shown as 0.
+    $rows = @()
+    foreach ($s in @(
+      @{ k = 'callbacks';            label = 'Calls requested' },
+      @{ k = 'payoutsDue';           label = 'Payouts due' },
+      @{ k = 'campaignReviews';      label = 'Campaigns to review' },
+      @{ k = 'brandVerifications';   label = 'Brands to verify' },
+      @{ k = 'deliverables';         label = 'Deliverables submitted' },
+      @{ k = 'barterDeliveries';     label = 'Barter deliveries stalled' },
+      @{ k = 'quotes';               label = 'Quote requests' },
+      @{ k = 'adminCampaignUpdates'; label = 'Our campaigns updated' }
+    )) {
+      $v = $nt.($s.k)
+      if ($null -eq $v) { $rows += ($s.label + ': unavailable') }
+      elseif ((N $v) -gt 0) { $rows += ($s.label + ': ' + (Count (N $v))) }
+    }
+    if ($rows.Count -eq 0) { $rows += 'Nothing awaiting action' }
+    $notifTile.ToolTip = ($rows -join "`n") + "`n`nDouble-click to open the dashboard"
     if ($null -ne $script:lastNotifs -and $nn -gt $script:lastNotifs) {
       $d = $nn - $script:lastNotifs
       $chips += '+' + (Count $d) + ' ' + (Plural $d 'alert' 'alerts')
