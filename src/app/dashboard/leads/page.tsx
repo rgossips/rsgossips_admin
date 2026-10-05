@@ -3,6 +3,25 @@ import { FilterBar } from "@/components/filter-bar";
 import { RefreshButton } from "@/components/refresh-button";
 import { getTranslations } from "next-intl/server";
 import { ListCard } from "@/components/mobile/list-card";
+import { SortBar, SortLink } from "@/components/sort-controls";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/leads";
+
+// A lead is a failed sign-in attempt, so `attempts` and the two timestamps
+// are what an admin actually orders by: who keeps trying, and who tried
+// most recently.
+function leadSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "phone", ascending: true };
+  return [
+    { key: "lastAttempt", column: "last_attempt_at", label: label("lastAttempt"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "firstSeen", column: "created_at", label: label("firstSeen"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "attempts", column: "attempts", label: label("attempts"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "phone", column: "phone", label: label("phone"), defaultDir: "asc", tiebreak },
+    { key: "roleAttempted", column: "role_attempted", label: label("roleAttempted"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "source", column: "source", label: label("source"), defaultDir: "asc", nullsLast: true, tiebreak },
+  ];
+}
 
 export default async function LeadsPage({
   searchParams,
@@ -10,10 +29,16 @@ export default async function LeadsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const t = await getTranslations("DashboardLeads");
-  const { search, role, source } = await searchParams;
+  const params = await searchParams;
+  const { search, role, source } = params;
   const supabase = createAdminClient();
+  const SORTS = leadSorts((k) => t(`columns.${k}`));
+  // `lastAttempt` is the fallback, so a page with no ?sort keeps the order
+  // it had before sorting existed.
+  const sort = resolveSort(params.sort, SORTS, "lastAttempt");
 
-  let query = supabase.from("leads").select("*").order("last_attempt_at", { ascending: false });
+  let query = supabase.from("leads").select("*");
+  query = applySort(query, sort);
 
   if (search) query = query.ilike("phone", `%${search}%`);
   if (role) query = query.eq("role_attempted", role);
@@ -74,6 +99,9 @@ export default async function LeadsPage({
       </div>
 
       <FilterBar fields={filterFields} />
+      {/* Cards have no headers to click, so this is the only way to reorder
+          on a phone. */}
+      <SortBar options={SORTS} current={sort} basePath={BASE} params={params} className="mb-4" />
 
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">
@@ -132,12 +160,21 @@ export default async function LeadsPage({
         <table className="w-full min-w-180">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.phone")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.roleAttempted")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.source")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.attempts")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.lastAttempt")}</th>
-              <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.firstSeen")}</th>
+              {(["phone", "roleAttempted", "source", "attempts", "lastAttempt", "firstSeen"] as const).map((c) => {
+                const option = SORTS.find((o) => o.key === c);
+                return (
+                  <th
+                    key={c}
+                    className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5"
+                  >
+                    {option ? (
+                      <SortLink option={option} current={sort} basePath={BASE} params={params} />
+                    ) : (
+                      t(`columns.${c}`)
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">

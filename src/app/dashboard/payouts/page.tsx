@@ -5,8 +5,29 @@ import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { MarkPaidForm } from "./_components/mark-paid-form";
 import { FixPayoutDetails } from "./_components/fix-payout-details";
 import { BarterDeliveries } from "./_components/barter-deliveries";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
 
 export const dynamic = "force-dynamic";
+
+const BASE = "/dashboard/payouts";
+
+// Cards at every width, so the menu is the only sort affordance. Amount is
+// the one that earns its place here: this is a queue of money owed, and
+// "biggest payment first" is a real question an admin asks before a run.
+//
+// `escrow_amount` is PAISE on this table — the sort does not care, but
+// anything comparing it to a rupee figure would.
+function payoutSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "id", ascending: true };
+  return [
+    { key: "releaseAt", column: "payout_release_at", label: label("releaseAt"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "amount", column: "escrow_amount", label: label("amount"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "processedAt", column: "payout_processed_at", label: label("processedAt"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "scheduledAt", column: "payout_scheduled_at", label: label("scheduledAt"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "status", column: "payout_status", label: label("status"), defaultDir: "asc", tiebreak },
+  ];
+}
 
 const formatINR = (paise: number | null | undefined) =>
   paise == null
@@ -43,12 +64,14 @@ const FILTERS = [
 export default async function PayoutsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const sp = (await searchParams) || {};
   const filter = sp.status || "scheduled";
 
   const t = await getTranslations("DashboardPayouts");
+  const SORTS = payoutSorts((k) => t(`sort.${k}`));
+  const sort = resolveSort(sp.sort, SORTS, filter === "processed" ? "processedAt" : "releaseAt");
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
 
@@ -62,10 +85,15 @@ export default async function PayoutsPage({
 
   if (filter === "scheduled") q = q.eq("payout_status", "scheduled");
   else if (filter === "pending_creator_info") q = q.eq("payout_status", "pending_creator_info");
-  else if (filter === "processed") q = q.eq("payout_status", "processed").order("payout_processed_at", { ascending: false }).limit(50);
-  else q = q.in("payout_status", ["scheduled", "pending_creator_info", "processed", "failed"]).order("payout_release_at", { ascending: true });
+  else if (filter === "processed") q = q.eq("payout_status", "processed");
+  else q = q.in("payout_status", ["scheduled", "pending_creator_info", "processed", "failed"]);
 
-  if (filter !== "processed") q = q.order("payout_release_at", { ascending: true, nullsFirst: false });
+  // The default order depends on the tab, and both defaults are deliberate:
+  // an open queue is FIFO by release date (oldest money owed first), while
+  // Processed is a history and reads newest first. An explicit ?sort
+  // overrides either.
+  q = applySort(q, sort);
+  if (filter === "processed") q = q.limit(50);
 
   const { data: apps, error } = await q;
 
@@ -139,7 +167,7 @@ export default async function PayoutsPage({
           return (
             <a
               key={f.id}
-              href={`?status=${f.id}`}
+              href={sortHref(BASE, { ...sp, status: f.id }, sort.token)}
               className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-colors ${
                 active
                   ? "bg-indigo-600 border-indigo-600 text-white"
@@ -153,6 +181,8 @@ export default async function PayoutsPage({
             </a>
           );
         })}
+        {/* Always visible: this page has no table header to click. */}
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} className="ml-auto" />
       </div>
 
       {error && (

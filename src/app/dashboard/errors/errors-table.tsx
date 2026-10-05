@@ -4,6 +4,42 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setErrorLogStatus } from "./actions";
+import { SortLink, SortMenu } from "@/components/sort-controls";
+import type { ResolvedSort, SortOption } from "@/lib/sorting";
+
+// One header cell, sortable when its key is in the page's allowlist.
+//
+// MODULE SCOPE, deliberately. Defined inside ErrorsTable it was a new
+// component identity on every render, which remounts the cell and resets
+// anything it holds — the same trap that made the campaigns form lose focus
+// on every keystroke (CLAUDE.md, "Client component pitfalls"). The
+// react-hooks lint rule catches it, and did.
+function Th({
+  label,
+  sortKey,
+  sort,
+  sortOptions,
+  basePath,
+  params,
+}: {
+  label: string;
+  sortKey?: string;
+  sort?: ResolvedSort;
+  sortOptions: SortOption[];
+  basePath: string;
+  params: Record<string, string | string[] | undefined>;
+}) {
+  const option = sort && sortKey ? sortOptions.find((o) => o.key === sortKey) : undefined;
+  return (
+    <th className="px-3 py-2 font-bold">
+      {option && sort ? (
+        <SortLink option={option} current={sort} basePath={basePath} params={params} />
+      ) : (
+        label
+      )}
+    </th>
+  );
+}
 
 export type ErrorRow = {
   id: string;
@@ -56,10 +92,20 @@ export function ErrorsTable({
   rows,
   statusLive,
   users,
+  sortOptions = [],
+  sort,
+  params = {},
+  basePath = "/dashboard/errors",
 }: {
   rows: ErrorRow[];
   statusLive: boolean;
   users: Record<string, ErrorUser>;
+  // Passed in rather than read from useSearchParams: SortLink is link-only,
+  // so one component serves both this client table and the server ones.
+  sortOptions?: SortOption[];
+  sort?: ResolvedSort;
+  params?: Record<string, string | string[] | undefined>;
+  basePath?: string;
 }) {
   const router = useRouter();
   const [picked, setSelected] = useState<Set<string>>(new Set());
@@ -163,6 +209,13 @@ export function ErrorsTable({
       {/* Phones: one card per error. Triage (select + mark addressed) is the
           point of this page, so both controls come along rather than being
           desktop-only. */}
+      {/* Cards have no headers to click, so this is the only way to
+          reorder on a phone. */}
+      {sort && sortOptions.length > 0 && (
+        <div className="mb-3 lg:hidden">
+          <SortMenu options={sortOptions} current={sort} basePath={basePath} params={params} />
+        </div>
+      )}
       <ul className="space-y-2.5 lg:hidden">
         {rows.map((r) => (
           <ErrorCard
@@ -196,14 +249,16 @@ export function ErrorsTable({
                   />
                 </th>
               )}
-              <th className="px-3 py-2 font-bold">When (IST)</th>
-              {statusLive && <th className="px-3 py-2 font-bold">Status</th>}
-              <th className="px-3 py-2 font-bold">Severity</th>
-              <th className="px-3 py-2 font-bold">Area</th>
-              <th className="px-3 py-2 font-bold">Event</th>
-              <th className="px-3 py-2 font-bold">Message</th>
-              <th className="px-3 py-2 font-bold">Where</th>
-              <th className="px-3 py-2 font-bold">User</th>
+              <Th label="When (IST)" sortKey="when" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
+              {statusLive && <Th label="Status" sortKey="status" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />}
+              <Th label="Severity" sortKey="severity" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
+              <Th label="Area" sortKey="area" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
+              <Th label="Event" sortKey="event" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
+              {/* Message is free text, and User resolves through a second
+                  lookup — neither has a column worth ordering by. */}
+              <Th label="Message" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
+              <Th label="Where" sortKey="source" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
+              <Th label="User" sort={sort} sortOptions={sortOptions} basePath={basePath} params={params} />
             </tr>
           </thead>
           <tbody>

@@ -6,6 +6,28 @@ import { RefreshButton } from "@/components/refresh-button";
 import { ErrorsTable, type ErrorRow, type ErrorUser } from "./errors-table";
 import { DeleteOldErrorsButton } from "./delete-old-errors-button";
 import { ERROR_RETENTION_DAYS } from "./constants";
+import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/errors";
+
+// Paginated, so the sort goes to PostgREST. `status` is only offered when
+// the column exists — the page probes for it (migration 068) and falls back
+// to a read-only list without it, so offering the sort unconditionally
+// would hand an admin a link that 400s on an un-migrated database.
+function errorSorts(statusLive: boolean): SortOption[] {
+  const tiebreak = { column: "id", ascending: true };
+  const options: SortOption[] = [
+    { key: "when", column: "occurred_at", label: "When (IST)", defaultDir: "desc", tiebreak },
+    { key: "severity", column: "severity", label: "Severity", defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "area", column: "area", label: "Area", defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "event", column: "event", label: "Event", defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "source", column: "source", label: "Where", defaultDir: "asc", nullsLast: true, tiebreak },
+  ];
+  if (statusLive) {
+    options.splice(1, 0, { key: "status", column: "status", label: "Status", defaultDir: "asc", tiebreak });
+  }
+  return options;
+}
 
 // Module scope, not inline in the component: reading the clock during render
 // trips react-hooks/purity.
@@ -77,6 +99,7 @@ export default async function ErrorsPage({
     source?: string;
     q?: string;
     days?: string;
+    sort?: string;
     page?: string;
     status?: string;
   }>;
@@ -107,11 +130,14 @@ export default async function ErrorsPage({
   const statusLive = !statusProbe.error;
   if (statusLive) current.status = status;
 
-  let query = admin
-    .from("error_logs")
-    .select("*", { count: "exact" })
-    .order("occurred_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+  const SORTS = errorSorts(statusLive);
+  // `when` is the fallback, so a page with no ?sort keeps the newest-first
+  // order it had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "when");
+  if (sp.sort) current.sort = sort.token;
+
+  let query = admin.from("error_logs").select("*", { count: "exact" });
+  query = applySort(query, sort).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (statusLive && status !== "all") query = query.eq("status", status);
   if (area) query = query.eq("area", area);
@@ -285,7 +311,15 @@ export default async function ErrorsPage({
             {pageCount > 1 ? ` · page ${page} of ${pageCount}` : ""}
           </p>
 
-          <ErrorsTable rows={rows} statusLive={statusLive} users={users} />
+          <ErrorsTable
+            rows={rows}
+            statusLive={statusLive}
+            users={users}
+            sortOptions={SORTS}
+            sort={sort}
+            params={sp}
+            basePath={BASE}
+          />
 
           {pageCount > 1 && (
             <div className="flex items-center justify-between">

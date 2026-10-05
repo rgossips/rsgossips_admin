@@ -4,6 +4,25 @@ import { ActionButton } from "@/components/action-button";
 import { AdjustRcForm } from "./_components/adjust-rc-form";
 import { resolveManualReview } from "./actions";
 import { getTranslations } from "next-intl/server";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
+
+const BASE = "/dashboard/referrals";
+
+// Cards at every width here, so the menu is the only sort affordance.
+// `referrer_reward_rc` is the one an admin reaches for: the biggest reward
+// owed is the one worth checking before it is paid.
+function referralSorts(label: (k: string) => string): SortOption[] {
+  const tiebreak = { column: "id", ascending: true };
+  return [
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc", tiebreak },
+    { key: "reward", column: "referrer_reward_rc", label: label("reward"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "status", column: "status", label: label("status"), defaultDir: "asc", tiebreak },
+    { key: "plan", column: "referee_first_plan", label: label("plan"), defaultDir: "asc", nullsLast: true, tiebreak },
+    { key: "qualified", column: "qualified_at", label: label("qualified"), defaultDir: "desc", nullsLast: true, tiebreak },
+    { key: "rewarded", column: "rewarded_at", label: label("rewarded"), defaultDir: "desc", nullsLast: true, tiebreak },
+  ];
+}
 
 export const dynamic = "force-dynamic";
 
@@ -37,19 +56,23 @@ const formatDate = (iso: string | null | undefined) =>
 export default async function ReferralsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const sp = (await searchParams) || {};
   const filter = sp.status || "review";
   const admin = createAdminClient();
   const canWrite = await isAdminOrAbove();
   const t = await getTranslations("DashboardReferrals");
+  const SORTS = referralSorts((k) => t(`sort.${k}`));
+  // `created` is the fallback, so a page with no ?sort keeps the
+  // newest-first order it had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "created");
 
   let q = admin
     .from("referrals")
     .select("id, referrer_id, referee_id, referral_code, status, referee_first_plan, referrer_reward_rc, created_at, qualified_at, rewarded_at, review_reason, signup_ip, device_fingerprint, reviewed_at")
-    .order("created_at", { ascending: false })
-    .limit(100);
+    ;
+  q = applySort(q, sort).limit(100);
   if (filter === "review") q = q.eq("status", "MANUAL_REVIEW");
   else if (filter === "rewarded") q = q.eq("status", "REWARDED");
   else if (filter === "signed_up") q = q.in("status", ["PENDING", "SIGNED_UP"]);
@@ -153,7 +176,7 @@ export default async function ReferralsPage({
           return (
             <a
               key={id}
-              href={`?status=${id}`}
+              href={sortHref(BASE, { ...sp, status: id }, sort.token)}
               className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border transition-colors ${
                 active
                   ? "bg-indigo-600 border-indigo-600 text-white"
@@ -164,6 +187,8 @@ export default async function ReferralsPage({
             </a>
           );
         })}
+        {/* Always visible: this page has no table header to click. */}
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} className="ml-auto" />
       </div>
 
       {error && (

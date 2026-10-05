@@ -2,8 +2,29 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { QueueCard } from "@/components/mobile/queue-card";
+import { SortBar, SortLink } from "@/components/sort-controls";
+import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
 
 export const dynamic = "force-dynamic";
+
+const BASE = "/dashboard/disputes";
+
+// escrow_disputes_v is a view, so every column here is one it exposes —
+// the campaign, brand and creator names are already flattened onto it,
+// which is why those sort in the database rather than in memory.
+function disputeSorts(label: (k: string) => string): SortOption[] {
+  return [
+    { key: "opened", column: "dispute_opened_at", label: label("opened"), defaultDir: "desc", nullsLast: true },
+    { key: "amount", column: "escrow_amount", label: label("amount"), defaultDir: "desc", nullsLast: true },
+    { key: "campaign", column: "campaign_title", label: label("campaign"), defaultDir: "asc", nullsLast: true },
+    { key: "brand", column: "brand_name", label: label("brand"), defaultDir: "asc", nullsLast: true },
+    // The view calls it influencer_name, not creator_name — the table header
+    // says "Creator". Naming the wrong column here is a hard 400, and the
+    // view is empty today so it would not have shown up in a smoke test.
+    { key: "creator", column: "influencer_name", label: label("creator"), defaultDir: "asc", nullsLast: true },
+    { key: "status", column: "escrow_status", label: label("status"), defaultDir: "asc" },
+  ];
+}
 
 const STATUS_LABEL: Record<string, { key: string; class: string }> = {
   disputed: { key: "disputed", class: "bg-red-50 text-red-700" },
@@ -33,14 +54,20 @@ const formatDate = (iso: string | null) =>
 export default async function DisputesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const t = await getTranslations("DashboardDisputes");
   const sp = (await searchParams) || {};
   const filter = sp.status || "disputed";
 
+  const SORTS = disputeSorts((k) => t(`columns.${k}`));
+  // `opened` is the fallback, so a page with no ?sort keeps the
+  // newest-first order it had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "opened");
+
   const admin = createAdminClient();
-  let q = admin.from("escrow_disputes_v").select("*").order("dispute_opened_at", { ascending: false });
+  let q = admin.from("escrow_disputes_v").select("*");
+  q = applySort(q, sort);
 
   if (filter === "disputed") q = q.eq("escrow_status", "disputed");
   else if (filter === "resolved") q = q.in("escrow_status", ["refunded", "released"]);
@@ -73,7 +100,8 @@ export default async function DisputesPage({
           return (
             <Link
               key={f.id}
-              href={`/dashboard/disputes?status=${f.id}`}
+              // Carries the sort through; a hard-coded `?status=` dropped it.
+              href={sortHref(BASE, { ...sp, status: f.id }, sort.token)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 active
                   ? "bg-violet-600 text-white"
@@ -85,6 +113,9 @@ export default async function DisputesPage({
             </Link>
           );
         })}
+        {/* Cards have no headers to click, so this is the only way to
+            reorder on a phone. */}
+        <SortBar options={SORTS} current={sort} basePath={BASE} params={sp} className="ml-auto" />
       </div>
 
       {error && (
@@ -105,12 +136,25 @@ export default async function DisputesPage({
           <table className="w-full min-w-180 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
               <tr>
-                <th className="px-4 py-3 text-left">{t("columns.campaign")}</th>
-                <th className="px-4 py-3 text-left">{t("columns.brand")}</th>
-                <th className="px-4 py-3 text-left">{t("columns.creator")}</th>
-                <th className="px-4 py-3 text-right">{t("columns.amount")}</th>
-                <th className="px-4 py-3 text-left">{t("columns.opened")}</th>
-                <th className="px-4 py-3 text-left">{t("columns.status")}</th>
+                {(["campaign", "brand", "creator", "amount", "opened", "status"] as const).map((c) => {
+                  const option = SORTS.find((o) => o.key === c);
+                  const right = c === "amount";
+                  return (
+                    <th key={c} className={`px-4 py-3 ${right ? "text-right" : "text-left"}`}>
+                      {option ? (
+                        <SortLink
+                          option={option}
+                          current={sort}
+                          basePath={BASE}
+                          params={sp}
+                          align={right ? "right" : "left"}
+                        />
+                      ) : (
+                        t(`columns.${c}`)
+                      )}
+                    </th>
+                  );
+                })}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>

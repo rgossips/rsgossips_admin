@@ -1645,7 +1645,14 @@
       "upi": "UPI",
       "default": "Payment method"
     },
-    "noMethodOnFile": "No method on file"
+    "noMethodOnFile": "No method on file",
+    "sort": {
+      "releaseAt": "Release date",
+      "amount": "Amount",
+      "processedAt": "Paid on",
+      "scheduledAt": "Scheduled",
+      "status": "Status"
+    }
   },
   "DashboardPayoutsComponentsMarkPaidForm": {
     "markAsPaid": "Mark as paid",
@@ -1683,6 +1690,12 @@
       "revision_requested": "Revision requested",
       "paid_final": "Final paid",
       "completed": "Completed"
+    },
+    "sort": {
+      "created": "Requested",
+      "orderNumber": "Order no.",
+      "service": "Service",
+      "status": "Status"
     }
   },
   "DashboardQuoteRequestsComponentsDeliverDraftForm": {
@@ -1831,6 +1844,14 @@
       "duplicate_device_fp": "Duplicate device fingerprint",
       "duplicate_signup_ip": "Duplicate signup IP",
       "daily_cap_hit": "Daily cap hit"
+    },
+    "sort": {
+      "created": "Created",
+      "reward": "Reward (RC)",
+      "status": "Status",
+      "plan": "First plan",
+      "qualified": "Qualified",
+      "rewarded": "Rewarded"
     }
   },
   "DashboardReferralsComponentsAdjustRcForm": {

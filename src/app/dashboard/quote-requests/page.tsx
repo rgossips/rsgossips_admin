@@ -2,8 +2,24 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { SortMenu } from "@/components/sort-controls";
+import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
 
 export const dynamic = "force-dynamic";
+
+const BASE = "/dashboard/quote-requests";
+
+// This page is cards at every width — there are no column headers to click,
+// so the menu is the ONLY sort affordance and is always visible rather than
+// hidden above lg.
+function quoteSorts(label: (k: string) => string): SortOption[] {
+  return [
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc" },
+    { key: "orderNumber", column: "order_number", label: label("orderNumber"), defaultDir: "desc", nullsLast: true },
+    { key: "service", column: "service_title", label: label("service"), defaultDir: "asc", nullsLast: true },
+    { key: "status", column: "status", label: label("status"), defaultDir: "asc" },
+  ];
+}
 
 const STATUS_CLASS: Record<string, string> = {
   pending_quote: "bg-amber-50 text-amber-700",
@@ -24,17 +40,20 @@ const FILTERS = ["pending_quote", "active", "completed", "declined", "all"];
 export default async function QuoteRequestsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const t = await getTranslations("DashboardQuoteRequests");
   const sp = (await searchParams) || {};
   const filter = sp.status || "pending_quote";
 
+  const SORTS = quoteSorts((k) => t(`sort.${k}`));
+  // `created` is the fallback, so a page with no ?sort keeps the
+  // newest-first order it had before sorting existed.
+  const sort = resolveSort(sp.sort, SORTS, "created");
+
   const admin = createAdminClient();
-  let q = admin
-    .from("service_orders")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let q = admin.from("service_orders").select("*");
+  q = applySort(q, sort);
 
   if (filter === "active") {
     q = q.in("status", ["quoted", "paid_advance", "in_progress", "draft_ready", "revision_requested", "paid_final"]);
@@ -108,7 +127,8 @@ export default async function QuoteRequestsPage({
         {FILTERS.map((f) => (
           <Link
             key={f}
-            href={`/dashboard/quote-requests?status=${f}`}
+            // Carries the sort through; a hard-coded `?status=` dropped it.
+            href={sortHref(BASE, { ...sp, status: f }, sort.token)}
             className={`text-[12px] font-semibold px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 ${
               filter === f
                 ? "bg-indigo-600 text-white"
@@ -125,6 +145,9 @@ export default async function QuoteRequestsPage({
             </span>
           </Link>
         ))}
+        {/* Always visible: this page has no table, so there is no header to
+            click at any width. */}
+        <SortMenu options={SORTS} current={sort} basePath={BASE} params={sp} className="ml-auto" />
       </div>
 
       {error && (
