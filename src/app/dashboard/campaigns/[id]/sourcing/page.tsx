@@ -8,6 +8,7 @@ import { ALL_MAIN_STAGES, STAGE_LABEL, STAGE_STYLE, type BookingStage, type Fulf
 import { SourcingTable } from "./sourcing-table";
 import { AddBookingButton } from "./add-booking";
 import { PoolPicker } from "./pool-picker";
+import { BulkCreateButton } from "./bulk-create";
 import { ApprovedApplicants } from "./approved-applicants";
 
 export const dynamic = "force-dynamic";
@@ -134,6 +135,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         <div className="flex flex-wrap items-start gap-2">
           <PoolPicker campaignId={id} defaultMode={defaultMode} />
           <AddBookingButton campaignId={id} />
+          <BulkCreateButton campaignId={id} defaultMode={defaultMode} />
         </div>
       )}
 
