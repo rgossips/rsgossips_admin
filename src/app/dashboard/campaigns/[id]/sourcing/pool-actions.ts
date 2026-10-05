@@ -6,6 +6,7 @@ import { adminGate, requireAdmin } from "@/lib/require-super-admin";
 import { logError } from "@/lib/log";
 import { sanitizeSearchTerm } from "@/lib/validation";
 import { rankCandidates, scoreCandidate, type PoolCandidate } from "@/lib/sourcing/pool";
+import { genderExcludes, requiredGender } from "@/lib/gender-target";
 import { toFulfilmentMode, type FulfilmentMode } from "@/lib/sourcing/stages";
 
 // Pulling creators out of our own database onto a campaign's sourcing list.
@@ -18,6 +19,25 @@ import { toFulfilmentMode, type FulfilmentMode } from "@/lib/sourcing/stages";
 
 const PAGE = 400;
 
+// Two trailers, two separators, and they are NOT the same: a campaign's
+// description uses "\n\n---\n" (the campaign forms write it) while an
+// invitation's notes use "\n---\n" (ensure-invitation's buildNotes). Parsing
+// one with the other's separator silently yields {} — which on a gender
+// brief would read as "no restriction" and put the whole mismatched half of
+// the base back in the list.
+function parseTrailer(raw: string | null | undefined, sep: string): Record<string, unknown> {
+  const s = String(raw || "");
+  const at = s.indexOf(sep);
+  const json = at !== -1 ? s.slice(at + sep.length) : s.trimStart().startsWith("{") ? s : "";
+  if (!json) return {};
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function searchCreatorPool(
   campaignId: string,
   opts?: { search?: string; includeInvited?: boolean },
@@ -27,17 +47,24 @@ export async function searchCreatorPool(
 
   const admin = createAdminClient();
 
+  // target_gender is NOT a column — it lives in the description trailer with
+  // the rest of the brief's metadata (see CLAUDE.md, "Description / notes
+  // trailer metadata"), so the description has to come back too.
   const { data: campaign } = await admin
     .from("campaigns")
-    .select("target_categories, target_cities, target_follower_min, target_follower_max")
+    .select("target_categories, target_cities, target_follower_min, target_follower_max, description")
     .eq("campaign_id", campaignId)
     .maybeSingle();
+  const campaignMeta = parseTrailer(campaign?.description, "\n\n---\n");
   const target = {
     categories: campaign?.target_categories ?? null,
     cities: campaign?.target_cities ?? null,
     followerMin: campaign?.target_follower_min ?? null,
     followerMax: campaign?.target_follower_max ?? null,
+    gender: Array.isArray(campaignMeta.target_gender) ? (campaignMeta.target_gender as string[]) : null,
   };
+  // Null unless the brief names exactly one gender. Nine of 75 campaigns do.
+  const needGender = requiredGender(target.gender);
 
   const term = sanitizeSearchTerm(opts?.search || "");
 
@@ -58,7 +85,7 @@ export async function searchCreatorPool(
   // Registered creators.
   let q = admin
     .from("influencer_profiles")
-    .select("influencer_id, full_name, username, instagram_handle, followers_count, categories, location, engagement_rate, status")
+    .select("influencer_id, full_name, username, instagram_handle, followers_count, categories, location, engagement_rate, status, gender")
     .neq("status", "pending_deletion")
     .limit(PAGE);
   if (term) q = q.or(`full_name.ilike.%${term}%,instagram_handle.ilike.%${term}%,username.ilike.%${term}%`);
@@ -68,6 +95,10 @@ export async function searchCreatorPool(
     return { error: "Could not search creators. Please try again." };
   }
   for (const p of profiles || []) {
+    // A female-only brief must not return male creators. Dropped here rather
+    // than scored low, and dropped server-side so the mismatched half of the
+    // base never crosses to the client at all.
+    if (genderExcludes(needGender, p.gender)) continue;
     const handle = p.instagram_handle || p.username || "";
     const { score, reasons } = scoreCandidate(p, target);
     candidates.push({
@@ -79,6 +110,7 @@ export async function searchCreatorPool(
       categories: p.categories || [],
       location: p.location ?? null,
       engagementRate: p.engagement_rate ?? null,
+      gender: p.gender ?? null,
       registered: true,
       score,
       reasons,
@@ -99,23 +131,19 @@ export async function searchCreatorPool(
     const { data: invites, error: invErr } = await qi;
     if (invErr) logError("sourcing.pool.invites", invErr, { campaignId });
     for (const i of invites || []) {
-      let meta: Record<string, unknown> = {};
-      const raw = String(i.notes || "");
-      const at = raw.indexOf("\n---\n");
-      const json = at !== -1 ? raw.slice(at + 5) : raw.trimStart().startsWith("{") ? raw : "";
-      if (json) {
-        try {
-          meta = JSON.parse(json) || {};
-        } catch {
-          /* a malformed trailer just means less to score on */
-        }
-      }
+      // A malformed trailer just means less to score on.
+      const meta = parseTrailer(i.notes, "\n---\n");
+      const invGender = typeof meta.gender === "string" ? meta.gender : null;
+      // Invitations are the better-populated half for this: 997 of 1000
+      // pending ones carry a gender, against 247 of 492 registered profiles.
+      if (genderExcludes(needGender, invGender)) continue;
       const handle = i.instagram_username || "";
       const shaped = {
         followers_count: Number(meta.followers) || null,
         categories: Array.isArray(meta.categories) ? (meta.categories as string[]) : [],
         location: typeof meta.city === "string" ? meta.city : null,
         engagement_rate: null,
+        gender: invGender,
       };
       const { score, reasons } = scoreCandidate(shaped, target);
       candidates.push({
@@ -127,6 +155,7 @@ export async function searchCreatorPool(
         categories: shaped.categories,
         location: shaped.location,
         engagementRate: null,
+        gender: invGender,
         registered: false,
         score,
         reasons,

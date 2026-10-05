@@ -9,6 +9,13 @@
 // field returns nothing on a campaign that asks for Beauty creators in
 // Mumbai with 5-10k followers; a score surfaces the near misses and lets the
 // admin judge. The campaign's own numbers are a brief, not a specification.
+//
+// GENDER IS THE ONE EXCEPTION, and it is a hard exclusion. A creator at 11k
+// on a 1-10k brief is a near miss worth showing; a male creator on a
+// female-only hair-styler brief is not a near miss, he is the wrong answer,
+// and the consumer app now refuses his application outright. Scoring it
+// would still have put him in the list. The exclusion only ever drops a
+// KNOWN mismatch — see genderExcludes in lib/gender-target.ts.
 
 export type PoolCandidate = {
   influencerId: string | null;
@@ -19,6 +26,8 @@ export type PoolCandidate = {
   categories: string[];
   location: string | null;
   engagementRate: number | null;
+  /** male | female | non_binary | prefer_not_to_say | null (not on file). */
+  gender: string | null;
   /** Registered on the platform, or only invited so far. */
   registered: boolean;
   score: number;
@@ -34,7 +43,11 @@ export type PoolTargeting = {
   cities?: string[] | null;
   followerMin?: number | null;
   followerMax?: number | null;
+  /** The campaign's target_gender array, straight off the description trailer. */
+  gender?: string[] | null;
 };
+
+import { genderLabel, requiredGender } from "@/lib/gender-target";
 
 const norm = (s: unknown) => String(s || "").trim().toLowerCase();
 
@@ -43,11 +56,35 @@ const norm = (s: unknown) => String(s || "").trim().toLowerCase();
 const WILDCARD_CITIES = new Set(["all india", "all", "anywhere", "pan india"]);
 
 export function scoreCandidate(
-  c: { followers_count?: number | null; categories?: string[] | null; location?: string | null; engagement_rate?: number | null },
+  c: {
+    followers_count?: number | null;
+    categories?: string[] | null;
+    location?: string | null;
+    engagement_rate?: number | null;
+    gender?: string | null;
+  },
   target: PoolTargeting,
 ): { score: number; reasons: string[] } {
   let score = 0;
   const reasons: string[] = [];
+
+  // Gender. A known mismatch never reaches here — it is excluded before
+  // scoring — so this only distinguishes a confirmed match from someone
+  // whose gender we don't hold. Saying "gender not on file" out loud matters
+  // on a restricted brief: the admin is about to DM them, and it is the one
+  // thing they'd want to check on the profile first.
+  const needGender = requiredGender(target.gender);
+  if (needGender) {
+    const theirs = String(c.gender || "").trim().toLowerCase();
+    if (theirs === needGender) {
+      score += 15;
+      reasons.push(`${needGender} — matches brief`);
+    } else if (!theirs) {
+      reasons.push("gender not on file");
+    } else {
+      reasons.push(genderLabel(theirs) || theirs);
+    }
+  }
 
   // Category overlap is the strongest signal: a beauty brief wants beauty
   // creators far more than it wants a particular follower count.
