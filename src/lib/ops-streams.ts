@@ -32,6 +32,17 @@ export type OpsStreamKey =
 // How far back a status change still counts as news.
 export const ADMIN_UPDATE_WINDOW_DAYS = 3;
 
+// Rows the bell loads PER STREAM.
+//
+// Was 10, which made the badge a lie: 21 admin-campaign updates arrived as
+// 10, so the count an admin saw was capped long before the "9+" clamp on top
+// of it. 50 is above any real queue here (the busiest stream today is 21)
+// while still bounding the payload — these selects carry embedded campaign
+// and creator names, so this is not a number to make large. A stream that
+// returns exactly this many is reported as truncated rather than silently
+// undercounted.
+export const FEED_LIMIT = 50;
+
 export type OpsStream = {
   key: OpsStreamKey;
   table: string;

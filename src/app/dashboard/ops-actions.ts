@@ -4,7 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { viewerGate, getCurrentUser } from "@/lib/require-super-admin";
 import { logError } from "@/lib/log";
 import type { OpsBadges } from "@/hooks/use-ops-badges";
-import { applyStream } from "@/lib/ops-streams";
+import { applyStream, FEED_LIMIT } from "@/lib/ops-streams";
 
 // Server-side reads for the live "needs attention" surfaces (sidebar badges,
 // mobile nav/hub, notification bell).
@@ -78,6 +78,8 @@ export type AwaitingActionFeed = {
   // Item keys this admin has dismissed. Empty when migration 082 is not
   // applied yet, which simply means nothing is marked read.
   readKeys: string[];
+  /** A stream hit FEED_LIMIT, so the counts below are a floor. */
+  truncated: boolean;
   adminCampaignUpdates: {
     id: string;
     campaign_id: string;
@@ -110,32 +112,32 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
       .from("service_orders")
       .select("id, order_number, service_title, status, created_at, updated_at"), now)
       .order("updated_at", { ascending: false })
-      .limit(10),
+      .limit(FEED_LIMIT),
     applyStream("deliverables", admin
       .from("campaign_applications")
       .select("id, campaign_id, created_at, updated_at, campaigns(title)"), now)
       .order("updated_at", { ascending: false })
-      .limit(10),
+      .limit(FEED_LIMIT),
     // Invited-brand campaigns have no brand_profiles row, so fall back to the
     // invitation's name rather than showing a nameless entry.
     applyStream("campaignReviews", admin
       .from("campaigns")
       .select("campaign_id, title, created_at, brand_profiles(brand_name), brand_invitations(brand_name)"), now)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(FEED_LIMIT),
     // Brands waiting on verification — they can't publish until an admin acts.
     applyStream("brandVerifications", admin
       .from("brand_profiles")
       .select("brand_id, brand_name, gstin_trade_name, created_at"), now)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(FEED_LIMIT),
     // Payouts are manual now (RazorpayX was removed): a scheduled payout whose
     // release time has passed is money an admin owes a creator today.
     applyStream("payoutsDue", admin
       .from("campaign_applications")
       .select("id, escrow_amount, payout_release_at, campaigns(title), influencer_profiles(full_name, instagram_handle)"), now)
       .order("payout_release_at", { ascending: true })
-      .limit(10),
+      .limit(FEED_LIMIT),
     // Barter deliveries that stalled: dispatched and overdue with no word, or
     // explicitly reported as not arrived. Filtered in SQL so the bell never
     // loads the settled ones.
@@ -143,12 +145,12 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
       .from("campaign_applications")
       .select("id, campaign_id, shipping_expected_at, product_received, campaigns(title), influencer_profiles(full_name, instagram_handle)"), now)
       .order("shipping_expected_at", { ascending: true })
-      .limit(10),
+      .limit(FEED_LIMIT),
     applyStream("callbacks", admin
       .from("support_callbacks")
       .select("id, topic, phone, user_role, created_at, user_id"), now)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(FEED_LIMIT),
     // Inner-joined down to the campaign so only admin-owned ones come back:
     // brand_id IS NULL means there is no registered brand, which is exactly
     // the case where nobody else gets told.
@@ -162,7 +164,7 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
         "id, created_at, from_status, to_status, application_id, campaign_applications!inner(campaign_id, influencer_profiles(full_name, instagram_handle), campaigns!inner(title, brand_id))",
       ), now)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(FEED_LIMIT),
     // Dismissed items for whoever is asking. A missing table (migration 082
     // not applied) degrades to "nothing is read" rather than breaking the
     // bell — same probe-and-fall-back shape the errors page uses.
@@ -182,8 +184,17 @@ export async function getAwaitingActionFeed(): Promise<AwaitingActionFeed | null
   if (appsRes.error) logError("ops-feed", appsRes.error, { query: "submissions" });
   if (reviewRes.error) logError("ops-feed", reviewRes.error, { query: "reviews" });
 
+  // Did any stream come back full? Then there are more items than the bell
+  // loaded and its count is a floor, not the total — the badge says so with
+  // a "+" rather than quietly undercounting, which is what the old
+  // 10-per-stream cap did.
+  const truncated = [
+    quotesRes, appsRes, reviewRes, verifyRes, payoutRes, deliveryRes, callbackFeedRes, adminUpdatesRes,
+  ].some((r) => (r.data?.length ?? 0) >= FEED_LIMIT);
+
   /* eslint-disable @typescript-eslint/no-explicit-any */
   return {
+    truncated,
     quotes: (quotesRes.data || []) as AwaitingActionFeed["quotes"],
     submissions: (appsRes.data || []).map((a: any) => ({
       id: a.id,

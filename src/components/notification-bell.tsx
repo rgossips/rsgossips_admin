@@ -41,6 +41,8 @@ export function NotificationBell() {
   // their desk, and so one admin reading something does not clear it for
   // everyone else.
   const [readKeys, setReadKeys] = useState<Set<string>>(new Set());
+  // True when a stream came back full, so the badge count is a floor.
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -191,6 +193,7 @@ export function NotificationBell() {
 
         if (!cancelled) {
           setReadKeys(new Set(feed.readKeys ?? []));
+          setTruncated(!!feed.truncated);
           setNotifications(items);
           setLoading(false);
         }
@@ -255,8 +258,14 @@ export function NotificationBell() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         {unread.length > 0 && (
-          <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-            {unread.length > 9 ? "9+" : unread.length}
+          // The real number. It used to clamp to "9+", which hid the
+          // difference between ten things waiting and sixty — and the feed
+          // itself capped each stream at 10, so even the uncapped number
+          // would have been wrong. The badge widens to fit instead, and only
+          // shows a "+" when a stream genuinely hit FEED_LIMIT.
+          <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center tabular-nums">
+            {unread.length}
+            {truncated ? "+" : ""}
           </span>
         )}
       </button>
@@ -276,7 +285,7 @@ export function NotificationBell() {
                 </button>
               )}
               <span className="text-[10px] font-semibold text-gray-400">
-                {unread.length}/{notifications.length}
+                {unread.length}/{notifications.length}{truncated ? "+" : ""}
               </span>
             </div>
           </div>
