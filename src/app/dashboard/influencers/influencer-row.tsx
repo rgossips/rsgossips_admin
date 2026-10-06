@@ -7,6 +7,8 @@ import { Avatar } from "@/components/avatar";
 import { InstagramLink } from "@/components/instagram-link";
 import type { IgStatus } from "@/lib/instagram-status";
 import { ListCard } from "@/components/mobile/list-card";
+import { PlatformBadges } from "@/components/platform-badges";
+import type { Platform } from "@/lib/device-platforms";
 
 const IG_STATUS_STYLE: Record<IgStatus, string> = {
   authorized: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
@@ -44,7 +46,7 @@ function mediaKitUrlOf(inf: Influencer) {
 // Phone-width twin of InfluencerRow. A seven-column table is unreadable on a
 // phone, so the same fields stack into a card; both live in this file so a
 // change to one is a change in front of the other.
-export function InfluencerCard({ inf, phone }: { inf: Influencer; phone?: string | null }) {
+export function InfluencerCard({ inf, phone, platforms }: { inf: Influencer; phone?: string | null; platforms?: Platform[] }) {
   const t = useTranslations("DashboardInfluencersInfluencerRow");
   const tIg = useTranslations("DashboardInfluencers.igStatus");
   const mediaKitUrl = mediaKitUrlOf(inf);
@@ -95,12 +97,15 @@ export function InfluencerCard({ inf, phone }: { inf: Influencer; phone?: string
         ...(inf.categories && inf.categories.length > 0
           ? [{ label: t("categoriesLabel"), value: inf.categories.slice(0, 3).join(", ") + (inf.categories.length > 3 ? ` +${inf.categories.length - 3}` : "") }]
           : []),
+        // Which platforms they actually sign in from. Derived from
+        // device_sessions' user agents — see lib/device-platforms.ts.
+        { label: t("platformsLabel"), value: <PlatformBadges platforms={platforms} emptyLabel={t("neverSignedIn")} /> },
       ]}
     />
   );
 }
 
-export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string | null }) {
+export function InfluencerRow({ inf, phone, platforms }: { inf: Influencer; phone?: string | null; platforms?: Platform[] }) {
   const t = useTranslations("DashboardInfluencersInfluencerRow");
   const tIg = useTranslations("DashboardInfluencers.igStatus");
   const status = inf.status;
@@ -192,6 +197,9 @@ export function InfluencerRow({ inf, phone }: { inf: Influencer; phone?: string 
           <span className={`w-1.5 h-1.5 rounded-full ${IG_STATUS_DOT[inf.igStatus]}`} />
           {tIg(inf.igStatus)}
         </span>
+      </td>
+      <td className="px-6 py-4">
+        <PlatformBadges platforms={platforms} emptyLabel={t("neverSignedIn")} />
       </td>
     </tr>
   );

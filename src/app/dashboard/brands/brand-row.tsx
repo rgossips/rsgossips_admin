@@ -11,6 +11,8 @@ import { useRole } from "@/components/role-context";
 import { BrandTypeBadge } from "@/components/brand-type-badge";
 import { toBrandAccountType } from "@/lib/brand-account-type";
 import { ListCard } from "@/components/mobile/list-card";
+import { PlatformBadges } from "@/components/platform-badges";
+import type { Platform } from "@/lib/device-platforms";
 
 interface Brand {
   brand_id: string;
@@ -26,7 +28,7 @@ interface Brand {
 // (optimistic status, per-action spinner), so a separate card component would
 // mean two copies of handleVerification and two chances for them to diverge.
 // Only the markup branches.
-export function BrandRow({ brand, variant = "row" }: { brand: Brand; variant?: "row" | "card" }) {
+export function BrandRow({ brand, variant = "row", platforms }: { brand: Brand; variant?: "row" | "card"; platforms?: Platform[] }) {
   const t = useTranslations("DashboardBrandsBrandRow");
   const router = useRouter();
   const { isAdmin } = useRole();
@@ -84,7 +86,10 @@ export function BrandRow({ brand, variant = "row" }: { brand: Brand; variant?: "
             <BrandTypeBadge kind="profile" id={brand.brand_id} value={toBrandAccountType(brand.account_type)} />
           </>
         }
-        facts={brand.gstin ? [{ label: "GSTIN", value: <span className="font-mono text-[12px]">{brand.gstin}</span> }] : undefined}
+        facts={[
+          ...(brand.gstin ? [{ label: "GSTIN", value: <span className="font-mono text-[12px]">{brand.gstin}</span> }] : []),
+          { label: "Platform", value: <PlatformBadges platforms={platforms} emptyLabel="Never signed in" /> },
+        ]}
         // The same buttons as the desktop row, not a reduced set: verifying a
         // brand is the whole reason an admin opens this on a phone.
         actions={
@@ -155,6 +160,9 @@ export function BrandRow({ brand, variant = "row" }: { brand: Brand; variant?: "
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-mono text-xs">
         {brand.gstin || "—"}
+      </td>
+      <td className="px-6 py-4">
+        <PlatformBadges platforms={platforms} emptyLabel="Never signed in" />
       </td>
       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
         {!isAdmin ? (

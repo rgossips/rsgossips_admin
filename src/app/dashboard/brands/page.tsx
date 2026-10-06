@@ -13,6 +13,7 @@ import { BrandTypeFilter } from "@/components/brand-type-filter";
 import { BRAND_TYPE_PARAM, brandTypeFilter } from "@/lib/brand-account-type";
 import { SortBar, SortLink } from "@/components/sort-controls";
 import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
+import { platformsForUsers } from "@/lib/device-platforms";
 
 const BASE = "/dashboard/brands";
 
@@ -152,6 +153,14 @@ export default async function BrandsPage({
   const invitesTotal = pendingInviteCount ?? 0;
   const allCount = (brands?.length || 0) + invitesTotal;
 
+  // Which platforms each brand signs in from. Only registered brands have
+  // sessions — an invitation has no account behind it yet, so the invited
+  // cards deliberately show nothing rather than an empty badge row.
+  const platformMap = await platformsForUsers(
+    supabase,
+    (brands || []).map((b) => b.brand_id),
+  );
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -194,7 +203,7 @@ export default async function BrandsPage({
             {brands && brands.length > 0 ? (
               brands.map((brand) => (
                 <CardListItem key={brand.brand_id}>
-                  <BrandRow brand={brand} variant="card" />
+                  <BrandRow brand={brand} variant="card" platforms={platformMap.get(brand.brand_id)?.platforms} />
                 </CardListItem>
               ))
             ) : (
@@ -224,13 +233,16 @@ export default async function BrandsPage({
                       </th>
                     );
                   })}
+                  {/* Not sortable: the platforms come from device_sessions,
+                      which PostgREST cannot order this query by. */}
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.platforms")}</th>
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("columns.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {brands && brands.length > 0 ? (
                   brands.map((brand) => (
-                    <BrandRow key={brand.brand_id} brand={brand} />
+                    <BrandRow key={brand.brand_id} brand={brand} platforms={platformMap.get(brand.brand_id)?.platforms} />
                   ))
                 ) : (
                   <tr>

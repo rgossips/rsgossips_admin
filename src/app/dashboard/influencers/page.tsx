@@ -16,6 +16,7 @@ import { getCreatorCategoryOptions } from "@/lib/creator-categories";
 import { INDIAN_CITIES } from "@/lib/cities";
 import { INDIAN_LANGUAGES } from "@/lib/languages";
 import { SUBSCRIPTION_TIERS } from "@/lib/subscription-plans";
+import { platformsForUsers } from "@/lib/device-platforms";
 import { SortBar, SortLink } from "@/components/sort-controls";
 import { applySort, resolveSort, type SortOption } from "@/lib/sorting";
 
@@ -208,6 +209,14 @@ export default async function InfluencersPage({
     if (u.phone) phoneMap.set(u.id, u.phone);
   }
 
+  // Which platforms each visible creator signs in from. Scoped to the 25
+  // ids on this page, so it is one small query rather than a scan of every
+  // session — and it runs after the row query because it needs those ids.
+  const platformMap = await platformsForUsers(
+    supabase,
+    influencers.map((i) => i.influencer_id),
+  );
+
   const allCount = influencersTotal + invitesTotal;
 
   return (
@@ -245,7 +254,7 @@ export default async function InfluencersPage({
             {influencers.length > 0 ? (
               influencers.map((inf) => (
                 <CardListItem key={inf.influencer_id}>
-                  <InfluencerCard inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />
+                  <InfluencerCard inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} platforms={platformMap.get(inf.influencer_id)?.platforms} />
                 </CardListItem>
               ))
             ) : (
@@ -279,10 +288,13 @@ export default async function InfluencersPage({
                     );
                   })}
                   <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.igStatus")}</th>
+                  {/* Not sortable: the platforms come from device_sessions,
+                      which PostgREST cannot order this query by. */}
+                  <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-6 py-3.5">{t("table.platforms")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} />) : (
+                {influencers.length > 0 ? influencers.map((inf) => <InfluencerRow key={inf.influencer_id} inf={inf} phone={phoneMap.get(inf.influencer_id) ?? null} platforms={platformMap.get(inf.influencer_id)?.platforms} />) : (
                   <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-400 dark:text-gray-500">{t("noRegisteredInfluencers")}</td></tr>
                 )}
               </tbody>

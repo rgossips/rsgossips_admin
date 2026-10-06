@@ -241,7 +241,8 @@
       "contactNumber": "Contact Number",
       "verification": "Verification",
       "gstin": "GSTIN",
-      "actions": "Actions"
+      "actions": "Actions",
+      "platforms": "Platform"
     },
     "noRegisteredBrands": "No registered brands found",
     "pendingInvitations": "Pending Invitations",
@@ -1372,7 +1373,8 @@
       "followers": "Followers",
       "categories": "Categories",
       "status": "Status",
-      "igStatus": "IG Status"
+      "igStatus": "IG Status",
+      "platforms": "Platform"
     },
     "igStatus": {
       "authorized": "Fully authorized",
@@ -1610,7 +1612,9 @@
     "reactivate": "Reactivate",
     "followersLabel": "Followers",
     "phoneLabel": "Contact Number",
-    "categoriesLabel": "Categories"
+    "categoriesLabel": "Categories",
+    "platformsLabel": "Platform",
+    "neverSignedIn": "Never signed in"
   },
   "DashboardInfluencersInviteInfluencerForm": {
     "tags": "Tags",
