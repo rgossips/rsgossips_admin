@@ -272,7 +272,7 @@ export function Sidebar({
       >
         {/* Logo */}
         <div className="h-16 px-5 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800">
-          <img src="/logo.svg" alt="RecentGossips" className="h-7 dark:brightness-125" />
+          <img src="/logo2.webp" alt="RGossips" className="h-7 dark:brightness-125" />
           <span className="text-[9px] font-semibold text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">ADMIN</span>
         </div>
 

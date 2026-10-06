@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ButtonSpinner } from "@/components/spinner";
-import { COMING_SOON_CHUNK } from "./coming-soon-constants";
+import { TRANSITION_CHUNK, type TransitionMode } from "./campaign-transition-constants";
 import {
   applyComingSoon,
   notifyComingSoonChunk,
@@ -55,15 +55,54 @@ function ResultRow({ name, result }: { name: string; result?: NotifyResult }) {
   );
 }
 
+// Copy per mode. Both screens say the same SHAPE of thing — how many
+// people, then did each of them hear — but the consequence differs, and a
+// modal that said "put on hold" while closing applications for good would
+// be the most expensive kind of wrong.
+const COPY: Record<TransitionMode, {
+  heading: string;
+  consequence: string;
+  untouchedNote: string;
+  cta: (n: number) => string;
+}> = {
+  coming_soon: {
+    heading: "Move to Coming Soon",
+    consequence:
+      "Their applications will be put on hold — kept, not rejected — and each of them gets an email and an in-app notification saying the campaign is being prepared and that they do not need to apply again.",
+    untouchedNote: "withdrawn, rejected or completed",
+    cta: (n) => (n === 0 ? "Move to Coming Soon" : `Notify ${n} and move`),
+  },
+  reopen: {
+    heading: "Reopen this campaign",
+    consequence:
+      "Their applications were put on hold when the campaign was pulled back. Reopening closes those applications and emails each creator that the campaign is open again and they need to apply afresh — the brief may have changed while it was being prepared.",
+    untouchedNote: "not on hold",
+    cta: (n) => (n === 0 ? "Reopen the campaign" : `Notify ${n} and reopen`),
+  },
+  closed: {
+    heading: "Close this campaign",
+    consequence:
+      "Their applications are still undecided. Closing the campaign marks them Closed — explicitly NOT rejected — and each creator gets an email and an in-app notification telling them so, with the campaigns that are open now.",
+    untouchedNote: "already decided or in progress",
+    cta: (n) => (n === 0 ? "Close the campaign" : `Notify ${n} and close`),
+  },
+};
+
 export function ComingSoonModal({
   campaignId,
+  mode = "coming_soon",
+  requestedStatus = "coming_soon",
   onClose,
   onDone,
 }: {
   campaignId: string;
+  mode?: TransitionMode;
+  /** For `closed`: the campaign status the admin actually picked. */
+  requestedStatus?: string;
   onClose: () => void;
   onDone: () => void;
 }) {
+  const copy = COPY[mode];
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
@@ -77,7 +116,7 @@ export function ComingSoonModal({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const plan = await prepareComingSoon(campaignId);
+      const plan = await prepareComingSoon(campaignId, mode);
       if (cancelled) return;
       if (plan.error) {
         setError(plan.error);
@@ -92,23 +131,23 @@ export function ComingSoonModal({
     return () => {
       cancelled = true;
     };
-  }, [campaignId]);
+  }, [campaignId, mode]);
 
   const run = async () => {
     setPhase("working");
     // The campaign and the applications flip first, in one call. That is the
     // part that must not be half-done; the notifications after it are
     // best-effort and a failure there leaves the state correct regardless.
-    const applied = await applyComingSoon(campaignId);
+    const applied = await applyComingSoon(campaignId, mode, requestedStatus);
     if (applied.error) {
       setError(applied.error);
       setPhase("error");
       return;
     }
 
-    for (let i = 0; i < applicants.length; i += COMING_SOON_CHUNK) {
-      const chunk = applicants.slice(i, i + COMING_SOON_CHUNK);
-      const res = await notifyComingSoonChunk(campaignId, chunk);
+    for (let i = 0; i < applicants.length; i += TRANSITION_CHUNK) {
+      const chunk = applicants.slice(i, i + TRANSITION_CHUNK);
+      const res = await notifyComingSoonChunk(campaignId, chunk, mode);
       if (res.error) {
         // Stop, but keep what already went out on screen — re-running would
         // email the ones who already heard a second time.
@@ -138,7 +177,7 @@ export function ComingSoonModal({
       <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white">Move to Coming Soon</h3>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white">{copy.heading}</h3>
             {title && <p className="truncate text-[12px] text-gray-500">{title}</p>}
           </div>
           {phase !== "working" && (
@@ -165,22 +204,20 @@ export function ComingSoonModal({
             <div className="space-y-3">
               {total === 0 ? (
                 <p className="text-[13px] text-gray-600 dark:text-gray-300">
-                  Nobody has applied yet, so this just changes the campaign — no emails, no notifications.
+                  No applications need closing, so this just changes the campaign — no emails, no notifications.
                 </p>
               ) : (
                 <>
                   <p className="text-[14px] text-gray-800 dark:text-gray-200">
                     <span className="font-bold">{total}</span>{" "}
-                    {total === 1 ? "creator has" : "creators have"} already applied to this campaign.
+                    {total === 1 ? "creator is" : "creators are"} affected.
                   </p>
                   <p className="text-[13px] leading-relaxed text-gray-600 dark:text-gray-400">
-                    Their applications will be put on hold — kept, not rejected — and each of them gets an email and
-                    an in-app notification telling them the campaign is being prepared and that they do not need to
-                    apply again.
+                    {copy.consequence}
                   </p>
                   {untouched > 0 && (
                     <p className="text-[12px] text-gray-500">
-                      {untouched} withdrawn, rejected or completed{" "}
+                      {untouched} {copy.untouchedNote}{" "}
                       {untouched === 1 ? "application is" : "applications are"} left alone.
                     </p>
                   )}
@@ -243,7 +280,7 @@ export function ComingSoonModal({
                 className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[13px] font-semibold text-white cursor-pointer"
                 style={{ background: "linear-gradient(135deg, #7C3AED 0%, #9810FA 100%)" }}
               >
-                {total === 0 ? "Move to Coming Soon" : `Notify ${total} and move`}
+                {copy.cta(total)}
               </button>
             </>
           )}

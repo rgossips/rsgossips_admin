@@ -149,7 +149,7 @@ export async function toggleInfluencerStatus(influencerId: string, _currentStatu
         });
         await sendMail({
           to: profile.email,
-          subject: `Your RecentGossips account has been ${subjectFragment}`,
+          subject: `Your RGossips account has been ${subjectFragment}`,
           html,
           text,
         });
@@ -233,7 +233,7 @@ export async function restoreInfluencerAccount(
           fullName: profile.full_name || profile.username || "there",
           action: "reactivated",
         });
-        await sendMail({ to: profile.email, subject: `Your RecentGossips account has been ${subjectFragment}`, html, text });
+        await sendMail({ to: profile.email, subject: `Your RGossips account has been ${subjectFragment}`, html, text });
         emailSent = true;
       } catch (e) {
         emailError = e instanceof Error ? e.message : "Failed to send notification email";

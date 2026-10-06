@@ -22,6 +22,7 @@ export interface CampaignInitial {
   campaign_type: "barter" | "paid" | "hybrid";
   max_influencers: number | null;
   budget_total: number | null;
+  budget_per_influencer: number | null;
   target_follower_min: number | null;
   target_follower_max: number | null;
   target_influencer_tier: string | null;
@@ -145,6 +146,13 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
   const [description, setDescription] = useState(initial?.description || "");
   const [budgetTotal, setBudgetTotal] = useState(initial?.budget_total ? String(initial.budget_total) : "");
   const [maxInfluencers, setMaxInfluencers] = useState(initial?.max_influencers ? String(initial.max_influencers) : "");
+  // Seeded from the row, not re-derived: an existing campaign's per-influencer
+  // figure may have been set directly and need not equal total / slots.
+  const [budgetPerInfluencer, setBudgetPerInfluencer] = useState(
+    initial?.budget_per_influencer ? String(initial.budget_per_influencer) : "",
+  );
+  // "total" | "per" — which box the admin typed in last.
+  const [budgetSource, setBudgetSource] = useState<"total" | "per">("total");
   const [tier, setTier] = useState(initial?.target_influencer_tier || "all");
   const [followerMin, setFollowerMin] = useState(initial?.target_follower_min ? String(initial.target_follower_min) : "");
   const [followerMax, setFollowerMax] = useState(initial?.target_follower_max ? String(initial.target_follower_max) : "");
@@ -206,13 +214,45 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
     }
   }, [tier]);
 
-  // Auto-calc Budget / Influencer
-  const budgetPerInfluencer = useMemo(() => {
-    const total = Number(budgetTotal) || 0;
-    const slots = Number(maxInfluencers) || 0;
-    if (total > 0 && slots > 0) return Math.round(total / slots);
-    return 0;
-  }, [budgetTotal, maxInfluencers]);
+  // Budget total and budget per influencer derive from each other, in BOTH
+  // directions: divide the total by the slots, or multiply the rate up.
+  // Whichever box was typed in last is the authority, so changing the slot
+  // count afterwards keeps that number and recomputes the other one.
+  const applyBudget = (
+    next: { total: string; per: string; slots: string },
+    source: "total" | "per",
+  ) => {
+    const slots = Number(next.slots) || 0;
+    const total = Number(next.total) || 0;
+    const per = Number(next.per) || 0;
+    if (slots <= 0) return next;
+    if (source === "per") {
+      return per > 0 ? { ...next, total: String(per * slots) } : next;
+    }
+    return total > 0 ? { ...next, per: String(Math.round(total / slots)) } : next;
+  };
+
+  const commitBudget = (next: { total: string; per: string; slots: string }, source: "total" | "per") => {
+    const r = applyBudget(next, source);
+    setBudgetTotal(r.total);
+    setBudgetPerInfluencer(r.per);
+    setMaxInfluencers(r.slots);
+  };
+
+  const budgetFields = () => ({ total: budgetTotal, per: budgetPerInfluencer, slots: maxInfluencers });
+
+  const onBudgetTotalChange = (v: string) => {
+    setBudgetSource("total");
+    commitBudget({ ...budgetFields(), total: v }, "total");
+  };
+
+  const onBudgetPerInfluencerChange = (v: string) => {
+    setBudgetSource("per");
+    commitBudget({ ...budgetFields(), per: v }, "per");
+  };
+
+  // Changing the slots recomputes whichever figure the admin did NOT type.
+  const onSlotsChange = (v: string) => commitBudget({ ...budgetFields(), slots: v }, budgetSource);
 
   const totalDeliverables = useMemo(() => {
     return [numReels, numPosts, numStories, numVideos, numBlogs]
@@ -300,8 +340,9 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
       const finalCities = allIndia ? ["All India"] : selectedCities;
       formData.set("target_cities", finalCities.join(","));
 
-      // Auto-calc'd budget per influencer (overwrite manual)
-      formData.set("budget_per_influencer", String(budgetPerInfluencer));
+      // Whatever is in the box — it is editable now, and kept in step with
+      // the total by the handlers above.
+      formData.set("budget_per_influencer", String(Number(budgetPerInfluencer) || 0));
 
       // Extras (packed into description metadata server-side)
       formData.append("platforms_json", JSON.stringify(selectedPlatforms));
@@ -444,7 +485,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                   type="number"
                   min="1"
                   value={maxInfluencers}
-                  onChange={(e) => setMaxInfluencers(e.target.value)}
+                  onChange={(e) => onSlotsChange(e.target.value)}
                   placeholder="10"
                   className={inputClass}
                 />
@@ -457,7 +498,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                     type="number"
                     min="0"
                     value={budgetTotal}
-                    onChange={(e) => setBudgetTotal(e.target.value)}
+                    onChange={(e) => onBudgetTotalChange(e.target.value)}
                     placeholder="50000"
                     className={inputClass}
                   />
@@ -469,10 +510,11 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                   <input
                     name="budget_per_influencer"
                     type="number"
-                    value={budgetPerInfluencer || ""}
-                    readOnly
+                    min="0"
+                    value={budgetPerInfluencer}
+                    onChange={(e) => onBudgetPerInfluencerChange(e.target.value)}
                     placeholder="—"
-                    className={`${inputClass} bg-gray-100 dark:bg-gray-700 cursor-not-allowed`}
+                    className={inputClass}
                   />
                   <p className="text-[10px] text-gray-400 mt-1">{t("hints.budgetAutoCalc")}</p>
                 </div>

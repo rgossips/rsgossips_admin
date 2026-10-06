@@ -64,7 +64,7 @@ export async function requestPasswordReset(email: string): Promise<{ success: tr
     });
     await sendMail({
       to: profile.email || clean,
-      subject: "Reset your RecentGossips Admin password",
+      subject: "Reset your RGossips Admin password",
       html,
       text,
     });

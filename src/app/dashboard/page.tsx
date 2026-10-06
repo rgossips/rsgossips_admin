@@ -417,7 +417,7 @@ export default async function DashboardPage() {
           phone). */}
       <div className="hidden lg:block relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 p-8 text-white">
         <div className="relative z-10 max-w-xl">
-          <img src="/logo.svg" alt="RecentGossips" className="h-7 brightness-200 mb-3 opacity-80" />
+          <img src="/logo2.webp" alt="RGossips" className="h-7 brightness-200 mb-3 opacity-80" />
           <h1 className="text-2xl font-bold">{t("welcome.title")}</h1>
           <p className="mt-2 text-indigo-100 text-sm leading-relaxed">
             {t("welcome.subtitle")}

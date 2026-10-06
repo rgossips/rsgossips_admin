@@ -19,6 +19,10 @@ export const APPLICATION_STATUS_BADGE: Record<string, string> = {
   payment: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
   completed: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
   rejected: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+  // The campaign ended without a decision on this application. Slate, not
+  // red: nobody judged this creator, so it must not look like a rejection
+  // in a list they scroll past.
+  closed: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300",
   withdrawn: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
 };
 

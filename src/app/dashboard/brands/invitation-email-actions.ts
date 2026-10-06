@@ -77,7 +77,7 @@ export async function sendBrandInvitationEmail(
   try {
     await sendMail({
       to: cleaned,
-      subject: "You're invited to join RecentGossips",
+      subject: "You're invited to join RGossips",
       html,
       text,
     });

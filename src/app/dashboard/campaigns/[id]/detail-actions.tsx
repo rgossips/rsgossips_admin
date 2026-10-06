@@ -48,6 +48,15 @@ export function CampaignDetailActions({
   // flip — it parks their applications and tells each of them. The modal owns
   // that whole flow, including the write, so the select never performs it.
   const [comingSoonOpen, setComingSoonOpen] = useState(false);
+  // Closing a campaign that still has undecided applications is the same
+  // shape of problem as pulling one back: people are waiting on an answer.
+  // `pendingStatus` remembers which of completed/paused was picked, since
+  // the modal writes the status itself.
+  const [closing, setClosing] = useState<string | null>(null);
+  // Reopening is the other half of Coming Soon. Without it the promise that
+  // email makes — "we'll tell you the moment it reopens" — is never kept:
+  // the campaign goes live and the parked applications sit on hold forever.
+  const [reopening, setReopening] = useState(false);
 
   const handleChange = async (next: string) => {
     if (next === current) return;
@@ -57,9 +66,20 @@ export function CampaignDetailActions({
       return;
     }
 
-    // Soft confirm only for terminal transitions where it matters.
-    const isCompleting = next === "completed";
-    if (isCompleting && !confirm(t("confirmComplete"))) {
+    // Completed / paused go through the modal too — but only when there is
+    // actually someone to tell. The modal does the counting, so it is opened
+    // unconditionally and shows "no applications need closing" when there
+    // are none, rather than this component guessing.
+    if (next === "completed" || next === "paused") {
+      setClosing(next);
+      return;
+    }
+
+    // Only from coming_soon. Activating a draft has nobody waiting on it,
+    // and the under_review path is blocked upstream because it must go
+    // through Approve.
+    if (next === "active" && current === "coming_soon") {
+      setReopening(true);
       return;
     }
 
@@ -86,6 +106,24 @@ export function CampaignDetailActions({
           campaignId={campaignId}
           onClose={() => setComingSoonOpen(false)}
           onDone={() => setCurrent("coming_soon")}
+        />
+      )}
+      {reopening && (
+        <ComingSoonModal
+          campaignId={campaignId}
+          mode="reopen"
+          requestedStatus="active"
+          onClose={() => setReopening(false)}
+          onDone={() => setCurrent("active")}
+        />
+      )}
+      {closing && (
+        <ComingSoonModal
+          campaignId={campaignId}
+          mode="closed"
+          requestedStatus={closing}
+          onClose={() => setClosing(null)}
+          onDone={() => setCurrent(closing)}
         />
       )}
       <label className="sr-only" htmlFor="campaign-status-select">{t("campaignStatusLabel")}</label>

@@ -39,7 +39,7 @@ export async function deleteBrandStep(
           const { html, text } = renderUserDeletedEmail({ fullName, kind: "brand" });
           await sendMail({
             to: email,
-            subject: "Your RecentGossips account has been removed",
+            subject: "Your RGossips account has been removed",
             html,
             text,
           });

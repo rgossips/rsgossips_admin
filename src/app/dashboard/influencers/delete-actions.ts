@@ -44,7 +44,7 @@ export async function deleteInfluencerStep(
           const { html, text } = renderUserDeletedEmail({ fullName, kind: "influencer" });
           await sendMail({
             to: email,
-            subject: "Your RecentGossips account has been removed",
+            subject: "Your RGossips account has been removed",
             html,
             text,
           });

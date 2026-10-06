@@ -67,7 +67,7 @@ export async function sendInfluencerInvitationEmail(
       .maybeSingle();
     invitedByName = me?.full_name || me?.email || undefined;
   } catch {
-    /* non-fatal — copy just falls back to "The RecentGossips team" */
+    /* non-fatal — copy just falls back to "The RGossips team" */
   }
 
   // Onboarding URL on the public app. Keeps the @handle in the path so
@@ -86,7 +86,7 @@ export async function sendInfluencerInvitationEmail(
   try {
     await sendMail({
       to: cleaned,
-      subject: "You're invited to join RecentGossips",
+      subject: "You're invited to join RGossips",
       html,
       text,
     });

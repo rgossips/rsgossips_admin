@@ -17,12 +17,23 @@
 import { sendMail } from "@/lib/mailer";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { logError } from "@/lib/log";
+import { emailBanner, emailBrandMark, emailLogo } from "@/lib/email-templates";
+
+// Local copy: email-templates keeps its own private one, and exporting it
+// just for this would widen that module's surface for a four-line helper.
+function escapeHtml(v: string) {
+  return String(v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 const SITE = "https://rgossips.com";
 
 type Side = "creator" | "brand";
 
-type Vars = {
+export type Vars = {
   campaignTitle: string;
   campaignId: string;
   creatorName: string;
@@ -30,12 +41,15 @@ type Vars = {
   reason?: string | null;
 };
 
-type Copy = { subject: string; headline: string; body: string; ctaLabel: string };
+export type Copy = { subject: string; headline: string; body: string; ctaLabel: string };
 
 // Statuses an admin can set that are worth an email. Anything missing is
 // silent on purpose — `pending` is where an application starts, `withdrawn` is
 // the creator's own doing, and `payment` belongs to the escrow-release flow.
-const CREATOR_COPY: Record<string, (v: Vars) => Copy> = {
+// Exported so the copy can be rendered without going through a send —
+// previewing what a creator will actually receive should not require
+// emailing one.
+export const CREATOR_COPY: Record<string, (v: Vars) => Copy> = {
   // "Shortlisted", never "on hold". The admin is parking a decision; the
   // creator is being told they made the cut so far. Saying "on hold" to them
   // reads as a rejection with extra steps, and saying "approved" would be a
@@ -155,12 +169,26 @@ function tidy(html: string): string {
     .join("\n");
 }
 
-function render(copy: Copy, ctaUrl: string, reason?: string | null) {
+export function renderApplicationEmail(
+  copy: Copy,
+  ctaUrl: string,
+  reason?: string | null,
+  // Optional, because a campaign without a banner (or a brand without a
+  // logo) must still send a clean email rather than a broken box.
+  imagery?: { bannerUrl?: string | null; brandLogoUrl?: string | null; brandName?: string },
+) {
   const reasonBlock = reason
     ? `<div style="margin:0 0 20px;padding:14px 16px;background:#F3F4F6;border-radius:12px;border-left:3px solid #9CA3AF;">
          <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#4B5563;text-transform:uppercase;letter-spacing:1px;">Note</p>
          <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;white-space:pre-wrap;">${reason}</p>
        </div>`
+    : "";
+
+  // Images are optional and each degrades to nothing rather than a broken
+  // box — a campaign may have no banner, a brand may have no logo.
+  const bannerRow = emailBanner(imagery?.bannerUrl, imagery?.brandName ? `${imagery.brandName} campaign` : "");
+  const brandRow = imagery?.brandLogoUrl
+    ? `<p style="margin:0 0 16px;font-size:13px;color:#6B7280;">${emailBrandMark(imagery.brandLogoUrl, imagery.brandName || "Brand")}<span style="vertical-align:middle;font-weight:600;color:#374151;">${escapeHtml(imagery.brandName || "Brand")}</span></p>`
     : "";
 
   const html = `<!DOCTYPE html>
@@ -172,10 +200,12 @@ function render(copy: Copy, ctaUrl: string, reason?: string | null) {
     <tr><td align="center">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="540" style="max-width:540px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,0.08);">
         <tr><td style="background:linear-gradient(135deg, #6366F1 0%, #A855F7 50%, #EC4899 100%);padding:36px 32px;text-align:center;color:#ffffff;">
-          <div style="font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;opacity:0.85;">RGossips</div>
+          ${emailLogo()}
           <div style="font-size:22px;font-weight:700;margin-top:6px;">${copy.headline}</div>
         </td></tr>
+        ${bannerRow}
         <tr><td style="padding:36px 36px 28px 36px;">
+          ${brandRow}
           <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#374151;">${copy.body}</p>
           ${reasonBlock}
           <div style="margin:26px 0 8px;">
@@ -220,6 +250,60 @@ async function resolveEmail(side: Side, userId: string): Promise<string> {
   }
 }
 
+/**
+ * The campaign's banner and the brand's logo, for the email header.
+ *
+ * Read here rather than asked of every caller: the campaign id is all any
+ * of them has, and an email missing its imagery because one call site
+ * forgot a parameter is exactly the kind of inconsistency nobody notices
+ * until a creator mentions it.
+ *
+ * Both are PUBLIC storage URLs (campaign-images / brand-icons), which is
+ * what makes them usable in mail at all — an email client cannot fetch a
+ * signed URL, and would render a broken image forever once one expired.
+ */
+async function campaignImagery(campaignId: string): Promise<{
+  bannerUrl: string | null;
+  brandLogoUrl: string | null;
+}> {
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("campaigns")
+      .select("description, brand_profiles(logo_url)")
+      .eq("campaign_id", campaignId)
+      .maybeSingle();
+    if (!data) return { bannerUrl: null, brandLogoUrl: null };
+    let bannerUrl: string | null = null;
+    const rawDesc = String(data.description || "");
+    // The separator is SIX characters. Hard-coding 5 left a stray newline in
+    // front of the JSON — JSON.parse tolerates that, so it would have looked
+    // like it worked while being wrong.
+    const SEP = "\n\n---\n";
+    const at = rawDesc.indexOf(SEP);
+    const json = at !== -1 ? rawDesc.slice(at + SEP.length) : rawDesc.trimStart().startsWith("{") ? rawDesc : "";
+    if (json) {
+      try {
+        const meta = JSON.parse(json);
+        if (typeof meta?.banner_image === "string" && meta.banner_image.startsWith("http")) {
+          bannerUrl = meta.banner_image;
+        }
+      } catch {
+        /* a malformed trailer just means no banner */
+      }
+    }
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    const logo = (data as any).brand_profiles?.logo_url;
+    return {
+      bannerUrl,
+      brandLogoUrl: typeof logo === "string" && logo.startsWith("http") ? logo : null,
+    };
+  } catch (e) {
+    logError("application-emails.imagery", e, { campaignId });
+    return { bannerUrl: null, brandLogoUrl: null };
+  }
+}
+
 export async function sendAdminApplicationStatusEmails(opts: {
   status: string;
   campaignId: string;
@@ -230,6 +314,8 @@ export async function sendAdminApplicationStatusEmails(opts: {
   brandName: string;
   reason?: string | null;
 }): Promise<void> {
+  const imagery = await campaignImagery(opts.campaignId);
+
   const vars: Vars = {
     campaignTitle: opts.campaignTitle,
     campaignId: opts.campaignId,
@@ -250,7 +336,12 @@ export async function sendAdminApplicationStatusEmails(opts: {
       if (!to) continue;
       // The reason is only ever shown to the creator — it is written for them,
       // and the brand already knows what it asked for.
-      const { html, text } = render(t.copy, `${SITE}${t.path}`, t.side === "creator" ? opts.reason : null);
+      const { html, text } = renderApplicationEmail(
+        t.copy,
+        `${SITE}${t.path}`,
+        t.side === "creator" ? opts.reason : null,
+        { ...imagery, brandName: opts.brandName },
+      );
       await sendMail({ to, subject: t.copy.subject, html, text });
     } catch (e) {
       logError("application-status-email", e, { side: t.side, status: opts.status, campaignId: opts.campaignId });

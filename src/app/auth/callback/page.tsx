@@ -74,7 +74,7 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 px-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
         <div className="text-center mb-6">
-          <img src="/logo.svg" alt="RecentGossips" className="h-9 mx-auto mb-4" />
+          <img src="/logo2.webp" alt="RGossips" className="h-9 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             {status === "set_password"
               ? type === "recovery"

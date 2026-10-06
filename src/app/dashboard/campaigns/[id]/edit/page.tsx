@@ -76,6 +76,7 @@ export default async function EditCampaignPage({
     campaign_type: (campaign.campaign_type as "barter" | "paid" | "hybrid") || "barter",
     max_influencers: campaign.max_influencers,
     budget_total: campaign.budget_total,
+    budget_per_influencer: campaign.budget_per_influencer,
     target_follower_min: campaign.target_follower_min,
     target_follower_max: campaign.target_follower_max,
     target_influencer_tier: campaign.target_influencer_tier,

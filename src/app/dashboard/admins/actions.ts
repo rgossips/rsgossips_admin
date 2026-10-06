@@ -146,7 +146,7 @@ export async function inviteAdmin(formData: FormData) {
 
     await sendMail({
       to: email,
-      subject: "You're invited to the RecentGossips Admin Portal",
+      subject: "You're invited to the RGossips Admin Portal",
       html,
       text,
     });
@@ -215,7 +215,7 @@ export async function resendAdminInvite(adminId: string) {
     });
     await sendMail({
       to: profile.email,
-      subject: "Your RecentGossips Admin invitation (resent)",
+      subject: "Your RGossips Admin invitation (resent)",
       html,
       text,
     });

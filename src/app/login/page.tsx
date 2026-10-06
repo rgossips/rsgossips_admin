@@ -68,7 +68,7 @@ export default function LoginPage() {
         <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border border-white/20 dark:border-gray-800 rounded-2xl shadow-2xl p-8">
           {/* Logo / Header */}
           <div className="text-center mb-8">
-            <img src="/logo.svg" alt="RecentGossips" className="h-9 mx-auto mb-4" />
+            <img src="/logo2.webp" alt="RGossips" className="h-9 mx-auto mb-4" />
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t("heading")}</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
               {t("subtitle")}

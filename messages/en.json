@@ -666,7 +666,7 @@
     },
     "hints": {
       "description": "A guided template helps creators understand what you need.",
-      "budgetAutoCalc": "Auto-calculated from total ÷ slots",
+      "budgetAutoCalc": "Total ÷ slots — or type a rate here and the total fills in",
       "serviceLocation": "Where the influencer experiences the service.",
       "applicationDeadline": "Last day for influencers to apply.",
       "campaignEndDate": "All content must be delivered by this date.",
@@ -833,7 +833,8 @@
       "completed": "Completed",
       "rejected": "Rejected",
       "withdrawn": "Withdrawn",
-      "on_hold": "On Hold — Shortlisted"
+      "on_hold": "On Hold — Shortlisted",
+      "closed": "Campaign Closed"
     },
     "overrideConfirm": "Change status from \"{from}\" to \"{to}\"?",
     "selectAtLeastOneDeliverable": "Please select at least one deliverable that needs revision.",
