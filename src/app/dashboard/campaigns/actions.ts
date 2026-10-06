@@ -7,6 +7,7 @@ import { notifyUser } from "@/lib/notify";
 import { auditLog } from "@/lib/rate-limit";
 import { clampLen } from "@/lib/validation";
 import { sendAdminApplicationStatusEmails } from "@/lib/application-emails";
+import { isApplicationStatus } from "@/lib/application-status";
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ error?: string; url?: string }> {
   const gate = await adminGate();
@@ -212,6 +213,15 @@ const APPLICATION_NOTIFICATIONS: Record<
   string,
   { type: string; title: string; text: (campaign: string) => string }
 > = {
+  // The creator hears "shortlisted", not "on hold". Both describe the same
+  // row, but the admin is parking a decision while the creator is being told
+  // they made the cut so far — and "on hold" reads to them as a rejection
+  // with extra steps. The copy is careful not to promise approval.
+  on_hold: {
+    type: "app_on_hold",
+    title: "You've been shortlisted",
+    text: (c) => `You're shortlisted for "${c}". The final selection isn't made yet — we'll let you know either way.`,
+  },
   approved: {
     type: "app_approved",
     title: "Application approved",
@@ -250,6 +260,13 @@ export async function updateApplicationStatus(
 ): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
+
+  // The status set has one owner (lib/application-status.ts) and this is the
+  // only writer, so validate here rather than trusting the caller: the
+  // consumer app clamps an unknown status to the first rung of its ladder,
+  // which would leave a creator reading "Applied" with no way to tell
+  // anything had happened.
+  if (!isApplicationStatus(newStatus)) return { error: "Unknown application status." };
 
   const adminClient = createAdminClient();
   const updates: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };

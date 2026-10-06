@@ -194,6 +194,19 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMo
     setShowReview(false);
   };
 
+  // One click, no panel: parking an applicant needs no rate and no reason,
+  // and asking for either would make the quick decision slow. The creator
+  // gets the "shortlisted" email and notification from the action itself.
+  const handleHold = async () => {
+    setLoading(true);
+    const result = await updateApplicationStatus(application.id, "on_hold");
+    if (result.error) alert(result.error);
+    else router.refresh();
+    setLoading(false);
+    setShowReview(false);
+    setShowReject(false);
+  };
+
   const handleReject = async () => {
     setLoading(true);
     const result = await updateApplicationStatus(application.id, "rejected", reason || undefined);
@@ -261,35 +274,45 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMo
             <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${st.bg}`}>{t(`status.${stKey}`)}</span>
           )}
 
-          {isAdmin && application.status === "pending" && (
+          {isAdmin && (
             <div className="flex items-center gap-1.5 ml-2">
-              <button onClick={() => { setShowReview(!showReview); setShowReject(false); }} disabled={loading}
-                className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100`}>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                {t("reviewAndApprove")}
-              </button>
-              <button onClick={() => { setShowReject(!showReject); setShowReview(false); }} disabled={loading}
-                className={`${btnBase} bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                {t("reject")}
-              </button>
+              {/* Approve opens the review panel (rate + note), which is why
+                  it only shows while the application is still undecided —
+                  on_hold included, since parking one is explicitly not a
+                  decision. */}
+              {(application.status === "pending" || application.status === "on_hold") && (
+                <button onClick={() => { setShowReview(!showReview); setShowReject(false); }} disabled={loading}
+                  className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100`}>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  {t("approve")}
+                </button>
+              )}
+
+              {/* On hold is ALWAYS available, which is the point of it: an
+                  applicant can be parked at any stage, including one already
+                  approved or rejected that is being reconsidered. Hidden only
+                  when the row is already on hold (nothing to do) or the
+                  creator withdrew (their call, not ours). */}
+              {!["on_hold", "withdrawn"].includes(application.status) && (
+                <button onClick={handleHold} disabled={loading} title={t("onHoldHint")}
+                  className={`${btnBase} bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-100`}>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  {t("onHold")}
+                </button>
+              )}
+
+              {/* Icon only. The label was the widest thing in a row that
+                  already carries a badge, a status dropdown and up to three
+                  other controls; the accessible name stays on title +
+                  aria-label so it is still announced and still hoverable. */}
+              {!["rejected", "withdrawn"].includes(application.status) && (
+                <button onClick={() => { setShowReject(!showReject); setShowReview(false); }} disabled={loading}
+                  title={t("reject")} aria-label={t("reject")}
+                  className={`${btnBase} px-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
             </div>
-          )}
-
-          {isAdmin && application.status === "approved" && (
-            <button onClick={() => { setShowReject(!showReject); }} disabled={loading}
-              className={`${btnBase} ml-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              {t("reject")}
-            </button>
-          )}
-
-          {isAdmin && application.status === "revision_needed" && (
-            <button onClick={() => { setShowReject(!showReject); }} disabled={loading}
-              className={`${btnBase} ml-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              {t("reject")}
-            </button>
           )}
         </div>
       </div>

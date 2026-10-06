@@ -830,7 +830,8 @@
       "payment": "Payment Processing",
       "completed": "Completed",
       "rejected": "Rejected",
-      "withdrawn": "Withdrawn"
+      "withdrawn": "Withdrawn",
+      "on_hold": "On Hold — Shortlisted"
     },
     "overrideConfirm": "Change status from \"{from}\" to \"{to}\"?",
     "selectAtLeastOneDeliverable": "Please select at least one deliverable that needs revision.",
@@ -903,7 +904,10 @@
     "exporting": "Preparing…",
     "exportFailed": "Couldn't export the applicant list. Please try again.",
     "approveLinks": "Approve & complete",
-    "barterCompletedNext": "Approved. Add the delivery tracking below once the product ships."
+    "barterCompletedNext": "Approved. Add the delivery tracking below once the product ships.",
+    "approve": "Approve",
+    "onHold": "On hold",
+    "onHoldHint": "Keep as a strong applicant for later. The creator is told they are shortlisted."
   },
   "DashboardSubscriptions": {
     "title": "Subscriptions",

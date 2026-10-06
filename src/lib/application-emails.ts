@@ -36,6 +36,17 @@ type Copy = { subject: string; headline: string; body: string; ctaLabel: string 
 // silent on purpose — `pending` is where an application starts, `withdrawn` is
 // the creator's own doing, and `payment` belongs to the escrow-release flow.
 const CREATOR_COPY: Record<string, (v: Vars) => Copy> = {
+  // "Shortlisted", never "on hold". The admin is parking a decision; the
+  // creator is being told they made the cut so far. Saying "on hold" to them
+  // reads as a rejection with extra steps, and saying "approved" would be a
+  // promise nobody has made — so the copy is warm about the shortlist and
+  // explicit that the decision is still open.
+  on_hold: (v) => ({
+    subject: `You've been shortlisted for "${v.campaignTitle}"`,
+    headline: "Shortlisted",
+    body: `Good news — your application for <strong>${v.campaignTitle}</strong> with ${v.brandName} has been shortlisted. The final selection hasn't been made yet, so there's nothing for you to do right now. We'll tell you either way, and you don't need to apply again.`,
+    ctaLabel: "See the campaign",
+  }),
   approved: (v) => ({
     subject: `You're approved for "${v.campaignTitle}"`,
     headline: "You're in",
@@ -75,6 +86,14 @@ const CREATOR_COPY: Record<string, (v: Vars) => Copy> = {
 };
 
 const BRAND_COPY: Record<string, (v: Vars) => Copy> = {
+  // The brand gets the admin's word for it — they are the one who may still
+  // take this creator, so "shortlisted" would understate what happened.
+  on_hold: (v) => ({
+    subject: `${v.creatorName} was shortlisted for "${v.campaignTitle}"`,
+    headline: "An applicant was shortlisted",
+    body: `<strong>${v.creatorName}</strong> has been put on hold for <strong>${v.campaignTitle}</strong> by the RGossips team — kept as a strong applicant without being approved yet, so they are still available if you want them.`,
+    ctaLabel: "Open the campaign",
+  }),
   approved: (v) => ({
     subject: `${v.creatorName} was approved for "${v.campaignTitle}"`,
     headline: "An application was approved",
