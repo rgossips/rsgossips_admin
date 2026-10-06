@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ComingSoonModal } from "./coming-soon-modal";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { updateCampaignStatus } from "../actions";
@@ -43,9 +44,18 @@ export function CampaignDetailActions({
   const router = useRouter();
   const [current, setCurrent] = useState(status);
   const [loading, setLoading] = useState(false);
+  // Coming Soon on a campaign people have ALREADY applied to is not a badge
+  // flip — it parks their applications and tells each of them. The modal owns
+  // that whole flow, including the write, so the select never performs it.
+  const [comingSoonOpen, setComingSoonOpen] = useState(false);
 
   const handleChange = async (next: string) => {
     if (next === current) return;
+
+    if (next === "coming_soon") {
+      setComingSoonOpen(true);
+      return;
+    }
 
     // Soft confirm only for terminal transitions where it matters.
     const isCompleting = next === "completed";
@@ -68,6 +78,16 @@ export function CampaignDetailActions({
 
   return (
     <div className="inline-flex items-center gap-2 shrink-0">
+      {/* Mounted on demand, so cancelling and reopening starts clean rather
+          than showing the previous run's results (same reasoning as
+          RejectCampaignModal). */}
+      {comingSoonOpen && (
+        <ComingSoonModal
+          campaignId={campaignId}
+          onClose={() => setComingSoonOpen(false)}
+          onDone={() => setCurrent("coming_soon")}
+        />
+      )}
       <label className="sr-only" htmlFor="campaign-status-select">{t("campaignStatusLabel")}</label>
       <div className={`relative inline-flex items-center rounded-xl border ${statusStyle[current] || statusStyle.draft}`}>
         <select

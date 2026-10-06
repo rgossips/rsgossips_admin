@@ -403,6 +403,82 @@ export function renderPasswordResetEmail({ fullName, resetUrl }: PasswordResetPa
   return { html, text };
 }
 
+// ── Campaign pulled back to "coming soon" ────────────────────────────────
+
+interface CampaignComingSoonParams {
+  fullName: string;
+  campaignTitle: string;
+}
+
+/**
+ * Sent to everyone who had already applied when an admin takes a live
+ * campaign back to "coming soon".
+ *
+ * Deliberately NOT the generic on-hold / "you've been shortlisted" copy,
+ * even though the application lands on the same `on_hold` status. Nobody
+ * shortlisted these creators — the campaign was pulled back — and telling
+ * them otherwise would be a flattering lie they would act on.
+ *
+ * The three things it has to land: this is not a rejection, their
+ * application is kept, and they do not need to do anything or re-apply.
+ */
+export function renderCampaignComingSoonEmail({ fullName, campaignTitle }: CampaignComingSoonParams) {
+  const subject = `"${campaignTitle}" is being prepared — your application is saved`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Campaign update</title></head>
+<body style="margin:0;padding:0;background-color:#F4F5F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1F2937;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#F4F5F8;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="540" style="max-width:540px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,0.08);">
+        <tr><td style="background:linear-gradient(135deg, #7C3AED 0%, #9810FA 100%);padding:36px 32px;text-align:center;color:#ffffff;">
+          <div style="font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;opacity:0.85;">RGossips</div>
+          <div style="font-size:22px;font-weight:700;margin-top:6px;">This one's not quite ready</div>
+        </td></tr>
+        <tr><td style="padding:36px 36px 28px 36px;">
+          <p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#111827;">Hi ${escapeHtml(fullName)},</p>
+          <p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;color:#374151;">
+            <strong>${escapeHtml(campaignTitle)}</strong> has gone back to being prepared, so it isn't taking
+            applications at the moment.
+          </p>
+          <div style="margin:0 0 20px 0;padding:14px 16px;background:#F5F3FF;border-radius:12px;border-left:3px solid #7C3AED;">
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#5B21B6;">
+              <strong>This isn't a no.</strong> Your application is saved exactly as it was. When the campaign opens
+              you'll be among the first to hear, and you won't need to apply again.
+            </p>
+          </div>
+          <p style="margin:0 0 24px 0;font-size:15px;line-height:1.65;color:#374151;">
+            There's nothing for you to do right now. Plenty of other campaigns are open in the meantime.
+          </p>
+          <hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;" />
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#9CA3AF;">Questions? Just reply to this email.</p>
+        </td></tr>
+        <tr><td style="background:#F9FAFB;padding:20px 36px;text-align:center;border-top:1px solid #E5E7EB;">
+          <p style="margin:0;font-size:12px;color:#6B7280;">&copy; ${new Date().getFullYear()} RGossips &middot; <a href="https://rgossips.com" style="color:#6B7280;text-decoration:none;">rgossips.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const text = [
+    `Hi ${fullName},`,
+    "",
+    `"${campaignTitle}" has gone back to being prepared, so it isn't taking applications at the moment.`,
+    "",
+    "This isn't a no. Your application is saved exactly as it was. When the campaign",
+    "opens you'll be among the first to hear, and you won't need to apply again.",
+    "",
+    "There's nothing for you to do right now. Plenty of other campaigns are open in",
+    "the meantime.",
+    "",
+    "— RGossips",
+  ].join("\n");
+
+  return { subject, html, text };
+}
+
 function escapeHtml(s: string) {
   return s
     .replace(/&/g, "&amp;")
