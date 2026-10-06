@@ -429,6 +429,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 <label className={labelClass}>{t("fields.status")}</label>
                 <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
                   <option value="draft">{t("status.draft")}</option>
+                  <option value="coming_soon">{t("status.coming_soon")}</option>
                   <option value="active">{t("status.active")}</option>
                   <option value="paused">{t("status.paused")}</option>
                   <option value="completed">{t("status.completed")}</option>

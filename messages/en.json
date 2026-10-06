@@ -551,7 +551,8 @@
       "paused": "Paused",
       "completed": "Completed",
       "underReview": "Under review",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "comingSoon": "Coming Soon"
     }
   },
   "DashboardCampaignsCampaignsTable": {
@@ -684,7 +685,8 @@
       "draft": "Draft",
       "active": "Active",
       "paused": "Paused",
-      "completed": "Completed"
+      "completed": "Completed",
+      "coming_soon": "Coming Soon"
     },
     "offering": {
       "product": "📦 Product",
@@ -973,7 +975,8 @@
       "draft": "Draft",
       "active": "Active",
       "paused": "Paused",
-      "completed": "Completed"
+      "completed": "Completed",
+      "coming_soon": "Coming Soon"
     },
     "confirmComplete": "Mark this campaign as completed? Applications won't change but the campaign will no longer accept new ones.",
     "campaignStatusLabel": "Campaign status"

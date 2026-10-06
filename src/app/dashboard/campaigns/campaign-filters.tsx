@@ -9,6 +9,7 @@ import { CATEGORIES } from "@/lib/categories";
 const STATUS_OPTIONS = [
   { key: "all", value: "" },
   { key: "draft", value: "draft" },
+  { key: "comingSoon", value: "coming_soon" },
   { key: "underReview", value: "under_review" },
   { key: "rejected", value: "rejected" },
   { key: "active", value: "active" },

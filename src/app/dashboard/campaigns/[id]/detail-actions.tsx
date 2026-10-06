@@ -8,6 +8,10 @@ import { ButtonSpinner } from "@/components/spinner";
 
 const STATUSES = [
   { value: "draft" },
+  // Published to the creator feed, badged, but NOT applicable — a teaser for
+  // a campaign that is coming. Sits between draft and active because that is
+  // the order it happens in.
+  { value: "coming_soon" },
   { value: "active" },
   { value: "paused" },
   { value: "completed" },
@@ -17,6 +21,7 @@ const STATUSES = [
 // the list/detail pages so the dropdown reads as the same affordance.
 const statusStyle: Record<string, string> = {
   draft: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700",
+  coming_soon: "bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800",
   active: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
   paused: "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
   completed: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
