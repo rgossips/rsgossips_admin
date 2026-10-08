@@ -16,6 +16,11 @@ export type SourcingImportRow = {
   sheet: string;
   line: number;
   handle: string;
+  // The handle cell exactly as the sheet wrote it. Kept because a handle
+  // that parses to nonsense can only be diagnosed — or corrected — by
+  // seeing the original: a pasted reel URL yields the handle "reel", and
+  // the raw cell is the only way to tell that from a creator called reel.
+  handleRaw: string;
   name: string;
   email: string;
   phone: string;
@@ -33,6 +38,20 @@ export type SourcingImportRow = {
   // and must be walked deliberately.
   stage: "shortlisted" | "price_agreed" | "confirmed" | "declined";
   warnings: string[];
+  // ── Historical columns, raw ────────────────────────────────────────────
+  //
+  // Left as the sheet wrote them. A backfill needs to tell "Barter" apart
+  // from an unreadable number and "Live" apart from blank, and `stage`
+  // above has already collapsed that detail away. Interpreting these is
+  // import-vega.ts's job, not this parser's.
+  progress: string;
+  commercial: string;
+  finalPayment: string;
+  deliverables: string;
+  product: string;
+  orderId: string;
+  // ISO date, or null when the cell was blank or unreadable.
+  liveDate: string | null;
 };
 
 // Header aliases, lowercased and stripped of punctuation. One sheet says
@@ -51,6 +70,17 @@ const FIELD_ALIASES: Record<string, string[]> = {
     "profile link",
     "insta link",
     "username",
+    // The payment workbook calls the column "Profile".
+    "profile",
+    // The Vega workbooks say "IG Link". Missing these meant every row in
+    // those sheets parsed with no handle and was silently dropped as a
+    // spacer — a seven-campaign import that reported success and wrote
+    // nothing. Distinct from "ig live link" below, which is the deliverable.
+    "ig link",
+    "ig handle",
+    "ig profile",
+    "ig url",
+    "ig",
   ],
   category: ["category", "categories", "niche", "genre"],
   followers: ["followers", "follower count", "followers count", "reach", "follower"],
@@ -58,12 +88,33 @@ const FIELD_ALIASES: Record<string, string[]> = {
   quotedFee: ["pricing", "price", "quoted price", "quote", "asking price", "rate", "charges"],
   agreedFee: ["negotiated pricing", "negotiated price", "negotiated", "final price", "agreed price", "final rate"],
   productCost: ["product cost", "product price", "product value", "cost of product"],
-  phone: ["contact number", "phone", "mobile", "contact", "whatsapp", "phone number"],
-  email: ["mail id", "email", "email id", "mail", "e mail"],
+  // "number" on its own is what the Vega barter sheets call the phone
+  // column (168 rows). "s no" canonicalises differently, so the row-number
+  // column is not caught by it.
+  phone: ["contact number", "phone", "mobile", "contact", "whatsapp", "phone number", "number", "phone no", "contact no"],
+  email: ["mail id", "email", "email id", "mail", "e mail", "gmail", "mail address"],
   address: ["address", "address optional", "delivery address", "shipping address", "full address"],
   confirmation: ["confirmation mail", "confirmation", "confirmation status", "confirmed"],
   liveUrl: ["live link", "live url", "post link", "reel link", "ig live link", "live"],
   notes: ["notes", "note", "remark", "remarks", "comment", "comments"],
+  // Columns the historical Vega workbooks carry. Every one of these landed
+  // in `unmapped` before, so adding them collides with nothing.
+  //
+  // `commercial` is kept RAW and separate from quotedFee on purpose: the
+  // cell often reads "Barter" rather than a number, and that distinction is
+  // what decides whether a finished row means "paid" or "no fee at all".
+  progress: ["progress", "current status", "update", "video status"],
+  commercial: ["commercial", "commercials", "deal type", "deal"],
+  liveDate: ["live date", "posting date", "go live date", "posted on"],
+  finalPayment: ["final payment", "payout status", "payment status", "payment"],
+  deliverables: ["deliverables", "deliverable"],
+  product: ["product", "product name", "sku"],
+  orderId: ["order id", "order no", "order number"],
+  // The address arrives split across up to four columns; parseSheet joins
+  // them rather than letting the first non-empty one win.
+  city: ["city", "town"],
+  state: ["state"],
+  pincode: ["pincode", "pin code", "pin", "zip", "postal code"],
 };
 
 const canon = (s: string) =>
@@ -158,6 +209,52 @@ export function parseEmail(raw: string): { email: string; warning: string | null
   return { email: v, warning: null };
 }
 
+// A date cell, which arrives two completely different ways in one column:
+// 104 rows are strings like "30/09/26" and 11 are raw Excel serials like
+// 46122, because somebody retyped a few cells and Excel converted those.
+//
+// Day-first is unambiguous for these workbooks — the day is 13 or higher on
+// most rows and never a valid month — but it is still only a convention, so
+// anything landing outside a sane window is rejected with a warning instead
+// of silently becoming a date in 1905 or 2087.
+const DATE_FLOOR = Date.UTC(2024, 0, 1);
+const DATE_CEIL = Date.UTC(2027, 11, 31);
+
+export function parseSheetDate(raw: unknown): { iso: string | null; warning: string | null } {
+  if (raw == null || String(raw).trim() === "") return { iso: null, warning: null };
+
+  let ms: number | null = null;
+
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    // Excel's epoch is 1899-12-30: 1900 is treated as a leap year, and the
+    // two-day offset absorbs that bug.
+    ms = Date.UTC(1899, 11, 30) + Math.round(raw) * 86_400_000;
+  } else {
+    const s = String(raw).trim();
+    const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2}|\d{4})$/);
+    if (m) {
+      const day = Number(m[1]);
+      const month = Number(m[2]);
+      const yearRaw = Number(m[3]);
+      const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        ms = Date.UTC(year, month - 1, day);
+      }
+    } else {
+      const parsed = Date.parse(s);
+      if (Number.isFinite(parsed)) ms = parsed;
+    }
+  }
+
+  if (ms == null || !Number.isFinite(ms)) {
+    return { iso: null, warning: `Couldn't read the date "${String(raw)}"` };
+  }
+  if (ms < DATE_FLOOR || ms > DATE_CEIL) {
+    return { iso: null, warning: `The date "${String(raw)}" is outside 2024-2027 — ignored` };
+  }
+  return { iso: new Date(ms).toISOString(), warning: null };
+}
+
 const YES = /^(yes|y|approved|done|ok|confirmed|true|1)$/i;
 const NO = /^(no|n|rejected|declined|not interested|false|0)$/i;
 const SENT = /^(sent|mail sent|shared|yes|done)$/i;
@@ -200,6 +297,19 @@ export function parseSheet(
       return "";
     };
 
+    // The cell UNSTRINGIFIED. A date written by Excel arrives as the number
+    // 46122, and `get` above would hand on "46122", which no date parser
+    // can tell apart from a typo. Only the date reader needs this.
+    const getRaw = (field: string): unknown => {
+      for (const [label, f] of Object.entries(headerMap)) {
+        if (f === field) {
+          const v = rec[label];
+          if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+        }
+      }
+      return null;
+    };
+
     const handle = handleFromCell(get("handle"));
     // A row with no handle is a spacer, a total line or a stray note. There
     // is nothing to book and nothing to warn about.
@@ -219,15 +329,45 @@ export function parseSheet(
     if (get("quotedFee") && quotedFee === null) warnings.push(`Couldn't read the price "${get("quotedFee")}"`);
     if (get("agreedFee") && agreedFee === null) warnings.push(`Couldn't read the negotiated price "${get("agreedFee")}"`);
 
+    const { iso: liveDate, warning: dateWarn } = parseSheetDate(getRaw("liveDate"));
+    if (dateWarn) warnings.push(dateWarn);
+
+    // One shipping address split across up to four columns. Joining beats
+    // first-non-empty-wins, which kept only the street and lost the city,
+    // state and pincode on every row of the VHSB-07 sheet.
+    //
+    // Then the headerless tail. On the VHSCC-01 sheet the header row stops
+    // at "Address" but three further columns carry state, city and pincode
+    // for 18 of its 75 rows; with no header, sheet_to_json names them
+    // __EMPTY, __EMPTY_1, __EMPTY_2 and nothing would ever map them. They
+    // are treated as address overflow — which is what an unlabelled column
+    // sitting past the address column is — and only when this sheet has an
+    // address column at all, so a stray blank header elsewhere is ignored.
+    const hasAddressColumn = Object.values(headerMap).includes("address");
+    const overflow = hasAddressColumn
+      ? Object.keys(rec)
+          .filter((k) => /^__EMPTY(_\d+)?$/.test(k))
+          // Numeric order, so __EMPTY_2 precedes __EMPTY_10.
+          .sort((a, b) => Number(a.split("_")[3] ?? 0) - Number(b.split("_")[3] ?? 0))
+          .map((k) => String(rec[k] ?? "").trim())
+          .filter(Boolean)
+      : [];
+
+    const address = [get("address"), get("city"), get("state"), get("pincode"), ...overflow]
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .join(", ");
+
     rows.push({
       sheet: sheetName,
       // +2: the header is line 1 and sheet_to_json is zero-based.
       line: i + 2,
       handle,
+      handleRaw: get("handle"),
       name: get("name"),
       email,
       phone,
-      address: get("address"),
+      address,
       // The sheet name IS the tier in every workbook we have been sent.
       tier: sheetName,
       category: get("category"),
@@ -239,6 +379,13 @@ export function parseSheet(
       notes: noteParts.filter(Boolean).join(" · "),
       stage: inferStage(get("approval"), get("confirmation")),
       warnings,
+      progress: get("progress"),
+      commercial: get("commercial"),
+      finalPayment: get("finalPayment"),
+      deliverables: get("deliverables"),
+      product: get("product"),
+      orderId: get("orderId"),
+      liveDate,
     });
   });
 
@@ -248,11 +395,24 @@ export function parseSheet(
 // Collapse a handle appearing on more than one sheet. The Vega workbook had
 // two such rows out of 87; keeping both would trip the unique index halfway
 // through the insert and make the count wrong.
-export function dedupeRows(rows: SourcingImportRow[]): { rows: SourcingImportRow[]; duplicates: SourcingImportRow[] } {
+//
+// `keyOf` defaults to the bare handle, which is right when every sheet in
+// the workbook feeds ONE campaign — the only case this was written for.
+//
+// It is WRONG, and silently so, when the sheets feed different campaigns.
+// The unique index is on (campaign_id, lower(handle)), so the same creator
+// on two campaigns is two legitimate bookings; the historical backfill has
+// 37 such creators across its seven sheets and the default key would
+// discard 37 real rows while reporting a tidy-looking "duplicates
+// collapsed" count. Those callers pass `r => sheet|handle`.
+export function dedupeRows(
+  rows: SourcingImportRow[],
+  keyOf: (r: SourcingImportRow) => string = (r) => r.handle,
+): { rows: SourcingImportRow[]; duplicates: SourcingImportRow[] } {
   const seen = new Map<string, SourcingImportRow>();
   const duplicates: SourcingImportRow[] = [];
   for (const r of rows) {
-    const key = r.handle;
+    const key = keyOf(r);
     const prior = seen.get(key);
     if (!prior) {
       seen.set(key, r);

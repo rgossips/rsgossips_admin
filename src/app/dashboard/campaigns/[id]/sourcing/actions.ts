@@ -7,6 +7,7 @@ import { auditLog } from "@/lib/rate-limit";
 import { friendlyDbError, logError } from "@/lib/log";
 import { clampLen, isHttpUrl } from "@/lib/validation";
 import { ensureInvitation, normalizeHandle } from "@/lib/sourcing/ensure-invitation";
+import { logBookingEvent } from "@/lib/sourcing/booking-events";
 import {
   PAYOUT_ON_ENTER,
   canTransition,
@@ -39,27 +40,9 @@ function toPaise(rupees: unknown): number | null {
   return Math.round(n * 100);
 }
 
-async function logEvent(
-  admin: ReturnType<typeof createAdminClient>,
-  bookingId: string,
-  row: {
-    kind: "stage_change" | "outreach" | "note" | "receipt" | "payout";
-    from_stage?: string | null;
-    to_stage?: string | null;
-    channel?: string | null;
-    template?: string | null;
-    note?: string | null;
-    actor_id?: string | null;
-  },
-) {
-  // Best-effort: the timeline is for humans, and losing a line of it must
-  // never fail the thing it describes.
-  try {
-    await admin.from("campaign_booking_events").insert({ booking_id: bookingId, ...row });
-  } catch (e) {
-    logError("sourcing.event", e, { bookingId, kind: row.kind });
-  }
-}
+// Timeline writes moved to lib/sourcing/booking-events.ts so the historical
+// import writes them the same way — see `logBookingEvent` in the imports.
+const logEvent = logBookingEvent;
 
 export type BookingInput = {
   campaignId: string;
