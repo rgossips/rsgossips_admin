@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -13,6 +13,15 @@ import { APPLICATION_STATUS_BADGE } from "@/lib/application-status";
 import { InstagramLink } from "@/components/instagram-link";
 import { FulfilmentPanel } from "./fulfilment-panel";
 import type { ShippingMode } from "@/lib/barter-fulfilment";
+import { bulkRejectApplications } from "./bulk-reject-actions";
+import {
+  scoreApplicant,
+  rankByMatch,
+  matchTone,
+  type MatchResult,
+  type MatchTarget,
+  type Verdict,
+} from "@/lib/application-match";
 
 interface Application {
   id: string;
@@ -49,6 +58,10 @@ interface Application {
     engagement_rate: number | null;
     email: string | null;
     media_kit_published: boolean | null;
+    // Sparse in practice (location 14%, gender 51%) — the match scorer reads
+    // an absent value as "unknown", never as a mismatch.
+    location: string | null;
+    gender: string | null;
   } | null;
 }
 
@@ -65,6 +78,56 @@ function formatCount(n: number | null) {
   return String(n);
 }
 
+// Module scope, never nested inside a stateful component — a component
+// redefined each render remounts its children (see CLAUDE.md).
+const MATCH_TONE: Record<string, string> = {
+  strong: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  fair: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  weak: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  none: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500",
+};
+
+const VERDICT_MARK: Record<Verdict, string> = { match: "✓", miss: "✗", unknown: "?" };
+const VERDICT_TONE: Record<Verdict, string> = {
+  match: "text-emerald-600 dark:text-emerald-400",
+  miss: "text-rose-600 dark:text-rose-400",
+  unknown: "text-gray-400 dark:text-gray-500",
+};
+
+/**
+ * The score, with its reasoning one hover away.
+ *
+ * The reasons are not decoration: a ranking a brand or an admin cannot
+ * interrogate is one they will not trust, and "?" markers are what stop
+ * someone reading a middling score as a judgement when it really means the
+ * profile is thin.
+ */
+function MatchBadge({ result, label, whyLabel }: { result: MatchResult; label: string; whyLabel: string }) {
+  if (result.percent === null) return null;
+  return (
+    <span className="relative inline-flex items-center group">
+      <span
+        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${MATCH_TONE[matchTone(result.percent)]}`}
+      >
+        {label}
+      </span>
+      {result.dimensions.length > 0 && (
+        <span className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-max max-w-xs rounded-lg border border-gray-200 bg-white p-2 text-left shadow-lg group-hover:block dark:border-gray-700 dark:bg-gray-900">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+            {whyLabel}
+          </span>
+          {result.dimensions.map((d) => (
+            <span key={d.key} className="block text-[11px] text-gray-600 dark:text-gray-300">
+              <span className={`mr-1 font-bold ${VERDICT_TONE[d.verdict]}`}>{VERDICT_MARK[d.verdict]}</span>
+              {d.label}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function ApplicationsList({
   campaignId,
   applications,
@@ -72,6 +135,7 @@ export function ApplicationsList({
   campaignType,
   shippingMode,
   phones = {},
+  targeting,
 }: {
   campaignId: string;
   applications: Application[];
@@ -84,8 +148,93 @@ export function ApplicationsList({
   // influencer_id -> phone. Phones live on auth.users, never on
   // influencer_profiles, so the page fetches them separately.
   phones?: Record<string, string>;
+  // The campaign's own brief, for ranking applicants against it.
+  targeting?: MatchTarget;
 }) {
   const t = useTranslations("DashboardCampaignsIdApplications");
+  const router = useRouter();
+  const { isAdmin } = useRole();
+  const [sortMode, setSortMode] = useState<"match" | "newest">("match");
+  const [hideUnderMin, setHideUnderMin] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkReason, setBulkReason] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<string | null>(null);
+
+  // Score once per render pass, not once per row: the row component would
+  // otherwise recompute on every one of its own state changes.
+  const scored = useMemo(() => {
+    const target = targeting || {};
+    return (applications || []).map((app) => ({
+      app,
+      match: scoreApplicant(
+        {
+          followersCount: app.influencer_profiles?.followers_count,
+          categories: app.influencer_profiles?.categories,
+          location: app.influencer_profiles?.location,
+          engagementRate: app.influencer_profiles?.engagement_rate,
+          gender: app.influencer_profiles?.gender,
+        },
+        target,
+      ),
+    }));
+  }, [applications, targeting]);
+
+  const ordered = useMemo(() => {
+    if (sortMode === "newest") {
+      // The page already returns newest-first; keep that exact order rather
+      // than re-sorting on a date string.
+      return scored;
+    }
+    return rankByMatch(
+      scored,
+      (s) => s.match,
+      (s) => s.app.influencer_profiles?.followers_count,
+    );
+  }, [scored, sortMode]);
+
+  // "Under the follower minimum" means KNOWN to be under it. A creator whose
+  // follower count we do not hold is never swept up by this — hiding or
+  // rejecting someone for missing data would be a different decision than
+  // the one the button describes.
+  const underMin = useMemo(() => ordered.filter((s) => s.match.belowFollowerMin), [ordered]);
+  // Only the undecided ones can be bulk rejected; the server enforces this
+  // again, and the count here has to agree with what it will actually do.
+  const rejectable = useMemo(
+    () => underMin.filter((s) => s.app.status === "pending" || s.app.status === "on_hold"),
+    [underMin],
+  );
+
+  const visible = hideUnderMin ? ordered.filter((s) => !s.match.belowFollowerMin) : ordered;
+
+  const followerMin = Number(targeting?.followerMin) || 0;
+
+  async function runBulkReject() {
+    setBulkBusy(true);
+    const res = await bulkRejectApplications(
+      campaignId,
+      rejectable.map((s) => s.app.id),
+      bulkReason.trim() || undefined,
+    );
+    setBulkBusy(false);
+    if (res.error) {
+      setBulkNote(res.error);
+      return;
+    }
+    setBulkOpen(false);
+    setBulkReason("");
+    setBulkNote(
+      [
+        t("bulkRejectDone", { count: res.rejected ?? 0 }),
+        res.skipped ? t("bulkRejectSkipped", { count: res.skipped }) : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+    router.refresh();
+  }
+
+  // Hooks must run before this, so the empty case returns last.
   if (!applications || applications.length === 0) return null;
 
   const pending = applications.filter((a) => a.status === "pending").length;
@@ -103,22 +252,129 @@ export function ApplicationsList({
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("applications")}</h2>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">{applications.length}</span>
         </div>
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
           {pending > 0 && <span className="text-amber-600 dark:text-amber-400 font-semibold">{t("pendingCount", { count: pending })}</span>}
           {approved > 0 && <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{t("approvedCount", { count: approved })}</span>}
+          <label className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+            <span>{t("sortLabel")}</span>
+            <select
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as "match" | "newest")}
+              className="rounded-md border border-gray-300 bg-white px-1.5 py-0.5 text-xs dark:border-gray-700 dark:bg-gray-900"
+            >
+              <option value="match">{t("sortMatch")}</option>
+              <option value="newest">{t("sortNewest")}</option>
+            </select>
+          </label>
           <ExportApplicantsButton campaignId={campaignId} />
         </div>
       </div>
+
+      {/* Under-spec controls. Only shown when the brief sets a minimum AND
+          somebody is actually under it — otherwise they are two buttons that
+          can never do anything. */}
+      {followerMin > 0 && underMin.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-800 dark:bg-gray-900/50">
+          <button
+            type="button"
+            onClick={() => setHideUnderMin((v) => !v)}
+            className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {hideUnderMin
+              ? t("showAllApplicants")
+              : t("hideUnderMin", { min: followerMin.toLocaleString(), count: underMin.length })}
+          </button>
+          {isAdmin && rejectable.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setBulkNote(null);
+                setBulkOpen(true);
+              }}
+              className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-500"
+            >
+              {t("bulkRejectCta", { count: rejectable.length })}
+            </button>
+          )}
+          {bulkNote && <span className="text-xs text-gray-600 dark:text-gray-400">{bulkNote}</span>}
+        </div>
+      )}
+
+      {bulkOpen && (
+        <div className="border-b border-red-200 bg-red-50 px-6 py-4 dark:border-red-900 dark:bg-red-950/30">
+          <p className="text-sm font-semibold text-red-900 dark:text-red-200">
+            {t("bulkRejectHeading", { count: rejectable.length })}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-red-800 dark:text-red-300">{t("bulkRejectBody")}</p>
+          <label className="mt-3 block">
+            <span className="text-xs font-medium text-red-900 dark:text-red-200">{t("bulkRejectReasonLabel")}</span>
+            <textarea
+              value={bulkReason}
+              onChange={(e) => setBulkReason(e.target.value)}
+              maxLength={500}
+              rows={2}
+              placeholder={t("bulkRejectReasonPlaceholder")}
+              className="mt-1 w-full rounded-lg border border-red-300 bg-white px-2 py-1.5 text-xs dark:border-red-800 dark:bg-gray-900"
+            />
+          </label>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void runBulkReject()}
+              disabled={bulkBusy}
+              aria-busy={bulkBusy}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:cursor-wait disabled:opacity-60"
+            >
+              {bulkBusy && <ButtonSpinner />}
+              {t("bulkRejectConfirm", { count: rejectable.length })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkOpen(false)}
+              disabled={bulkBusy}
+              className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-900 disabled:opacity-50 dark:border-red-800 dark:text-red-200"
+            >
+              {t("bulkRejectCancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
-        {applications.map((app) => (
-          <ApplicationRow key={app.id} application={app} budgetPerInfluencer={budgetPerInfluencer} isBarter={campaignType === "barter"} shippingMode={shippingMode} phone={phones[app.influencer_id] || null} />
+        {visible.map(({ app, match }) => (
+          <ApplicationRow
+            key={app.id}
+            application={app}
+            budgetPerInfluencer={budgetPerInfluencer}
+            isBarter={campaignType === "barter"}
+            shippingMode={shippingMode}
+            phone={phones[app.influencer_id] || null}
+            match={match}
+            followerMin={followerMin}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMode, phone }: { application: Application; budgetPerInfluencer: number; isBarter: boolean; shippingMode: ShippingMode; phone?: string | null }) {
+function ApplicationRow({
+  application,
+  budgetPerInfluencer,
+  isBarter,
+  shippingMode,
+  phone,
+  match,
+  followerMin,
+}: {
+  application: Application;
+  budgetPerInfluencer: number;
+  isBarter: boolean;
+  shippingMode: ShippingMode;
+  phone?: string | null;
+  match?: MatchResult;
+  followerMin?: number;
+}) {
   const t = useTranslations("DashboardCampaignsIdApplications");
   const router = useRouter();
   const { isAdmin } = useRole();
@@ -231,6 +487,18 @@ function ApplicationRow({ application, budgetPerInfluencer, isBarter, shippingMo
               {inf?.full_name || t("unknown")}
             </Link>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {match && (
+                <MatchBadge
+                  result={match}
+                  label={t("matchPercent", { percent: match.percent ?? 0 })}
+                  whyLabel={t("matchWhy")}
+                />
+              )}
+              {match?.belowFollowerMin && followerMin ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                  {t("underMinBadge", { min: formatCount(followerMin) })}
+                </span>
+              ) : null}
               {inf?.instagram_handle && <InstagramLink handle={inf.instagram_handle} className="text-xs text-gray-400" />}
               <span className="text-xs text-gray-400">{t("followersMeta", { count: formatCount(inf?.followers_count ?? null) })}</span>
               {inf?.engagement_rate != null && <span className="text-xs text-gray-400">{t("engagementRateMeta", { rate: inf.engagement_rate })}</span>}

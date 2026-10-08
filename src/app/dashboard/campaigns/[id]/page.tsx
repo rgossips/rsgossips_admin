@@ -34,7 +34,11 @@ export default async function CampaignDetailPage({
   // Fetch applications for this campaign
   const { data: applications } = await supabase
     .from("campaign_applications")
-    .select("*, influencer_profiles(full_name, username, profile_photo_url, followers_count, instagram_handle, categories, bio, engagement_rate, email, media_kit_published)")
+    // location + gender are here for the match ranking (lib/application-match.ts).
+    // Both columns exist and are verified present; they are sparse (location
+    // 14%, gender 51% of profiles) which the scorer treats as "unknown"
+    // rather than as a mismatch.
+    .select("*, influencer_profiles(full_name, username, profile_photo_url, followers_count, instagram_handle, categories, bio, engagement_rate, email, media_kit_published, location, gender)")
     .eq("campaign_id", id)
     .order("created_at", { ascending: false });
 
@@ -79,6 +83,10 @@ export default async function CampaignDetailPage({
   let galleryUrls: string[] = [];
   let engagementRate: number | null = null;
   let shippingMode: ShippingMode = "no";
+  // The brief’s gender restriction lives only in the trailer, and the match
+  // ranking needs it. requiredGender() treats "Any"/both/absent as no
+  // restriction, so this being null is the common case.
+  let targetGender: string[] | null = null;
 
   const metaSeparator = description.indexOf("\n\n---\n");
   if (metaSeparator !== -1) {
@@ -90,6 +98,7 @@ export default async function CampaignDetailPage({
       galleryUrls = meta.gallery_images || [];
       engagementRate = meta.min_engagement_rate || null;
       shippingMode = normalizeShippingMode(meta.shipping_required);
+      targetGender = Array.isArray(meta.target_gender) ? meta.target_gender : null;
     } catch { /* ignore */ }
   } else if (description.startsWith("{")) {
     try {
@@ -98,6 +107,7 @@ export default async function CampaignDetailPage({
       galleryUrls = meta.gallery_images || [];
       engagementRate = meta.min_engagement_rate || null;
       shippingMode = normalizeShippingMode(meta.shipping_required);
+      targetGender = Array.isArray(meta.target_gender) ? meta.target_gender : null;
       description = "";
     } catch { /* ignore */ }
   }
@@ -242,7 +252,16 @@ export default async function CampaignDetailPage({
           )}
 
           {/* Applications */}
-          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} phones={Object.fromEntries(phoneMap)} />
+          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} phones={Object.fromEntries(phoneMap)}
+            targeting={{
+              categories: campaign.target_categories || null,
+              cities: campaign.target_cities || null,
+              followerMin: campaign.target_follower_min,
+              followerMax: campaign.target_follower_max,
+              gender: targetGender,
+              minEngagementRate: engagementRate,
+            }}
+          />
 
           {/* Content Deliverables */}
           {Object.keys(deliverables).length > 0 && (
