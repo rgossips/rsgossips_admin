@@ -71,6 +71,20 @@ const statusConfig: Record<string, { bg: string }> = Object.fromEntries(
   Object.entries(APPLICATION_STATUS_BADGE).map(([k, bg]) => [k, { bg }]),
 );
 
+// Which statuses each control applies to.
+//
+// ONE predicate per control, used by BOTH the button and the panel it
+// opens. They used to be two hand-written status lists each, and they
+// drifted the moment `on_hold` was added: the button rendered on a
+// shortlisted row and clicking it did nothing at all, because the panel it
+// opens was gated on a list that had never heard of the new status. The
+// button appearing IS the promise that the panel will open, so the two
+// cannot be allowed to disagree.
+const canReview = (status: string) => status === "pending" || status === "on_hold";
+// Rejectable from anywhere except already-rejected, or withdrawn — which was
+// the creator's own decision, not ours to overturn.
+const canReject = (status: string) => !["rejected", "withdrawn"].includes(status);
+
 function formatCount(n: number | null) {
   if (!n) return "0";
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -548,7 +562,7 @@ function ApplicationRow({
                   it only shows while the application is still undecided —
                   on_hold included, since parking one is explicitly not a
                   decision. */}
-              {(application.status === "pending" || application.status === "on_hold") && (
+              {canReview(application.status) && (
                 <button onClick={() => { setShowReview(!showReview); setShowReject(false); }} disabled={loading}
                   className={`${btnBase} bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100`}>
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -573,7 +587,7 @@ function ApplicationRow({
                   already carries a badge, a status dropdown and up to three
                   other controls; the accessible name stays on title +
                   aria-label so it is still announced and still hoverable. */}
-              {!["rejected", "withdrawn"].includes(application.status) && (
+              {canReject(application.status) && (
                 <button onClick={() => { setShowReject(!showReject); setShowReview(false); }} disabled={loading}
                   title={t("reject")} aria-label={t("reject")}
                   className={`${btnBase} px-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100`}>
@@ -586,7 +600,7 @@ function ApplicationRow({
       </div>
 
       {/* ====== REVIEW PANEL ====== */}
-      {showReview && application.status === "pending" && (
+      {showReview && canReview(application.status) && (
         <div className="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl overflow-hidden">
           {/* Section 1: Submitted Profile (mirrors the RGossips apply form) */}
           <div className="p-5 space-y-4">
@@ -882,7 +896,7 @@ function ApplicationRow({
       )}
 
       {/* Reject Panel — works for all rejectable states */}
-      {showReject && ["pending", "approved", "submitted", "revision_needed"].includes(application.status) && (
+      {showReject && canReject(application.status) && (
         <div className="mt-3 flex items-center gap-2">
           <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("rejectionReasonPlaceholder")}
             className="flex-1 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" />
