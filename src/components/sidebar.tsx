@@ -271,9 +271,19 @@ export function Sidebar({
         }`}
       >
         {/* Logo */}
-        <div className="h-16 px-5 flex items-center gap-2 border-b border-gray-100 dark:border-gray-800">
-          <img src="/logo2.webp" alt="RGossips" className="h-7 dark:brightness-125" />
-          <span className="text-[9px] font-semibold text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">ADMIN</span>
+        {/* The wordmark is 512x74 — an aspect of ~6.9 — so height alone does
+            not bound it: at h-7 it renders 194px wide, and the sidebar only
+            has 220px inside its padding. With the 8px gap and the badge that
+            came to 247px and pushed ADMIN off the edge. Cap the WIDTH and let
+            the height follow, so a future wordmark of any proportion still
+            fits. */}
+        <div className="h-16 px-5 flex items-center gap-2 overflow-hidden border-b border-gray-100 dark:border-gray-800">
+          <img
+            src="/logo2.webp"
+            alt="RGossips"
+            className="h-7 w-auto max-w-[150px] min-w-0 object-contain object-left dark:brightness-125"
+          />
+          <span className="shrink-0 text-[9px] font-semibold text-gray-400 dark:text-gray-600 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">ADMIN</span>
         </div>
 
         {/* User profile card */}
