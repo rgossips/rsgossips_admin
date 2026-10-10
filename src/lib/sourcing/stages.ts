@@ -56,6 +56,34 @@ export function toFulfilmentMode(value: unknown): FulfilmentMode {
   return value === "ship" || value === "none" ? value : "reimburse";
 }
 
+/**
+ * The route a campaign's bookings should default to, read off its brief.
+ *
+ * Here rather than in a page because two pages now offer "add creators" — the
+ * outreach tracker and the campaign detail page's creator finder — and a
+ * second copy of this would drift the first time the brief grew a field.
+ *
+ * KNOWN GAP: `fulfilment_mode` is written only at creation (addBooking, the
+ * pool import, the sheet import) and there is no UI to change it afterwards,
+ * so whatever this returns is what that booking is stuck with. That was
+ * already true when the add form had a mode selector — the selector only
+ * moved the guess earlier — but it matters more now the selector is gone.
+ * If a creator needs a different route, the booking has to be recreated.
+ *
+ *   ships it                  -> we send it, so `ship`
+ *   pickup                    -> the creator collects; no parcel of ours
+ *   a product, but no shipping -> they buy it and we pay them back
+ *   a service or a stay       -> nothing physical moves
+ */
+export function defaultFulfilmentMode(meta: {
+  shipping_required?: unknown;
+  offering_type?: unknown;
+}): FulfilmentMode {
+  if (meta.shipping_required === "yes") return "ship";
+  if (meta.shipping_required === "pickup") return "none";
+  return meta.offering_type === "product" ? "reimburse" : "none";
+}
+
 export const FULFILMENT_MODE_LABEL: Record<FulfilmentMode, string> = {
   reimburse: "Creator buys · we reimburse",
   ship: "We ship it",

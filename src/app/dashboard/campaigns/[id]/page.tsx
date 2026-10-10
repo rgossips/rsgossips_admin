@@ -5,6 +5,8 @@ import { CampaignDetailActions } from "./detail-actions";
 import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
+import { PoolPicker } from "./sourcing/pool-picker";
+import { defaultFulfilmentMode } from "@/lib/sourcing/stages";
 import { normalizeShippingMode, type ShippingMode } from "@/lib/barter-fulfilment";
 import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
@@ -87,6 +89,9 @@ export default async function CampaignDetailPage({
   // ranking needs it. requiredGender() treats "Any"/both/absent as no
   // restriction, so this being null is the common case.
   let targetGender: string[] | null = null;
+  // Only needed to pick the default fulfilment route for newly sourced
+  // creators — see defaultFulfilmentMode.
+  let offeringType: string | null = null;
 
   const metaSeparator = description.indexOf("\n\n---\n");
   if (metaSeparator !== -1) {
@@ -99,6 +104,7 @@ export default async function CampaignDetailPage({
       engagementRate = meta.min_engagement_rate || null;
       shippingMode = normalizeShippingMode(meta.shipping_required);
       targetGender = Array.isArray(meta.target_gender) ? meta.target_gender : null;
+      offeringType = typeof meta.offering_type === "string" ? meta.offering_type : null;
     } catch { /* ignore */ }
   } else if (description.startsWith("{")) {
     try {
@@ -108,6 +114,7 @@ export default async function CampaignDetailPage({
       engagementRate = meta.min_engagement_rate || null;
       shippingMode = normalizeShippingMode(meta.shipping_required);
       targetGender = Array.isArray(meta.target_gender) ? meta.target_gender : null;
+      offeringType = typeof meta.offering_type === "string" ? meta.offering_type : null;
       description = "";
     } catch { /* ignore */ }
   }
@@ -209,13 +216,17 @@ export default async function CampaignDetailPage({
               applicationCount={applications?.length || 0}
             />
           )}
-          {/* The second intake path. Same seats, different door. */}
+          {/* The second intake path. Same seats, different door.
+              whitespace-nowrap because this label is two words where
+              "Sourcing" was one: without it the text wrapped inside the
+              fixed h-9 and the button read as squashed beside its
+              single-line neighbours. */}
           {canWrite && (
             <Link
               href={`/dashboard/campaigns/${campaign.campaign_id}/sourcing`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-[13px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-[13px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
             >
-              Sourcing
+              Outreach tracker
             </Link>
           )}
           <RefreshButton />
@@ -252,6 +263,19 @@ export default async function CampaignDetailPage({
           )}
 
           {/* Applications */}
+          {/* Who else should be on this campaign. It lives here rather
+              than on the tracker because this is the page where that
+              question gets asked, with the applications already in view.
+              Anyone who has applied, or is already on the tracker, is
+              filtered out server-side. */}
+          {canWrite && (
+            <div className="mb-4">
+              <PoolPicker
+                campaignId={campaign.campaign_id}
+                defaultMode={defaultFulfilmentMode({ shipping_required: shippingMode, offering_type: offeringType })}
+              />
+            </div>
+          )}
           <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} phones={Object.fromEntries(phoneMap)}
             targeting={{
               categories: campaign.target_categories || null,

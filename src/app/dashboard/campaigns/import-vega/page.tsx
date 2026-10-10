@@ -46,7 +46,7 @@ export default async function ImportVegaPage() {
             directly and deliberately avoids the actions that would message a creator or a brand.
           </li>
           <li>
-            <strong>Most of these creators have no account</strong>, so they can only appear in the admin Sourcing tab.
+            <strong>Most of these creators have no account</strong>, so they can only appear in the admin outreach tracker.
             Creators with an RGossips login also show up in the brand and creator apps; the rest are added to the
             creator database as invited creators so they are not lost again.
           </li>

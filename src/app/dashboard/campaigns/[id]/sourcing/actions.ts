@@ -61,6 +61,10 @@ export type BookingInput = {
   // Who gets the product to them. Defaults to reimburse, which is what the
   // original manual process did.
   fulfilmentMode?: FulfilmentMode;
+  // The admin who owns reaching out to this creator. Assigned at creation
+  // because an unassigned row is one nobody is responsible for, which is
+  // the failure the outreach tracker exists to stop.
+  assignTo?: string | null;
 };
 
 export async function addBooking(
@@ -114,6 +118,17 @@ export async function addBooking(
       notes: clampLen(input.notes || "", NOTE_MAX) || null,
       fulfilment_mode: toFulfilmentMode(input.fulfilmentMode),
       stage: "shortlisted",
+      // Spread so these keys are absent entirely when nobody was picked:
+      // they only exist once rgossips_web migration 084 is applied, and
+      // naming a missing column fails the whole insert.
+      ...(input.assignTo
+        ? {
+            assigned_to: input.assignTo,
+            assigned_at: new Date().toISOString(),
+            assigned_by: actorId,
+            outreach_owner: input.assignTo,
+          }
+        : {}),
       created_by: actorId,
     })
     .select("id")

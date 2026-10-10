@@ -41,7 +41,7 @@ function parseTrailer(raw: string | null | undefined, sep: string): Record<strin
 export async function searchCreatorPool(
   campaignId: string,
   opts?: { search?: string; includeInvited?: boolean },
-): Promise<{ error?: string; candidates?: PoolCandidate[] }> {
+): Promise<{ error?: string; candidates?: PoolCandidate[]; excluded?: number }> {
   const gate = await adminGate();
   if (gate) return { error: gate.error };
 
@@ -165,7 +165,19 @@ export async function searchCreatorPool(
     }
   }
 
-  return { candidates: rankCandidates(candidates) };
+  // Anyone already spoken for on this campaign is DROPPED, not just ranked
+  // low. This picker answers one question — who else should be on this
+  // campaign — and someone who has already applied, or is already on the
+  // tracker, is not an answer to it: there is nothing to reach out about.
+  // They used to be returned and sunk to the bottom, which meant an admin
+  // scrolled past their own existing list to reach the new names.
+  //
+  // The count comes back so the UI can say they were hidden rather than
+  // leaving the admin wondering where a creator they know applied has gone.
+  const engaged = candidates.filter((c) => c.alreadySourced || c.alreadyApplied).length;
+  const fresh = candidates.filter((c) => !c.alreadySourced && !c.alreadyApplied);
+
+  return { candidates: rankCandidates(fresh), excluded: engaged };
 }
 
 // Bring a selection onto the sourcing list. These creators are already in
@@ -175,6 +187,10 @@ export async function importFromPool(
   campaignId: string,
   picks: { influencerId?: string | null; invitationId?: string | null; handle: string; name?: string | null; followers?: number | null }[],
   fulfilmentMode: FulfilmentMode = "reimburse",
+  // Who owns reaching out to this batch. Optional, but without it twenty
+  // creators land on the tracker with nobody responsible for them, which is
+  // the exact failure the tracker exists to stop.
+  assignTo?: string | null,
 ): Promise<{ error?: string; added?: number; skipped?: number }> {
   let actorId: string;
   try {
@@ -198,6 +214,17 @@ export async function importFromPool(
       fulfilment_mode: toFulfilmentMode(fulfilmentMode),
       stage: "shortlisted",
       created_by: actorId,
+      // Spread so the keys are absent entirely when nobody was picked —
+      // these columns only exist once migration 084 is applied, and sending
+      // them as null would fail the insert on a database without them.
+      ...(assignTo
+        ? {
+            assigned_to: assignTo,
+            assigned_at: new Date().toISOString(),
+            assigned_by: actorId,
+            outreach_owner: assignTo,
+          }
+        : {}),
     }));
 
   // Filter against what is already on the list, then insert the rest.
@@ -233,6 +260,9 @@ export async function importFromPool(
     }
   }
 
+  // The picker lives on the campaign detail page now, so that path needs
+  // refreshing too or the admin sees no change where they just acted.
   revalidatePath(`/dashboard/campaigns/${campaignId}/sourcing`);
+  revalidatePath(`/dashboard/campaigns/${campaignId}`);
   return { added, skipped: rows.length - added };
 }

@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { isAdminOrAbove } from "@/lib/require-super-admin";
+import { isAdminOrAbove, getAdminProfile } from "@/lib/require-super-admin";
 import { logError } from "@/lib/log";
 import { SEAT_HOLDING_APPLICATION_STATUSES, countSeats, describeSeats } from "@/lib/sourcing/seats";
-import { ALL_MAIN_STAGES, STAGE_LABEL, STAGE_STYLE, type BookingStage, type FulfilmentMode } from "@/lib/sourcing/stages";
+import { ALL_MAIN_STAGES, STAGE_LABEL, STAGE_STYLE, defaultFulfilmentMode, type BookingStage, type FulfilmentMode } from "@/lib/sourcing/stages";
 import { SourcingTable } from "./sourcing-table";
 import { AddBookingButton } from "./add-booking";
-import { PoolPicker } from "./pool-picker";
+import { listAssignableAdmins } from "./outreach-actions";
 import { BulkCreateButton } from "./bulk-create";
 import { ApprovedApplicants } from "./approved-applicants";
 
@@ -38,6 +38,18 @@ function parseTrailer(description: string | null | undefined): Record<string, un
 export default async function SourcingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!(await isAdminOrAbove())) redirect("/dashboard/campaigns");
+
+  // Who is looking, and what they are allowed to press. The actions
+  // re-check all of it; this only decides what to render.
+  const me = await getAdminProfile();
+  const adminList = await listAssignableAdmins();
+  const admins = adminList.admins || [];
+  const isSuperAdmin = me.role === "super_admin";
+  // A super_admin stands in when nobody holds the approver flag, which is
+  // also the state before admin migration 005 is applied.
+  const approvers = admins.filter((a) => a.isApprover);
+  const canApprove =
+    approvers.some((a) => a.id === me.userId) || (approvers.length === 0 && isSuperAdmin);
 
   const admin = createAdminClient();
 
@@ -78,6 +90,49 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
   }
 
   const bookings = bookingsRes.data || [];
+
+  // Who moved each row last.
+  //
+  // Every action on this page already writes a campaign_booking_events
+  // row carrying actor_id — that is the audit trail. This reads the most
+  // recent one per booking so the trail is VISIBLE on the row rather than
+  // only recoverable from the table. One query for the whole page, not
+  // one per row.
+  //
+  // Resolved to a name here rather than stored on the booking: there is no
+  // outreach_updated_by column, and adding one would duplicate what the
+  // events table already records properly.
+  const lastActions: Record<string, { note: string; actorName: string; at: string } | null> = {};
+  if (bookings.length) {
+    const { data: events } = await admin
+      .from("campaign_booking_events")
+      .select("booking_id, note, actor_id, created_at, kind")
+      .in(
+        "booking_id",
+        bookings.map((b) => b.id),
+      )
+      .order("created_at", { ascending: false });
+    const nameById = new Map(admins.map((a) => [a.id, a.name]));
+    for (const e of events || []) {
+      const key = String(e.booking_id);
+      // Ordered newest-first, so the first one seen per booking wins.
+      if (lastActions[key]) continue;
+      lastActions[key] = {
+        note: String(e.note || e.kind || "updated"),
+        actorName: nameById.get(String(e.actor_id)) || "an admin",
+        // Fixed IST, computed on the server and passed down as a string —
+        // the same reason the errors page does it this way: a locale-
+        // dependent render would differ between server and client.
+        at: new Date(e.created_at).toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          day: "numeric",
+          month: "short",
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+      };
+    }
+  }
   const applications = appsRes.data || [];
   const seats = countSeats(campaign.max_influencers, applications, bookings);
 
@@ -106,13 +161,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
   //   pickup          -> the creator collects; no parcel of ours, no refund
   //   a product, but no shipping -> they buy it and we pay them back
   //   a service/stay  -> nothing physical moves
-  const defaultMode: FulfilmentMode = (() => {
-    const meta = parseTrailer(camp.description);
-    const shipping = meta.shipping_required;
-    if (shipping === "yes") return "ship";
-    if (shipping === "pickup") return "none";
-    return meta.offering_type === "product" ? "reimburse" : "none";
-  })();
+  const defaultMode: FulfilmentMode = defaultFulfilmentMode(parseTrailer(camp.description));
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
@@ -124,24 +173,23 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
           >
             ← {campaign.title || "Campaign"}
           </Link>
-          <h1 className="mt-1 text-xl font-black text-gray-900 dark:text-gray-100">Sourcing</h1>
+          <h1 className="mt-1 text-xl font-black text-gray-900 dark:text-gray-100">Outreach tracker</h1>
           <p className="text-[12px] text-gray-500">
-            {brandName} · creators booked by hand. They fill the same seats as portal applicants.
+            {brandName} · creators we are reaching out to by hand. They fill the same seats as portal applicants.
           </p>
         </div>
       </div>
 
       {!notLive && (
         <div className="flex flex-wrap items-start gap-2">
-          <PoolPicker campaignId={id} defaultMode={defaultMode} />
-          <AddBookingButton campaignId={id} />
+          <AddBookingButton campaignId={id} defaultMode={defaultMode} />
           <BulkCreateButton campaignId={id} defaultMode={defaultMode} />
         </div>
       )}
 
       {notLive ? (
         <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 px-5 py-10 text-center dark:border-amber-800 dark:bg-amber-900/20">
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Sourcing isn&apos;t live yet</p>
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">The outreach tracker isn&apos;t live yet</p>
           <p className="mx-auto mt-1 max-w-md text-[13px] text-amber-800 dark:text-amber-300">
             Apply migration <span className="font-mono">081_campaign_bookings</span> in rgossips_web and this tab
             starts working. Nothing is backfilled — bookings accrue from then on.
@@ -193,7 +241,15 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
             <h2 className="mb-2 text-sm font-bold text-gray-900 dark:text-white">
               Sourced by hand <span className="font-normal text-gray-400">({bookings.length})</span>
             </h2>
-            <SourcingTable bookings={bookings} />
+            <SourcingTable
+              bookings={bookings}
+              campaignId={id}
+              admins={admins}
+              currentAdminId={me.userId || ""}
+              isSuperAdmin={isSuperAdmin}
+              canApprove={canApprove}
+              lastActions={lastActions}
+            />
           </div>
         </>
       )}

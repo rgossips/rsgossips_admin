@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { InstagramLink } from "@/components/instagram-link";
 import { ButtonSpinner } from "@/components/spinner";
 import { useRole } from "@/components/role-context";
+import { OutreachAction, OutreachControl, type LastAction, type OutreachContext } from "./outreach-control";
+import type { AssignableAdmin } from "./outreach-actions";
 import {
   FULFILMENT_MODE_LABEL,
   STAGE_LABEL,
@@ -41,16 +43,57 @@ export type Booking = {
   fulfilment_mode: string | null;
   shipping_tracking_url: string | null;
   created_at: string;
+  // Outreach tracking (rgossips_web migration 084). Null on every row
+  // created before the tracker existed, which reads correctly as
+  // "nobody owns this yet".
+  assigned_to: string | null;
+  outreach_owner: string | null;
+  outreach_status: string | null;
+  outreach_note: string | null;
+  approval_state: string | null;
+  approval_note: string | null;
 };
 
 const rupees = (paise: number | null) =>
   paise == null ? "—" : `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 
-export function SourcingTable({ bookings }: { bookings: Booking[] }) {
+export function SourcingTable({
+  bookings,
+  campaignId,
+  admins,
+  currentAdminId,
+  isSuperAdmin,
+  canApprove,
+  lastActions = {},
+}: {
+  bookings: Booking[];
+  campaignId: string;
+  admins: AssignableAdmin[];
+  currentAdminId: string;
+  isSuperAdmin: boolean;
+  canApprove: boolean;
+  lastActions?: Record<string, LastAction>;
+}) {
   const router = useRouter();
   const { isViewer } = useRole();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const ctx: OutreachContext = {
+    campaignId,
+    admins,
+    currentAdminId,
+    isSuperAdmin,
+    canApprove,
+    isViewer,
+  };
+
+  // Once outreach is settled the row rejoins the delivery ladder, so the
+  // Action column hands back to the stage control. Replacing that column
+  // outright would have stranded every booking that predates the tracker
+  // with no way to advance past `confirmed`.
+  const inOutreach = (b: Booking) =>
+    b.approval_state !== "approved" && b.approval_state !== "rejected" && b.outreach_status !== "declined";
 
   if (bookings.length === 0) {
     return (
@@ -138,7 +181,7 @@ export function SourcingTable({ bookings }: { bookings: Booking[] }) {
           <li key={b.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-start justify-between gap-3">
               <Identity b={b} />
-              <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[b.stage as BookingStage]}`}>
+              <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[b.stage as BookingStage]}`}>
                 {STAGE_LABEL[b.stage as BookingStage] || b.stage}
               </span>
             </div>
@@ -153,7 +196,10 @@ export function SourcingTable({ bookings }: { bookings: Booking[] }) {
               </div>
             </dl>
             <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-              <StageControl b={b} />
+              <OutreachControl row={b} ctx={ctx} lastAction={lastActions[b.id]} />
+            </div>
+            <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+              {inOutreach(b) ? <OutreachAction row={b} ctx={ctx} /> : <StageControl b={b} />}
             </div>
           </li>
         ))}
@@ -165,8 +211,8 @@ export function SourcingTable({ bookings }: { bookings: Booking[] }) {
           <table className="w-full min-w-200">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-800/30">
-                {["Creator", "Stage", "Quoted", "Agreed", "Product", "Contact", "Next"].map((h) => (
-                  <th key={h} className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                {["Creator", "Stage", "Outreach", "Quoted", "Agreed", "Contact", "Action"].map((h) => (
+                  <th key={h} className="px-5 py-3.5 text-left align-top text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                     {h}
                   </th>
                 ))}
@@ -175,20 +221,24 @@ export function SourcingTable({ bookings }: { bookings: Booking[] }) {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {bookings.map((b) => (
                 <tr key={b.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30">
-                  <td className="px-5 py-3.5"><Identity b={b} /></td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[b.stage as BookingStage]}`}>
+                  <td className="px-5 py-3.5 align-top"><Identity b={b} /></td>
+                  <td className="px-5 py-3.5 align-top">
+                    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[b.stage as BookingStage]}`}>
                       {STAGE_LABEL[b.stage as BookingStage] || b.stage}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 dark:text-gray-300">{rupees(b.quoted_fee_paise)}</td>
-                  <td className="px-5 py-3.5 text-[13px] font-semibold text-gray-800 dark:text-gray-200">{rupees(b.agreed_fee_paise)}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 dark:text-gray-300">{rupees(b.product_cost_paise)}</td>
-                  <td className="px-5 py-3.5 text-[12px] text-gray-500">
+                  <td className="px-5 py-3.5 align-top">
+                    <OutreachControl row={b} ctx={ctx} lastAction={lastActions[b.id]} />
+                  </td>
+                  <td className="px-5 py-3.5 align-top text-[13px] text-gray-600 dark:text-gray-300">{rupees(b.quoted_fee_paise)}</td>
+                  <td className="px-5 py-3.5 align-top text-[13px] font-semibold text-gray-800 dark:text-gray-200">{rupees(b.agreed_fee_paise)}</td>
+                  <td className="px-5 py-3.5 align-top text-[12px] text-gray-500">
                     <div className="truncate max-w-[180px]">{b.email || "—"}</div>
                     <div>{b.phone || ""}</div>
                   </td>
-                  <td className="px-5 py-3.5"><StageControl b={b} /></td>
+                  <td className="px-5 py-3.5 align-top">
+                    {inOutreach(b) ? <OutreachAction row={b} ctx={ctx} /> : <StageControl b={b} />}
+                  </td>
                 </tr>
               ))}
             </tbody>

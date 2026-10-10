@@ -1,17 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ButtonSpinner } from "@/components/spinner";
-import { FULFILMENT_MODES, FULFILMENT_MODE_LABEL, type FulfilmentMode } from "@/lib/sourcing/stages";
+import { type FulfilmentMode } from "@/lib/sourcing/stages";
+import { tierForFollowers, tierRangeLabel } from "@/lib/sourcing/tiers";
 import { addBooking } from "./actions";
 import { lookupHandle, type HandleLookup } from "./lookup-actions";
+import { listAssignableAdmins, type AssignableAdmin } from "./outreach-actions";
 
-// Add one creator to a campaign's sourcing list.
+// Add one creator to the campaign's outreach tracker.
 //
-// The handle is the only required field: an admin pasting a name off a DM
-// should not be blocked for want of a follower count they can fill in later.
-// Everything else is optional and editable afterwards.
+// The handle and an assignee are the only required fields: an admin pasting
+// a name off a DM should not be blocked for want of a follower count, but a
+// creator nobody owns is the failure the tracker exists to stop.
+//
+// WATCH OUT: these values are write-once. Nothing in the portal edits a
+// booking's name, handle, followers, email, phone or quoted fee after
+// creation — the only updates that exist touch the stage, the shipping
+// fields, the outreach outcome and the sheet re-import. A typo here means
+// recreating the booking, so this is not the low-stakes form the old
+// "editable afterwards" comment claimed it was.
 //
 // Saving also files the creator as an invited influencer, which the success
 // line says out loud — that is the difference between this and the
@@ -21,31 +30,51 @@ const input =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100";
 const label = "block text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1";
 
-export function AddBookingButton({ campaignId }: { campaignId: string }) {
+export function AddBookingButton({
+  campaignId,
+  defaultMode = "reimburse",
+}: {
+  campaignId: string;
+  defaultMode?: FulfilmentMode;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
 
+  // Only what is known at the moment a creator is added. Agreed amount,
+  // product cost and the delivery address are NOT here on purpose: they
+  // are outcomes of the outreach conversation and of the product leg, and
+  // asking for them up front invited a guess that then read as a fact.
+  // Tier is absent too — it is derived from the follower count below.
   const [form, setForm] = useState({
     instagramUsername: "",
     creatorName: "",
     email: "",
     phone: "",
-    tier: "",
     followersCount: "",
     quotedFee: "",
-    agreedFee: "",
-    productCost: "",
-    shippingAddress: "",
-    notes: "",
   });
-  // Which route this creator takes. Per booking: on one campaign some are
-  // sent the product and others buy it.
-  const [mode, setMode] = useState<FulfilmentMode>("reimburse");
+  // Who will own reaching out. Required, because an unassigned creator is
+  // one nobody is chasing.
+  const [assignTo, setAssignTo] = useState("");
+  const [admins, setAdmins] = useState<AssignableAdmin[]>([]);
+  // The tier follows the follower count, so there is nothing to store.
+  const derivedTier = tierForFollowers(form.followersCount);
   const [looking, setLooking] = useState(false);
   const [lookup, setLookup] = useState<HandleLookup | null>(null);
+
+  useEffect(() => {
+    if (!open || admins.length > 0) return;
+    let alive = true;
+    listAssignableAdmins().then((res) => {
+      if (alive && res.admins) setAdmins(res.admins);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open, admins.length]);
 
   // Fired by a button, never on change or blur: each call spends HikerAPI
   // credits, and a debounce would buy one for "d", then "de", then "dee".
@@ -80,14 +109,11 @@ export function AddBookingButton({ campaignId }: { campaignId: string }) {
       creatorName: form.creatorName || undefined,
       email: form.email || undefined,
       phone: form.phone || undefined,
-      tier: form.tier || undefined,
-      shippingAddress: form.shippingAddress || undefined,
+      tier: derivedTier || undefined,
       followersCount: form.followersCount ? Number(form.followersCount) : null,
       quotedFee: form.quotedFee ? Number(form.quotedFee) : null,
-      agreedFee: form.agreedFee ? Number(form.agreedFee) : null,
-      productCost: form.productCost ? Number(form.productCost) : null,
-      notes: form.notes || undefined,
-      fulfilmentMode: mode,
+      fulfilmentMode: defaultMode,
+      assignTo: assignTo || null,
     });
     setBusy(false);
     if (res.error) return setError(res.error);
@@ -98,7 +124,9 @@ export function AddBookingButton({ campaignId }: { campaignId: string }) {
           ? "Added, and linked to their existing RGossips account."
           : "Added, and linked to their existing invitation.",
     );
-    setForm({ instagramUsername: "", creatorName: "", email: "", phone: "", tier: "", followersCount: "", quotedFee: "", agreedFee: "", productCost: "", shippingAddress: "", notes: "" });
+    setForm({ instagramUsername: "", creatorName: "", email: "", phone: "", followersCount: "", quotedFee: "" });
+    // The assignee is deliberately kept: an admin adding five creators is
+    // usually handing all five to the same person.
     router.refresh();
   };
 
@@ -194,41 +222,43 @@ export function AddBookingButton({ campaignId }: { campaignId: string }) {
           )}
         </div>
         <div><label className={label}>Name</label><input className={input} value={form.creatorName} onChange={set("creatorName")} /></div>
-        <div><label className={label}>Tier</label><input className={input} value={form.tier} onChange={set("tier")} placeholder="Nano / Micro / Macro" /></div>
         <div><label className={label}>Followers</label><input className={input} inputMode="numeric" value={form.followersCount} onChange={set("followersCount")} /></div>
+        {/* Derived, not typed. As free text this field collected "micro",
+            "Micro ", "mid-tier" and blank; the tier is a description OF the
+            follower count, so it follows from it. Blank count shows no tier
+            rather than defaulting to Nano — unknown is not the same as small. */}
+        <div>
+          <label className={label}>Tier</label>
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 dark:border-gray-800 dark:bg-gray-900">
+            {derivedTier ? (
+              <>
+                <span className="text-[13px] font-semibold text-gray-900 dark:text-gray-100">{derivedTier}</span>
+                <span className="text-[11px] text-gray-400">{tierRangeLabel(derivedTier)}</span>
+              </>
+            ) : (
+              <span className="text-[12px] text-gray-400">Enter followers to set the tier</span>
+            )}
+          </div>
+        </div>
         <div><label className={label}>Email</label><input className={input} value={form.email} onChange={set("email")} /></div>
         <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={set("phone")} /></div>
         {/* Rupees in, paise in the column — the action does the one conversion. */}
         <div><label className={label}>Quoted (₹)</label><input className={input} inputMode="numeric" value={form.quotedFee} onChange={set("quotedFee")} /></div>
-        <div><label className={label}>Agreed (₹)</label><input className={input} inputMode="numeric" value={form.agreedFee} onChange={set("agreedFee")} /></div>
-        <div><label className={label}>Product cost (₹)</label><input className={input} inputMode="numeric" value={form.productCost} onChange={set("productCost")} /></div>
-        <div className="sm:col-span-2 lg:col-span-3">
-          <label className={label}>How does the product reach them?</label>
-          <div className="flex flex-wrap gap-2">
-            {FULFILMENT_MODES.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold cursor-pointer ${
-                  mode === m
-                    ? "border-indigo-600 bg-indigo-600 text-white"
-                    : "border-gray-300 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300"
-                }`}
-              >
-                {FULFILMENT_MODE_LABEL[m]}
-              </button>
+        <div>
+          <label className={label}>Assign to *</label>
+          <select
+            className={input}
+            value={assignTo}
+            onChange={(e) => setAssignTo(e.target.value)}
+          >
+            <option value="">Choose an admin…</option>
+            {admins.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.isApprover ? " (approver)" : ""}
+              </option>
             ))}
-          </div>
-        </div>
-
-        <div className={`sm:col-span-2 lg:col-span-3 ${mode === "none" ? "hidden" : ""}`}>
-          <label className={label}>{mode === "ship" ? "Delivery address" : "Shipping address"}</label>
-          <textarea className={input} rows={2} value={form.shippingAddress} onChange={set("shippingAddress")} />
-        </div>
-        <div className="sm:col-span-2 lg:col-span-3">
-          <label className={label}>Notes</label>
-          <textarea className={input} rows={2} value={form.notes} onChange={set("notes")} placeholder="e.g. cost should be 10k-15k" />
+          </select>
         </div>
       </div>
 
@@ -236,13 +266,15 @@ export function AddBookingButton({ campaignId }: { campaignId: string }) {
         <button
           type="button"
           onClick={submit}
-          disabled={busy || !form.instagramUsername.trim()}
+          disabled={busy || !form.instagramUsername.trim() || !assignTo}
           className="inline-flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-[13px] font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           {busy && <ButtonSpinner />}
           Add to campaign
         </button>
-        <p className="text-[11px] text-gray-400">They&apos;re also filed as an invited influencer.</p>
+        <p className="text-[11px] text-gray-400">
+          They&apos;re also filed as an invited influencer. The assigned admin records what the creator says next.
+        </p>
       </div>
 
       {error && <p className="mt-2 text-[12px] text-rose-600 dark:text-rose-400">{error}</p>}

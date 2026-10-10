@@ -6,6 +6,7 @@ import { ButtonSpinner } from "@/components/spinner";
 import { FULFILMENT_MODE_LABEL, type FulfilmentMode } from "@/lib/sourcing/stages";
 import type { PoolCandidate } from "@/lib/sourcing/pool";
 import { importFromPool, searchCreatorPool } from "./pool-actions";
+import { listAssignableAdmins, type AssignableAdmin } from "./outreach-actions";
 
 // Pull creators out of our own database onto this campaign.
 //
@@ -32,6 +33,14 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
   const mode = defaultMode;
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  // How many matches were hidden because they are already on this
+  // campaign. Shown so a missing name reads as "already handled" rather
+  // than "not in the database".
+  const [excluded, setExcluded] = useState(0);
+  // Who will own reaching out to whoever is imported. Loaded lazily so the
+  // button does not cost a query until it is opened.
+  const [admins, setAdmins] = useState<AssignableAdmin[]>([]);
+  const [assignTo, setAssignTo] = useState("");
 
   const keyOf = (c: PoolCandidate) => c.influencerId || c.invitationId || c.handle;
 
@@ -43,7 +52,12 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
     setLoading(false);
     if (res.error) return setError(res.error);
     setCandidates(res.candidates || []);
+    setExcluded(res.excluded || 0);
     setPicked(new Set());
+    if (admins.length === 0) {
+      const who = await listAssignableAdmins();
+      if (who.admins) setAdmins(who.admins);
+    }
   };
 
   const toggle = (c: PoolCandidate) => {
@@ -72,11 +86,14 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
         followers: c.followers,
       })),
       mode,
+      assignTo || null,
     );
     setImporting(false);
     if (res.error) return setError(res.error);
+    const owner = admins.find((a) => a.id === assignTo);
     setNote(
-      `${res.added} added to the sourcing list${res.skipped ? `, ${res.skipped} already there` : ""}.`,
+      `${res.added} added to the outreach tracker${res.skipped ? `, ${res.skipped} already there` : ""}` +
+        `${owner ? `, assigned to ${owner.name}` : " — nobody assigned yet"}.`,
     );
     setPicked(new Set());
     await run();
@@ -100,22 +117,36 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
-        Find creators
+        Find matching creators
       </button>
     );
   }
 
   return (
     <div className="w-full rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Creators from our database</h2>
-          <p className="text-[12px] text-gray-500">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Find matching creators</h2>
+          <p className="max-w-2xl text-[12px] text-gray-500">
             Ranked against this campaign&apos;s brief. Invited creators are included — they&apos;re in here because
-            someone already thought they were worth approaching.
+            someone already thought they were worth approaching. Anyone who has already applied, or is already on
+            the tracker, is left out.
           </p>
+          {excluded > 0 && (
+            <p className="text-[12px] font-medium text-gray-400">
+              {excluded} match{excluded === 1 ? "" : "es"} hidden — already on this campaign.
+            </p>
+          )}
         </div>
-        <button type="button" onClick={() => setOpen(false)} className="text-[12px] font-semibold text-gray-500 hover:underline cursor-pointer">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close creator search"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-gray-800 cursor-pointer"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
           Close
         </button>
       </div>
@@ -166,6 +197,25 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
                   Clear
                 </button>
               )}
+              {/* Picking an owner is part of the same decision as picking
+                  the creators, so it sits on the same control bar rather
+                  than being something to remember afterwards. */}
+              <label className="flex items-center gap-1.5 text-[12px] text-gray-500">
+                <span>Assign to</span>
+                <select
+                  value={assignTo}
+                  onChange={(e) => setAssignTo(e.target.value)}
+                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-[12px] dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <option value="">Nobody yet</option>
+                  {admins.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                      {a.isApprover ? " (approver)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={addPicked}
@@ -173,7 +223,7 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
                 className="inline-flex h-8 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-[12px] font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 {importing && <ButtonSpinner />}
-                Add {picked.size || ""} to sourcing
+                Add {picked.size || ""} to tracker
               </button>
             </div>
           </div>
