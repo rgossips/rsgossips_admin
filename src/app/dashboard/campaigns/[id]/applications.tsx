@@ -284,20 +284,38 @@ export function ApplicationsList({
         </div>
       </div>
 
-      {/* Under-spec controls. Only shown when the brief sets a minimum AND
-          somebody is actually under it — otherwise they are two buttons that
-          can never do anything. */}
+      {/* Under-spec controls: a statement of fact, then two actions on it.
+          Only shown when the brief sets a minimum AND somebody is under it,
+          otherwise they are controls that can never do anything.
+
+          This used to be one button labelled "Hide under 10,000 followers
+          (5)" that flipped to "Show all applicants" — the classic confusing
+          toggle: the label described the ACTION while the count described
+          the SUBJECT, so "(5)" could read as how many would be hidden or how
+          many would remain, and the button gave no clue which state it was
+          in. A checkbox shows its own state, and the sentence owns the
+          count. */}
       {followerMin > 0 && underMin.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-800 dark:bg-gray-900/50">
-          <button
-            type="button"
-            onClick={() => setHideUnderMin((v) => !v)}
-            className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-white dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            {hideUnderMin
-              ? t("showAllApplicants")
-              : t("hideUnderMin", { min: followerMin.toLocaleString(), count: underMin.length })}
-          </button>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-100 bg-amber-50/60 px-6 py-3 dark:border-gray-800 dark:bg-amber-950/20">
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            {t("underMinSummary", {
+              count: underMin.length,
+              total: applications.length,
+              min: followerMin.toLocaleString(),
+            })}
+          </p>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={hideUnderMin}
+              onChange={(e) => setHideUnderMin(e.target.checked)}
+              className="h-3.5 w-3.5 cursor-pointer"
+            />
+            {t("hideThem")}
+          </label>
+          {/* Outline, not solid red: it opens a confirmation panel rather
+              than rejecting anything, and a solid destructive button beside
+              a neutral checkbox read as the primary action on the page. */}
           {isAdmin && rejectable.length > 0 && (
             <button
               type="button"
@@ -305,7 +323,7 @@ export function ApplicationsList({
                 setBulkNote(null);
                 setBulkOpen(true);
               }}
-              className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-500"
+              className="rounded-lg border border-red-300 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-950/40"
             >
               {t("bulkRejectCta", { count: rejectable.length })}
             </button>
