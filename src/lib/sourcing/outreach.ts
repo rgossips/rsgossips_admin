@@ -32,7 +32,7 @@
 //   sent back to renegotiate  -> price_agreed  (unchanged; it is still the
 //                                              price under discussion)
 
-import type { BookingStage } from "@/lib/sourcing/stages";
+import { ALL_MAIN_STAGES, type BookingStage } from "@/lib/sourcing/stages";
 
 // What the creator said. NULL on a row means nobody has recorded a
 // conversation yet, which is NOT the same as "no answer" — the difference is
@@ -170,6 +170,33 @@ export function canDecideApproval(
   // pair of eyes is the entire reason the step exists.
   if (booking.outreach_owner === actor.actorId) return false;
   return true;
+}
+
+// Stages that sit beyond the outreach conversation — the product leg and
+// everything after it. Derived from ALL_MAIN_STAGES rather than listed, so
+// a new stage cannot be forgotten here.
+const PAST_OUTREACH = new Set<string>(
+  ALL_MAIN_STAGES.slice(ALL_MAIN_STAGES.indexOf("confirmed") + 1),
+);
+
+/**
+ * Has this booking moved beyond what the tracker is for?
+ *
+ * Approval is the tracker's LAST step: once a price is signed off the
+ * creator has an application and is managed from the applications list, so
+ * the tracker stops offering controls and just points there.
+ *
+ * The stage check is for the bookings that predate the tracker. Sixty-three
+ * of those exist, some already at `live` or `fee_paid`, and they never went
+ * through an approval — without this they would be offered an outreach
+ * outcome dropdown on a creator who has already delivered.
+ */
+export function isPastOutreach(booking: {
+  approval_state?: string | null;
+  stage?: string | null;
+}): boolean {
+  if (booking.approval_state === "approved") return true;
+  return PAST_OUTREACH.has(String(booking.stage || ""));
 }
 
 /**

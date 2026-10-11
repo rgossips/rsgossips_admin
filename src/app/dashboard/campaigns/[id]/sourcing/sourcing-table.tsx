@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { InstagramLink } from "@/components/instagram-link";
 import { ButtonSpinner } from "@/components/spinner";
 import { useRole } from "@/components/role-context";
 import { OutreachAction, OutreachControl, type LastAction, type OutreachContext } from "./outreach-control";
+import { isPastOutreach } from "@/lib/sourcing/outreach";
 import type { AssignableAdmin } from "./outreach-actions";
 import {
   FULFILMENT_MODE_LABEL,
@@ -54,6 +56,37 @@ export type Booking = {
   approval_note: string | null;
 };
 
+// Where an approved booking ends. Module scope, never nested inside the
+// table — a component redefined each render remounts its children.
+//
+// Two outcomes, and the difference matters: a creator with an account got
+// a real application and the link goes to it. A creator we only ever
+// INVITED cannot have one — campaign_applications.influencer_id is a FK to
+// influencer_profiles, so there is no row for it to point at — and saying
+// “moved to applications” about them would be a lie. Migration 081's
+// trigger binds the booking when they claim their account.
+function DoneCell({ b, campaignId }: { b: Booking; campaignId: string }) {
+  if (!b.influencer_id) {
+    return (
+      <div className="text-[11px] text-gray-500">
+        <p className="font-semibold text-emerald-700 dark:text-emerald-400">Approved</p>
+        <p>No account yet — joins applications when they sign up.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="text-[11px]">
+      <p className="font-semibold text-emerald-700 dark:text-emerald-400">Approved</p>
+      <Link
+        href={`/dashboard/campaigns/${campaignId}`}
+        className="text-indigo-600 hover:underline dark:text-indigo-400"
+      >
+        Now in applications &rarr;
+      </Link>
+    </div>
+  );
+}
+
 const rupees = (paise: number | null) =>
   paise == null ? "—" : `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 
@@ -88,12 +121,16 @@ export function SourcingTable({
     isViewer,
   };
 
-  // Once outreach is settled the row rejoins the delivery ladder, so the
-  // Action column hands back to the stage control. Replacing that column
-  // outright would have stranded every booking that predates the tracker
-  // with no way to advance past `confirmed`.
+  // APPROVAL IS THE TRACKER’S LAST STEP. Once a price is signed off the
+  // creator has an application and is managed from the applications list,
+  // so the row stops offering controls and points there instead.
+  //
+  // The stage control survives only for bookings that predate the tracker
+  // and are already mid-delivery (isPastOutreach covers both cases) —
+  // dropping it outright would leave those 63 rows with no way to advance.
   const inOutreach = (b: Booking) =>
-    b.approval_state !== "approved" && b.approval_state !== "rejected" && b.outreach_status !== "declined";
+    !isPastOutreach(b) && b.approval_state !== "rejected" && b.outreach_status !== "declined";
+  const isDone = (b: Booking) => b.approval_state === "approved";
 
   if (bookings.length === 0) {
     return (
@@ -199,7 +236,13 @@ export function SourcingTable({
               <OutreachControl row={b} ctx={ctx} lastAction={lastActions[b.id]} />
             </div>
             <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-              {inOutreach(b) ? <OutreachAction row={b} ctx={ctx} /> : <StageControl b={b} />}
+              {inOutreach(b) ? (
+                <OutreachAction row={b} ctx={ctx} />
+              ) : isDone(b) ? (
+                <DoneCell b={b} campaignId={campaignId} />
+              ) : (
+                <StageControl b={b} />
+              )}
             </div>
           </li>
         ))}
@@ -237,7 +280,13 @@ export function SourcingTable({
                     <div>{b.phone || ""}</div>
                   </td>
                   <td className="px-5 py-3.5 align-top">
-                    {inOutreach(b) ? <OutreachAction row={b} ctx={ctx} /> : <StageControl b={b} />}
+                    {inOutreach(b) ? (
+                      <OutreachAction row={b} ctx={ctx} />
+                    ) : isDone(b) ? (
+                      <DoneCell b={b} campaignId={campaignId} />
+                    ) : (
+                      <StageControl b={b} />
+                    )}
                   </td>
                 </tr>
               ))}

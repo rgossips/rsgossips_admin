@@ -6,7 +6,7 @@ import { ButtonSpinner } from "@/components/spinner";
 import { FULFILMENT_MODE_LABEL, type FulfilmentMode } from "@/lib/sourcing/stages";
 import type { PoolCandidate } from "@/lib/sourcing/pool";
 import { importFromPool, searchCreatorPool } from "./pool-actions";
-import { listAssignableAdmins, type AssignableAdmin } from "./outreach-actions";
+import { type AssignableAdmin } from "./outreach-actions";
 
 // Pull creators out of our own database onto this campaign.
 //
@@ -20,7 +20,17 @@ import { listAssignableAdmins, type AssignableAdmin } from "./outreach-actions";
 // 5–10k followers; a score surfaces the near misses and lets the admin
 // judge. Why a creator ranked is printed on their row.
 
-export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaignId: string; defaultMode?: FulfilmentMode }) {
+export function PoolPicker({
+  campaignId,
+  defaultMode = "reimburse",
+  admins,
+  currentAdminId,
+}: {
+  campaignId: string;
+  defaultMode?: FulfilmentMode;
+  admins: AssignableAdmin[];
+  currentAdminId: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,10 +47,11 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
   // campaign. Shown so a missing name reads as "already handled" rather
   // than "not in the database".
   const [excluded, setExcluded] = useState(0);
-  // Who will own reaching out to whoever is imported. Loaded lazily so the
-  // button does not cost a query until it is opened.
-  const [admins, setAdmins] = useState<AssignableAdmin[]>([]);
-  const [assignTo, setAssignTo] = useState("");
+  // Who will own reaching out. Defaults to whoever is looking, because the
+  // common case is an admin sourcing creators for themselves — and because
+  // picking somebody here is what STARTS the tracking, an unassigned
+  // import would just recreate the pile of rows nobody owns.
+  const [assignTo, setAssignTo] = useState(currentAdminId);
 
   const keyOf = (c: PoolCandidate) => c.influencerId || c.invitationId || c.handle;
 
@@ -54,10 +65,6 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
     setCandidates(res.candidates || []);
     setExcluded(res.excluded || 0);
     setPicked(new Set());
-    if (admins.length === 0) {
-      const who = await listAssignableAdmins();
-      if (who.admins) setAdmins(who.admins);
-    }
   };
 
   const toggle = (c: PoolCandidate) => {
@@ -92,8 +99,8 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
     if (res.error) return setError(res.error);
     const owner = admins.find((a) => a.id === assignTo);
     setNote(
-      `${res.added} added to the outreach tracker${res.skipped ? `, ${res.skipped} already there` : ""}` +
-        `${owner ? `, assigned to ${owner.name}` : " — nobody assigned yet"}.`,
+      `Now tracking ${res.added}${res.skipped ? `, ${res.skipped} already on the list` : ""}` +
+        `${owner ? `, assigned to ${owner.name}` : ""}.`,
     );
     setPicked(new Set());
     await run();
@@ -130,7 +137,8 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
           <p className="max-w-2xl text-[12px] text-gray-500">
             Ranked against this campaign&apos;s brief. Invited creators are included — they&apos;re in here because
             someone already thought they were worth approaching. Anyone who has already applied, or is already on
-            the tracker, is left out.
+            the tracker, is left out. Picking somebody starts tracking them: they join the list below, assigned to
+            whoever you choose, ready for the first outreach.
           </p>
           {excluded > 0 && (
             <p className="text-[12px] font-medium text-gray-400">
@@ -207,8 +215,7 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
                   onChange={(e) => setAssignTo(e.target.value)}
                   className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-[12px] dark:border-gray-700 dark:bg-gray-900"
                 >
-                  <option value="">Nobody yet</option>
-                  {admins.map((a) => (
+                      {admins.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
                       {a.isApprover ? " (approver)" : ""}
@@ -219,11 +226,11 @@ export function PoolPicker({ campaignId, defaultMode = "reimburse" }: { campaign
               <button
                 type="button"
                 onClick={addPicked}
-                disabled={importing || picked.size === 0}
+                disabled={importing || picked.size === 0 || !assignTo}
                 className="inline-flex h-8 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-[12px] font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 {importing && <ButtonSpinner />}
-                Add {picked.size || ""} to tracker
+                Start tracking {picked.size || ""}
               </button>
             </div>
           </div>

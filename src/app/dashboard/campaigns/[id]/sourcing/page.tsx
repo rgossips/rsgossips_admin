@@ -7,6 +7,9 @@ import { SEAT_HOLDING_APPLICATION_STATUSES, countSeats, describeSeats } from "@/
 import { ALL_MAIN_STAGES, STAGE_LABEL, STAGE_STYLE, defaultFulfilmentMode, type BookingStage, type FulfilmentMode } from "@/lib/sourcing/stages";
 import { SourcingTable } from "./sourcing-table";
 import { AddBookingButton } from "./add-booking";
+import { PoolPicker } from "./pool-picker";
+import { FilterBar } from "@/components/filter-bar";
+import { OUTREACH_LABEL, OUTREACH_STATUSES } from "@/lib/sourcing/outreach";
 import { listAssignableAdmins } from "./outreach-actions";
 import { BulkCreateButton } from "./bulk-create";
 import { ApprovedApplicants } from "./approved-applicants";
@@ -35,8 +38,17 @@ function parseTrailer(description: string | null | undefined): Record<string, un
 // The campaign is an ordinary campaign. This is a tab on it, not a different
 // kind of campaign, and the seat counter at the top spans BOTH paths so a
 // brand's 100 slots cannot quietly become 140.
-export default async function SourcingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SourcingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const assigneeFilter = typeof sp.assignee === "string" ? sp.assignee : "";
+  const outcomeFilter = typeof sp.outcome === "string" ? sp.outcome : "";
   if (!(await isAdminOrAbove())) redirect("/dashboard/campaigns");
 
   // Who is looking, and what they are allowed to press. The actions
@@ -89,7 +101,14 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
     logError("sourcing.bookings", bookingsRes.error, { id });
   }
 
-  const bookings = bookingsRes.data || [];
+  const allBookings = bookingsRes.data || [];
+  const bookings = allBookings.filter((b) => {
+    if (assigneeFilter === "unassigned" && b.assigned_to) return false;
+    if (assigneeFilter && assigneeFilter !== "unassigned" && b.assigned_to !== assigneeFilter) return false;
+    if (outcomeFilter === "none" && b.outreach_status) return false;
+    if (outcomeFilter && outcomeFilter !== "none" && b.outreach_status !== outcomeFilter) return false;
+    return true;
+  });
 
   // Who moved each row last.
   //
@@ -182,6 +201,12 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
 
       {!notLive && (
         <div className="flex flex-wrap items-start gap-2">
+          <PoolPicker
+            campaignId={id}
+            defaultMode={defaultMode}
+            admins={admins}
+            currentAdminId={me.userId || ""}
+          />
           <AddBookingButton campaignId={id} defaultMode={defaultMode} />
           <BulkCreateButton campaignId={id} defaultMode={defaultMode} />
         </div>
@@ -241,6 +266,33 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
             <h2 className="mb-2 text-sm font-bold text-gray-900 dark:text-white">
               Sourced by hand <span className="font-normal text-gray-400">({bookings.length})</span>
             </h2>
+            <FilterBar
+              fields={[
+                {
+                  name: "assignee",
+                  label: "Assigned to",
+                  type: "select",
+                  options: [
+                    { label: "Unassigned", value: "unassigned" },
+                    ...admins.map((a) => ({ label: a.name, value: a.id })),
+                  ],
+                },
+                {
+                  name: "outcome",
+                  label: "Outcome",
+                  type: "select",
+                  options: [
+                    { label: "Not contacted yet", value: "none" },
+                    ...OUTREACH_STATUSES.map((st) => ({ label: OUTREACH_LABEL[st], value: st })),
+                  ],
+                },
+              ]}
+            />
+            {bookings.length !== allBookings.length && (
+              <p className="mb-2 text-[12px] text-gray-500">
+                Showing {bookings.length} of {allBookings.length} — a filter is on.
+              </p>
+            )}
             <SourcingTable
               bookings={bookings}
               campaignId={id}

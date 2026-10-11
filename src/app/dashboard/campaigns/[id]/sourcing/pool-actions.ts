@@ -200,6 +200,11 @@ export async function importFromPool(
   }
   if (!picks?.length) return { added: 0, skipped: 0 };
   if (picks.length > 200) return { error: "Too many at once — pick up to 200." };
+  // Picking creators here is what STARTS tracking them, and tracking with
+  // nobody responsible is the pile of unowned rows this replaced. Enforced
+  // server-side as well as in the picker, because the client gate is a
+  // courtesy and this one is the rule.
+  if (!assignTo) return { error: "Choose who will reach out to them." };
 
   const admin = createAdminClient();
   const rows = picks
