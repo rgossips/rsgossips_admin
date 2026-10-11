@@ -229,15 +229,15 @@ export default async function CampaignsPage({
       </div>
 
       {/* Filters */}
-      <CampaignFilters />
-      <div className="-mt-2">
+      <div className="mb-6 space-y-3 [&>*:last-child]:mb-0">
+        <CampaignFilters />
         <BrandTypeFilter />
-      </div>
       {/* The brief's own fields. A FilterBar row rather than more controls
           inside CampaignFilters' drawer, which holds draft state and applies
           on confirm — these read straight from the URL like every other
           page's filters. */}
-      <FilterBar fields={briefFilterFields} />
+        <FilterBar fields={briefFilterFields} />
+      </div>
 
       {error && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm mb-6">

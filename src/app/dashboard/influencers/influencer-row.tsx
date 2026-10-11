@@ -158,24 +158,24 @@ export function InfluencerRow({ inf, phone, platforms }: { inf: Influencer; phon
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {inf.followers_count?.toLocaleString() ?? "—"}
       </td>
+      {/* ONE category, then a count. Three pills in a ~120px column wrapped
+          each label onto two lines and stacked three deep, which made every
+          row in the table as tall as its untidiest cell. The rest are on
+          hover — a creator's full category list is rarely what someone is
+          scanning this column for, and it is on their detail page anyway. */}
       <td className="px-6 py-4">
-        <div className="flex flex-wrap gap-1">
-          {inf.categories && inf.categories.length > 0 ? (
-            inf.categories.slice(0, 3).map((cat) => (
-              <span
-                key={cat}
-                className="inline-flex px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-              >
-                {cat}
-              </span>
-            ))
-          ) : (
-            <span className="text-sm text-gray-400">—</span>
-          )}
-          {inf.categories && inf.categories.length > 3 && (
-            <span className="text-xs text-gray-400">+{inf.categories.length - 3}</span>
-          )}
-        </div>
+        {inf.categories && inf.categories.length > 0 ? (
+          <div className="flex items-center gap-1" title={inf.categories.join(", ")}>
+            <span className="inline-flex max-w-[140px] truncate rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              {inf.categories[0]}
+            </span>
+            {inf.categories.length > 1 && (
+              <span className="shrink-0 text-xs font-semibold text-gray-400">+{inf.categories.length - 1}</span>
+            )}
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">—</span>
+        )}
       </td>
       <td className="px-6 py-4">
         <span
