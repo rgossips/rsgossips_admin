@@ -9,6 +9,9 @@
 // the sourcing tab and anything else that wants "62 of 100" must call it
 // rather than counting rows themselves.
 
+// Type-only, so it is erased at build and this module stays safe to
+// import from a client component.
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { holdsSeat } from "./stages";
 
 // Application statuses that occupy a seat.
@@ -105,6 +108,33 @@ export function countSeats(
 }
 
 // "62 of 100 · 18 applied · 44 sourced · 38 left"
+/**
+ * Read a campaign's seat count straight from the database.
+ *
+ * Here rather than in each action because THREE places now add creators —
+ * the add form, the pool picker and the sheet import — and each needs the
+ * same answer to the same question before it writes. A copy per caller is
+ * how one of them ends up counting a stage the others do not.
+ *
+ * Deliberately NOT cached: it is the gate on "is there room", and a stale
+ * yes lets two admins past it at once.
+ */
+export async function readSeatCount(
+  admin: SupabaseClient,
+  campaignId: string,
+  capacity: number | null | undefined,
+): Promise<SeatCount> {
+  const [appsRes, bookRes] = await Promise.all([
+    admin.from("campaign_applications").select("influencer_id, status").eq("campaign_id", campaignId),
+    admin.from("campaign_bookings").select("influencer_id, instagram_username, stage").eq("campaign_id", campaignId),
+  ]);
+  return countSeats(
+    capacity,
+    (appsRes.data || []) as SeatApplication[],
+    (bookRes.data || []) as SeatBooking[],
+  );
+}
+
 export function describeSeats(s: SeatCount): string {
   const parts = [
     s.capacity === null ? `${s.taken} booked` : `${s.taken} of ${s.capacity}`,

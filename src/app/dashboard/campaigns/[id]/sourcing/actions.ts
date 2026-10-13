@@ -4,18 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { adminGate, requireAdmin, requireSuperAdmin } from "@/lib/require-super-admin";
 import { auditLog } from "@/lib/rate-limit";
-import { friendlyDbError, logError } from "@/lib/log";
+import { friendlyDbError } from "@/lib/log";
 import { clampLen, isHttpUrl } from "@/lib/validation";
 import { ensureInvitation, normalizeHandle } from "@/lib/sourcing/ensure-invitation";
 import { logBookingEvent } from "@/lib/sourcing/booking-events";
-import {
-  PAYOUT_ON_ENTER,
-  canTransition,
-  isBookingStage,
-  toFulfilmentMode,
-  type BookingStage,
-  type FulfilmentMode,
-} from "@/lib/sourcing/stages";
+import { readSeatCount } from "@/lib/sourcing/seats";
+import { isBookingStage, toFulfilmentMode, type FulfilmentMode } from "@/lib/sourcing/stages";
 
 // Managed sourcing, admin side. Tables come from rgossips_web migration 081.
 //
@@ -65,6 +59,8 @@ export type BookingInput = {
   // because an unassigned row is one nobody is responsible for, which is
   // the failure the outreach tracker exists to stop.
   assignTo?: string | null;
+  // Instagram / YouTube.
+  platform?: string;
 };
 
 export async function addBooking(
@@ -81,6 +77,33 @@ export async function addBooking(
   if (!handle) return { error: "Enter the creator's Instagram handle." };
 
   const admin = createAdminClient();
+
+  // Can this person wave a creator straight past the approval gate?
+  // select("*") because is_outreach_approver only exists once admin
+  // migration 005 is applied, and naming a missing column fails the query.
+  // A super_admin counts, and so does everyone when nobody holds the flag —
+  // otherwise a fresh database would park every creator at `proposed` with
+  // nobody able to release them.
+  // Is there room? Checked server-side because the button being enabled
+  // is a courtesy and this is the rule — two admins on the same campaign
+  // can both see a free seat and both click.
+  const { data: campRow } = await admin
+    .from("campaigns")
+    .select("max_influencers")
+    .eq("campaign_id", input.campaignId)
+    .maybeSingle();
+  const seats = await readSeatCount(admin, input.campaignId, campRow?.max_influencers);
+  if (seats.capacity !== null && seats.remaining === 0) {
+    return {
+      error: `This campaign's ${seats.capacity} seats are all taken. Raise the slot count on the campaign to add more.`,
+    };
+  }
+
+  const { data: adminRows } = await admin.from("admin_profiles").select("*");
+  const approverIds = (adminRows || []).filter((r) => r.is_outreach_approver === true).map((r) => String(r.id));
+  const me = (adminRows || []).find((r) => String(r.id) === actorId);
+  const isApprover =
+    approverIds.length === 0 || approverIds.includes(actorId) || me?.role === "super_admin";
 
   // The creator enters the database first. If this fails we do NOT write a
   // booking — a booking with no creator record behind it is the spreadsheet
@@ -117,7 +140,16 @@ export async function addBooking(
       product_cost_paise: toPaise(input.productCost),
       notes: clampLen(input.notes || "", NOTE_MAX) || null,
       fulfilment_mode: toFulfilmentMode(input.fulfilmentMode),
-      stage: "shortlisted",
+      // WHO adds the creator decides where they enter.
+      //
+      // An approver shortlisting someone has already made the call that
+      // matters, so the row goes straight to the team to reach out. Anyone
+      // else is SUGGESTING: it lands on `proposed` and the approver decides
+      // before the team spends time on outreach. Derived from the actor's
+      // own role rather than passed in, so a team member cannot skip the
+      // gate by sending a different stage.
+      stage: isApprover ? "shortlisted" : "proposed",
+      platform: clampLen(input.platform || "", 40) || null,
       // Spread so these keys are absent entirely when nobody was picked:
       // they only exist once rgossips_web migration 084 is applied, and
       // naming a missing column fails the whole insert.
@@ -151,104 +183,10 @@ export async function addBooking(
   return { success: true, bookingId: data.id, creatorOutcome: ensured.outcome };
 }
 
-export async function advanceBookingStage(
-  bookingId: string,
-  to: string,
-  extra?: { note?: string; liveUrl?: string },
-): Promise<{ error?: string; success?: boolean; queuedPayout?: string }> {
-  let actorId: string;
-  try {
-    actorId = await requireAdmin();
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Forbidden" };
-  }
-  if (!isBookingStage(to)) return { error: "Unknown stage." };
-
-  const admin = createAdminClient();
-  const { data: booking, error: readErr } = await admin
-    .from("campaign_bookings")
-    .select("id, campaign_id, stage, agreed_fee_paise, product_cost_paise, instagram_username, fulfilment_mode")
-    .eq("id", bookingId)
-    .maybeSingle();
-  if (readErr) return { error: friendlyDbError("sourcing.stage.read", readErr, "Could not load the booking.", { bookingId }) };
-  if (!booking) return { error: "Booking not found." };
-
-  const from = booking.stage as BookingStage;
-  if (from === to) return { success: true };
-  // The ladder is enforced here, not just drawn in the UI: a forced stage
-  // queues money, so an out-of-order jump needs the escape hatch below.
-  const mode = toFulfilmentMode(booking.fulfilment_mode);
-  if (!canTransition(from, to, mode)) {
-    return { error: `Cannot go from "${from}" to "${to}". Use the override if this is a correction.` };
-  }
-
-  const now = new Date().toISOString();
-  const updates: Record<string, unknown> = { stage: to, updated_at: now };
-  if (to === "contacted") updates.contacted_at = now;
-  if (to === "price_agreed") updates.price_agreed_at = now;
-  if (to === "confirmed") updates.confirmed_at = now;
-  if (to === "product_approved") {
-    updates.receipt_approved_at = now;
-    updates.receipt_approved_by = actorId;
-  }
-  if (to === "product_delivered") {
-    updates.product_received = true;
-    updates.product_received_at = now;
-  }
-  if (to === "script_shared") updates.script_shared_at = now;
-  if (to === "admin_approved") {
-    updates.admin_approved_at = now;
-    updates.admin_approved_by = actorId;
-  }
-  if (to === "brand_approved") {
-    updates.brand_approved_at = now;
-    updates.brand_approved_by = actorId;
-  }
-  if (to === "revision_needed" && extra?.note) updates.admin_revision_note = clampLen(extra.note, NOTE_MAX);
-  if (to === "live") {
-    if (extra?.liveUrl) {
-      if (!isHttpUrl(extra.liveUrl)) return { error: "That live link doesn't look like a URL." };
-      updates.live_url = clampLen(extra.liveUrl, 500);
-    }
-    updates.live_at = now;
-  }
-
-  const { error } = await admin.from("campaign_bookings").update(updates).eq("id", bookingId).eq("stage", from);
-  if (error) return { error: friendlyDbError("sourcing.stage.write", error, "Could not update the stage.", { bookingId, to }) };
-
-  await logEvent(admin, bookingId, { kind: "stage_change", from_stage: from, to_stage: to, actor_id: actorId, note: extra?.note || null });
-
-  // Money is queued by the transition, never typed in.
-  let queuedPayout: string | undefined;
-  const leg = PAYOUT_ON_ENTER[to];
-  if (leg) {
-    const amount = leg.kind === "fee" ? booking.agreed_fee_paise : booking.product_cost_paise;
-    if (!amount || amount <= 0) {
-      logError("sourcing.payout.noamount", new Error("stage entered with no amount"), { bookingId, kind: leg.kind });
-    } else {
-      const releaseAt = new Date(Date.now() + leg.dueAfterHours * 3_600_000).toISOString();
-      const { error: payErr } = await admin.from("campaign_booking_payouts").insert({
-        booking_id: bookingId,
-        kind: leg.kind,
-        amount_paise: amount,
-        payout_status: "scheduled",
-        payout_release_at: releaseAt,
-      });
-      // 23505 = the leg already exists, which is a double-clicked button and
-      // not a problem. The unique index is what makes that safe.
-      if (payErr && String(payErr.code) !== "23505") {
-        logError("sourcing.payout.queue", payErr, { bookingId, kind: leg.kind });
-      } else if (!payErr) {
-        queuedPayout = leg.kind;
-        await logEvent(admin, bookingId, { kind: "payout", note: `${leg.kind} queued for ${releaseAt}`, actor_id: actorId });
-      }
-    }
-  }
-
-  revalidatePath(`/dashboard/campaigns/${booking.campaign_id}/sourcing`);
-  revalidatePath("/dashboard/payouts");
-  return { success: true, queuedPayout };
-}
+// advanceBookingStage lived here. The pipeline no longer has a generic
+// "move to any stage" door: each stage offers named moves instead, and
+// moveBooking in outreach-actions.ts is the only writer. A free-form
+// stage jump was how a booking could land on a money stage out of order.
 
 // The escape hatch. Super-admin only, and stricter than the equivalent on
 // applications: a forced stage here can queue a payment.

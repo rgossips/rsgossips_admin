@@ -4,12 +4,12 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove, getAdminProfile } from "@/lib/require-super-admin";
 import { logError } from "@/lib/log";
 import { SEAT_HOLDING_APPLICATION_STATUSES, countSeats, describeSeats } from "@/lib/sourcing/seats";
-import { ALL_MAIN_STAGES, STAGE_LABEL, STAGE_STYLE, defaultFulfilmentMode, type BookingStage, type FulfilmentMode } from "@/lib/sourcing/stages";
-import { SourcingTable } from "./sourcing-table";
+import { defaultFulfilmentMode, type FulfilmentMode } from "@/lib/sourcing/stages";
+import { OutreachDesk, type Booking, type BookingEvent } from "./outreach-desk";
 import { AddBookingButton } from "./add-booking";
 import { PoolPicker } from "./pool-picker";
-import { FilterBar } from "@/components/filter-bar";
-import { OUTREACH_LABEL, OUTREACH_STATUSES } from "@/lib/sourcing/outreach";
+import type { ActorContext } from "@/lib/sourcing/outreach";
+import type { OutreachContext } from "./outreach-control";
 import { listAssignableAdmins } from "./outreach-actions";
 import { BulkCreateButton } from "./bulk-create";
 import { ApprovedApplicants } from "./approved-applicants";
@@ -38,17 +38,8 @@ function parseTrailer(description: string | null | undefined): Record<string, un
 // The campaign is an ordinary campaign. This is a tab on it, not a different
 // kind of campaign, and the seat counter at the top spans BOTH paths so a
 // brand's 100 slots cannot quietly become 140.
-export default async function SourcingPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function SourcingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const sp = await searchParams;
-  const assigneeFilter = typeof sp.assignee === "string" ? sp.assignee : "";
-  const outcomeFilter = typeof sp.outcome === "string" ? sp.outcome : "";
   if (!(await isAdminOrAbove())) redirect("/dashboard/campaigns");
 
   // Who is looking, and what they are allowed to press. The actions
@@ -101,47 +92,28 @@ export default async function SourcingPage({
     logError("sourcing.bookings", bookingsRes.error, { id });
   }
 
-  const allBookings = bookingsRes.data || [];
-  const bookings = allBookings.filter((b) => {
-    if (assigneeFilter === "unassigned" && b.assigned_to) return false;
-    if (assigneeFilter && assigneeFilter !== "unassigned" && b.assigned_to !== assigneeFilter) return false;
-    if (outcomeFilter === "none" && b.outreach_status) return false;
-    if (outcomeFilter && outcomeFilter !== "none" && b.outreach_status !== outcomeFilter) return false;
-    return true;
-  });
+  const bookings = (bookingsRes.data || []) as Booking[];
 
-  // Who moved each row last.
-  //
-  // Every action on this page already writes a campaign_booking_events
-  // row carrying actor_id — that is the audit trail. This reads the most
-  // recent one per booking so the trail is VISIBLE on the row rather than
-  // only recoverable from the table. One query for the whole page, not
-  // one per row.
-  //
-  // Resolved to a name here rather than stored on the booking: there is no
-  // outreach_updated_by column, and adding one would duplicate what the
-  // events table already records properly.
-  const lastActions: Record<string, { note: string; actorName: string; at: string } | null> = {};
+  const events: Record<string, BookingEvent[]> = {};
   if (bookings.length) {
-    const { data: events } = await admin
+    const { data: rows } = await admin
       .from("campaign_booking_events")
-      .select("booking_id, note, actor_id, created_at, kind")
+      .select("booking_id, note, kind, actor_id, created_at")
       .in(
         "booking_id",
         bookings.map((b) => b.id),
       )
       .order("created_at", { ascending: false });
     const nameById = new Map(admins.map((a) => [a.id, a.name]));
-    for (const e of events || []) {
+    for (const e of rows || []) {
       const key = String(e.booking_id);
-      // Ordered newest-first, so the first one seen per booking wins.
-      if (lastActions[key]) continue;
-      lastActions[key] = {
+      (events[key] ||= []).push({
+        booking_id: key,
         note: String(e.note || e.kind || "updated"),
         actorName: nameById.get(String(e.actor_id)) || "an admin",
-        // Fixed IST, computed on the server and passed down as a string —
-        // the same reason the errors page does it this way: a locale-
-        // dependent render would differ between server and client.
+        // Fixed IST, formatted on the server and passed down as a string:
+        // a locale-dependent render would differ between server and client
+        // and trip a hydration mismatch.
         at: new Date(e.created_at).toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata",
           day: "numeric",
@@ -149,10 +121,26 @@ export default async function SourcingPage({
           hour: "numeric",
           minute: "2-digit",
         }),
-      };
+      });
     }
   }
+
   const applications = appsRes.data || [];
+
+  // Does this creator ALSO hold a seat through the portal? It decides what
+  // the decline confirmation can honestly promise: countSeats counts a
+  // creator once across both routes, so dropping the booking of somebody
+  // who also applied frees nothing — their application still holds it.
+  const seatHolderIds = new Set(
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    (applications as any[])
+      .filter((a) => (SEAT_HOLDING_APPLICATION_STATUSES as readonly string[]).includes(a.status))
+      .map((a) => String(a.influencer_id))
+      .filter(Boolean),
+  );
+  for (const b of bookings) {
+    b.hasApplication = !!b.influencer_id && seatHolderIds.has(String(b.influencer_id));
+  }
   const seats = countSeats(campaign.max_influencers, applications, bookings);
 
   // The ones holding a seat through the portal. Same statuses the seat
@@ -182,8 +170,32 @@ export default async function SourcingPage({
   //   a service/stay  -> nothing physical moves
   const defaultMode: FulfilmentMode = defaultFulfilmentMode(parseTrailer(camp.description));
 
+  const actor: ActorContext = {
+    actorId: me.userId || "",
+    name: me.fullName || "an admin",
+    isSuperAdmin,
+    isApprover: canApprove,
+    isViewer: me.role === "viewer",
+  };
+  const outreachCtx: OutreachContext = {
+    campaignId: id,
+    admins,
+    actor,
+    // Shown as "waiting on …". The first configured approver stands for all
+    // of them: any approver can act, so naming one is a label rather than
+    // an assignment.
+    approverName: approvers[0]?.name || "an approver",
+  };
+
+  // Wider than the max-w-6xl the other dashboard pages use. This table
+  // carries seven columns and two of them hold CONTROLS rather than text —
+  // the Action cell stacks Approve / Send back / Reject and then an outcome
+  // dropdown under them — so at 1152px the buttons wrapped and the Outreach
+  // column squeezed the assignee onto three lines. Still capped rather than
+  // full-bleed: the notes and summary text are prose, and prose running the
+  // width of a 4K monitor is its own readability problem.
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
+    <div className="max-w-[1600px] mx-auto space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
@@ -199,17 +211,37 @@ export default async function SourcingPage({
         </div>
       </div>
 
-      {!notLive && (
-        <div className="flex flex-wrap items-start gap-2">
-          <PoolPicker
-            campaignId={id}
-            defaultMode={defaultMode}
-            admins={admins}
-            currentAdminId={me.userId || ""}
-          />
-          <AddBookingButton campaignId={id} defaultMode={defaultMode} />
-          <BulkCreateButton campaignId={id} defaultMode={defaultMode} />
+      {/* No room, no door. A seat is taken the moment a quote is APPROVED,
+          so this counts commitments rather than conversations — a campaign
+          can still have twenty people in outreach against four seats, which
+          is the point of having a pipeline. The actions refuse it again
+          server-side; this only avoids offering a button that would fail. */}
+      {!notLive && seats.capacity !== null && seats.remaining === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="font-semibold">All {seats.capacity} seats are taken.</p>
+          <p className="mt-0.5">
+            Creators already in the pipeline can still be moved along. To add anyone new, raise the slot count on the
+            campaign — or drop someone who is no longer going ahead.
+          </p>
         </div>
+      ) : (
+        !notLive && (
+          <div className="flex flex-wrap items-start gap-2">
+            <PoolPicker
+              campaignId={id}
+              defaultMode={defaultMode}
+              admins={admins}
+              currentAdminId={me.userId || ""}
+            />
+            <AddBookingButton
+              campaignId={id}
+              defaultMode={defaultMode}
+              isApprover={canApprove}
+              approverName={approvers[0]?.name || "an approver"}
+            />
+            <BulkCreateButton campaignId={id} defaultMode={defaultMode} />
+          </div>
+        )
       )}
 
       {notLive ? (
@@ -245,63 +277,13 @@ export default async function SourcingPage({
             )}
           </div>
 
-          {/* Funnel */}
-          {bookings.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {ALL_MAIN_STAGES.filter((s) => byStage.get(s)).map((s) => (
-                <span
-                  key={s}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${STAGE_STYLE[s as BookingStage]}`}
-                >
-                  {STAGE_LABEL[s as BookingStage]}
-                  <span className="font-black">{byStage.get(s)}</span>
-                </span>
-              ))}
-            </div>
-          )}
-
           <ApprovedApplicants applicants={approvedApplicants} campaignId={id} />
 
           <div>
             <h2 className="mb-2 text-sm font-bold text-gray-900 dark:text-white">
               Sourced by hand <span className="font-normal text-gray-400">({bookings.length})</span>
             </h2>
-            <FilterBar
-              fields={[
-                {
-                  name: "assignee",
-                  label: "Assigned to",
-                  type: "select",
-                  options: [
-                    { label: "Unassigned", value: "unassigned" },
-                    ...admins.map((a) => ({ label: a.name, value: a.id })),
-                  ],
-                },
-                {
-                  name: "outcome",
-                  label: "Outcome",
-                  type: "select",
-                  options: [
-                    { label: "Not contacted yet", value: "none" },
-                    ...OUTREACH_STATUSES.map((st) => ({ label: OUTREACH_LABEL[st], value: st })),
-                  ],
-                },
-              ]}
-            />
-            {bookings.length !== allBookings.length && (
-              <p className="mb-2 text-[12px] text-gray-500">
-                Showing {bookings.length} of {allBookings.length} — a filter is on.
-              </p>
-            )}
-            <SourcingTable
-              bookings={bookings}
-              campaignId={id}
-              admins={admins}
-              currentAdminId={me.userId || ""}
-              isSuperAdmin={isSuperAdmin}
-              canApprove={canApprove}
-              lastActions={lastActions}
-            />
+            <OutreachDesk bookings={bookings} ctx={outreachCtx} events={events} />
           </div>
         </>
       )}

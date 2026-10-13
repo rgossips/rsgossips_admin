@@ -8,6 +8,7 @@ import { sanitizeSearchTerm } from "@/lib/validation";
 import { rankCandidates, scoreCandidate, type PoolCandidate } from "@/lib/sourcing/pool";
 import { genderExcludes, requiredGender } from "@/lib/gender-target";
 import { toFulfilmentMode, type FulfilmentMode } from "@/lib/sourcing/stages";
+import { readSeatCount } from "@/lib/sourcing/seats";
 
 // Pulling creators out of our own database onto a campaign's sourcing list.
 //
@@ -207,6 +208,21 @@ export async function importFromPool(
   if (!assignTo) return { error: "Choose who will reach out to them." };
 
   const admin = createAdminClient();
+
+  // Seats, before writing anything. A batch is refused whole rather than
+  // part-filled: an admin picking twelve creators for four seats wants to
+  // choose which four, not be handed whichever eight the loop reached
+  // first.
+  const { data: campRow } = await admin
+    .from("campaigns")
+    .select("max_influencers")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  const seats = await readSeatCount(admin, campaignId, campRow?.max_influencers);
+  if (seats.capacity !== null && seats.remaining === 0) {
+    return { error: `This campaign's ${seats.capacity} seats are all taken. Raise the slot count to add more.` };
+  }
+
   const rows = picks
     .filter((p) => p.handle)
     .map((p) => ({

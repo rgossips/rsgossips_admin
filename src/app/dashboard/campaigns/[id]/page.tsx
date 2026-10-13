@@ -5,6 +5,7 @@ import { CampaignDetailActions } from "./detail-actions";
 import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
 import { ApplicationsList } from "./applications";
+import { countSeats } from "@/lib/sourcing/seats";
 import { normalizeShippingMode, type ShippingMode } from "@/lib/barter-fulfilment";
 import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
@@ -47,12 +48,18 @@ export default async function CampaignDetailPage({
   const brandLogo = campaign.brand_profiles?.logo_url || campaign.brand_invitations?.logo_url || "";
   const isInvitedBrand = !campaign.brand_id && campaign.brand_invitation_id;
 
-  // Slots: count applications that are approved/submitted/revision_needed/accepted/completed (not rejected/withdrawn/pending)
-  const filledSlots = (applications || []).filter((a: any) =>
-    ["approved", "submitted", "revision_needed", "accepted", "completed"].includes(a.status)
-  ).length;
-  const totalSlots = campaign.max_influencers || 0;
-  const availableSlots = Math.max(0, totalSlots - filledSlots);
+  // Seats, from lib/sourcing/seats.ts — the single owner of this sum.
+  // This page used to count applications only, with its own hand-written
+  // status list that had drifted (no live_submitted, no payment), so it
+  // showed free slots the outreach tracker knew were taken. countSeats
+  // reads both intake paths and counts a creator who arrived by both of
+  // them once.
+  const { data: seatBookings } = await supabase
+    .from("campaign_bookings")
+    .select("influencer_id, instagram_username, stage")
+    .eq("campaign_id", id);
+  const seats = countSeats(campaign.max_influencers, applications || [], seatBookings || []);
+  const totalSlots = seats.capacity ?? 0;
 
   const statusConfig: Record<string, { bg: string; dot: string; label: string }> = {
     draft: { bg: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400", dot: "bg-gray-400", label: t("status.draft") },
@@ -372,7 +379,22 @@ export default async function CampaignDetailPage({
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("overview")}</h2>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              <StatRow label={t("slots")} value={totalSlots > 0 ? t("slotsValue", { available: availableSlots, total: totalSlots }) : "—"} />
+              <StatRow
+                label={t("slots")}
+                value={totalSlots > 0 ? t("slotsTaken", { taken: seats.taken, total: totalSlots }) : "—"}
+                tone={seats.over ? "warn" : undefined}
+                sub={
+                  totalSlots > 0
+                    ? [
+                        t("slotsBreakdown", { applied: seats.fromApplications, sourced: seats.fromBookings }),
+                        seats.overlap > 0 ? t("slotsOverlap", { count: seats.overlap }) : "",
+                        seats.over ? t("slotsOver") : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    : undefined
+                }
+              />
               <StatRow label={t("campaignType")} value={typeLabels[campaign.campaign_type] || campaign.campaign_type || "—"} />
               <StatRow label={t("budgetTotal")} value={campaign.budget_total ? `₹${campaign.budget_total.toLocaleString()}` : "—"} />
               <StatRow label={t("perInfluencer")} value={campaign.budget_per_influencer ? `₹${campaign.budget_per_influencer.toLocaleString()}` : "—"} />
@@ -467,11 +489,31 @@ function InfoItem({ icon, label, value }: { icon: string; label: string; value: 
   );
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
+function StatRow({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  /** A quieter second line under the value, for a breakdown. */
+  sub?: string;
+  tone?: "warn";
+}) {
   return (
-    <div className="flex items-center justify-between px-6 py-3.5">
+    <div className="flex items-start justify-between gap-3 px-6 py-3.5">
       <span className="text-[13px] text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="text-[13px] font-semibold text-gray-900 dark:text-white">{value}</span>
+      <span className="flex flex-col items-end text-right">
+        <span
+          className={`text-[13px] font-semibold ${
+            tone === "warn" ? "text-amber-600 dark:text-amber-400" : "text-gray-900 dark:text-white"
+          }`}
+        >
+          {value}
+        </span>
+        {sub && <span className="text-[11px] text-gray-400">{sub}</span>}
+      </span>
     </div>
   );
 }
