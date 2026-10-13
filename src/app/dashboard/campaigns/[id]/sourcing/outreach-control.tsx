@@ -1,383 +1,470 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ButtonSpinner } from "@/components/spinner";
-import {
-  APPROVAL_LABEL,
-  APPROVAL_TONE,
-  OUTREACH_LABEL,
-  OUTREACH_STATUSES,
-  OUTREACH_TONE,
-  canDecideApproval,
-  canRecordOutcome,
-  outreachSummary,
-  type ActorContext,
-  type ApprovalState,
-  type OutreachStatus,
-} from "@/lib/sourcing/outreach";
-import {
-  assignBooking,
-  decideApproval,
-  recordOutreachOutcome,
-  type AssignableAdmin,
-} from "./outreach-actions";
+import { holdsSeat, stageSpec } from "@/lib/sourcing/stages";
+import { canAct, canDrop, dropNeedsReason, movesFrom, type ActorContext, type MoveId } from "@/lib/sourcing/outreach";
+import { assignBooking, deleteBooking, moveBooking, type AssignableAdmin } from "./outreach-actions";
 
-// The outreach workflow, split across two table cells.
+// The controls for one row of the pipeline.
 //
-//   OutreachControl -> the "Outreach" column: what state this row is in, who
-//                      holds it, and what was said. Read-mostly.
-//   OutreachAction  -> the "Action" column: the one control that moves it.
+// Each stage offers one or two named moves, and the form a move needs comes
+// with it — a quote box for the quote, a channel picker for the outreach, a
+// cash-or-barter choice for the settlement. There is no generic "set the
+// stage" dropdown: that was how a booking could land on a money stage out
+// of order, and it asked the admin to know the ladder rather than just
+// answer the question in front of them.
 //
-// They are two components rather than one spanning both cells because a
-// table cell cannot span columns conditionally, and because the question
-// each answers is different: one is "where is this", the other is "what do
-// I do about it".
-//
-// Everything is re-checked server-side. The gating here only decides what to
-// render — it is not the security boundary, which is the action's own gate.
+// Everything is re-checked server-side against the stage on the ROW, so a
+// stale tab cannot replay a move that already happened.
 
 const BTN =
-  "inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-semibold cursor-pointer disabled:cursor-wait disabled:opacity-60";
-const SELECT =
-  "rounded-lg border border-gray-300 bg-white px-2 py-1 text-[11px] dark:border-gray-700 dark:bg-gray-950";
+  "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold cursor-pointer disabled:cursor-wait disabled:opacity-60";
+const PRIMARY = `${BTN} bg-emerald-700 text-white hover:bg-emerald-800`;
+const PLAIN = `${BTN} border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`;
+const PICK_ON = `${BTN} border border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300`;
 const FIELD =
-  "w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-[11px] dark:border-gray-700 dark:bg-gray-950";
+  "w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-[12px] dark:border-gray-700 dark:bg-gray-950";
 
 export type OutreachRow = {
   id: string;
   instagram_username: string;
-  // Read only as a fallback for the summary line: bookings that predate the
-  // tracker have no outreach_status, so the stage is the only evidence of
-  // how far they actually got.
+  creator_name: string | null;
   stage: string;
+  quoted_fee_paise: number | null;
   agreed_fee_paise: number | null;
   assigned_to: string | null;
-  outreach_owner: string | null;
-  outreach_status: string | null;
-  outreach_note: string | null;
-  approval_state: string | null;
-  approval_note: string | null;
+  contacted_channel: string | null;
+  product_cost_paise: number | null;
+  influencer_id: string | null;
+  /** They also applied through the portal, so that row holds the seat too. */
+  hasApplication?: boolean;
 };
-
-/** The last thing anybody did to this booking, and who. */
-export type LastAction = { note: string; actorName: string; at: string } | null;
 
 export type OutreachContext = {
   campaignId: string;
   admins: AssignableAdmin[];
-  currentAdminId: string;
-  isSuperAdmin: boolean;
-  /** Holds the approver flag, or is a super_admin standing in. */
-  canApprove: boolean;
-  isViewer: boolean;
+  actor: ActorContext;
+  approverName: string;
 };
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: string }) {
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${tone}`}>{children}</span>;
-}
+const rupees = (paise: number | null | undefined) =>
+  paise == null ? "" : `₹${Math.round(Number(paise) / 100).toLocaleString("en-IN")}`;
 
-// The rule lives in lib/sourcing/outreach.ts and these only adapt the
-// context to it. They had their own copies of the logic for one commit,
-// which is how a UI ends up offering a button the server then refuses —
-// and here the server-side copy is the one the actions actually enforce.
-const actorOf = (ctx: OutreachContext): ActorContext => ({
-  actorId: ctx.currentAdminId,
-  isSuperAdmin: ctx.isSuperAdmin,
-  isApprover: ctx.canApprove,
-});
+// Button copy lives here rather than in outreach.ts: that module is shared
+// with the server, and labels are not.
+const MOVE_LABEL: Record<MoveId, string> = {
+  approveCreator: "Approve and start outreach",
+  rejectCreator: "Not a fit",
+  markReached: "Mark as reached out",
+  submitQuote: "Send for approval",
+  declined: "Creator declined",
+  approveQuote: "Approve quote",
+  negotiate: "Negotiate further",
+  markReimbursed: "Product bought and reimbursed",
+  submitContent: "Send content for review",
+  approveContent: "Approve content",
+  requestChanges: "Request changes",
+  closeDeal: "Settle and close",
+  reopen: "Reopen as shortlisted",
+  dropCreator: "Decline",
+};
 
-/** Can this actor move the outreach outcome on this row? */
-function mayRecord(row: OutreachRow, ctx: OutreachContext): boolean {
-  if (ctx.isViewer) return false;
-  return canRecordOutcome(row, actorOf(ctx));
-}
+const PRIMARY_MOVES = new Set<MoveId>([
+  "approveCreator",
+  "markReached",
+  "submitQuote",
+  "approveQuote",
+  "markReimbursed",
+  "submitContent",
+  "approveContent",
+  "closeDeal",
+]);
 
-/** Can this actor sign off on the agreed price? */
-function mayDecide(row: OutreachRow, ctx: OutreachContext): boolean {
-  if (ctx.isViewer) return false;
-  return canDecideApproval(row, actorOf(ctx));
-}
+// Moves that need a value before they can run. The rest fire on one click.
+const NEEDS_FORM: MoveId[] = [
+  "dropCreator",
+  "approveCreator",
+  "markReached",
+  "submitQuote",
+  "markReimbursed",
+  "submitContent",
+  "requestChanges",
+  "closeDeal",
+];
 
-// ── The "Outreach" column ────────────────────────────────────────────────
-
-export function OutreachControl({
-  row,
-  ctx,
-  lastAction,
-}: {
-  row: OutreachRow;
-  ctx: OutreachContext;
-  lastAction?: LastAction;
-}) {
+export function OutreachControl({ row, ctx }: { row: OutreachRow; ctx: OutreachContext }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [open, setOpen] = useState<MoveId | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [armedDelete, setArmedDelete] = useState(false);
 
-  const owner = ctx.admins.find((a) => a.id === row.assigned_to);
-  const negotiator = ctx.admins.find((a) => a.id === row.outreach_owner);
-  const approval = row.approval_state as ApprovalState | null;
-  const status = row.outreach_status as OutreachStatus | null;
-  const finished = approval === "approved" || approval === "rejected" || status === "declined";
+  // busy covers the action; pending covers the refresh that follows it.
+  // Without the second half the spinner stopped while the row still showed
+  // stale data, which read as a failure — Supabase is in Mumbai and this
+  // runs as a function elsewhere, so the gap is visible.
+  const working = busy || pending;
 
-  async function reassign(id: string) {
+  const spec = stageSpec(row.stage);
+  const moves = movesFrom(row.stage);
+  const mine = canAct(row, ctx.actor);
+  const canDelete = !ctx.actor.isViewer && (ctx.actor.isSuperAdmin || ctx.actor.isApprover);
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setDraft((d) => ({ ...d, [k]: e.target.value }));
+
+  async function run(move: MoveId, payload: Record<string, unknown>) {
     setBusy(true);
     setError("");
-    const res = await assignBooking(ctx.campaignId, row.id, id);
+    const res = await moveBooking(ctx.campaignId, row.id, move, payload);
     setBusy(false);
     if (res.error) return setError(res.error);
-    router.refresh();
+    setOpen(null);
+    setDraft({});
+    startTransition(() => router.refresh());
+  }
+
+  function start(move: MoveId) {
+    if (NEEDS_FORM.includes(move)) {
+      setOpen(open === move ? null : move);
+      setError("");
+      return;
+    }
+    void run(move, {});
+  }
+
+  if (!mine) {
+    return (
+      <div className="space-y-1">
+        <p className="text-[11px] text-gray-400">
+          {spec.actor ? `Waiting on ${spec.actor === "approver" ? ctx.approverName : "the owner"}.` : "—"}
+        </p>
+        {canDelete && <DeleteLink row={row} ctx={ctx} armed={armedDelete} setArmed={setArmedDelete} />}
+      </div>
+    );
   }
 
   return (
     <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {status && <Badge tone={OUTREACH_TONE[status]}>{OUTREACH_LABEL[status]}</Badge>}
-        {approval && <Badge tone={APPROVAL_TONE[approval]}>{APPROVAL_LABEL[approval]}</Badge>}
-        {!status && !approval && <span className="text-[11px] text-gray-400">{outreachSummary(row)}</span>}
-        {busy && <ButtonSpinner />}
+      <div className="flex flex-wrap gap-1.5">
+        {moves.map((m) => (
+          <button
+            key={m}
+            type="button"
+            disabled={working}
+            onClick={() => start(m)}
+            className={PRIMARY_MOVES.has(m) ? PRIMARY : PLAIN}
+          >
+            {working && open === m && <ButtonSpinner />}
+            {MOVE_LABEL[m]}
+          </button>
+        ))}
       </div>
 
-      <div className="text-[11px] text-gray-500">
-        {owner ? (
-          <>
-            with <span className="font-semibold text-gray-700 dark:text-gray-300">{owner.name}</span>
-            {approval === "pending" && negotiator && negotiator.id !== owner.id
-              ? ` · negotiated by ${negotiator.name}`
-              : ""}
-          </>
-        ) : (
-          <span className="text-amber-600 dark:text-amber-400">nobody assigned</span>
-        )}
-      </div>
-
-      {/* Assign, or hand to someone else. A super_admin can always reassign
-          so a row cannot stick when somebody is on leave mid-negotiation. */}
-      {!ctx.isViewer && !finished && (!row.assigned_to || ctx.isSuperAdmin) && (
-        <select
-          className={SELECT}
-          value={row.assigned_to || ""}
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.value) void reassign(e.target.value);
-          }}
+      {open === "approveCreator" && (
+        <MoveForm
+          hint={`Confirm or change the quote before outreach starts.${row.quoted_fee_paise ? ` Suggested ${rupees(row.quoted_fee_paise)}.` : ""}`}
+          onSubmit={() => run("approveCreator", { quote: Number(draft.quote) || null })}
+          working={working}
         >
-          <option value="">Assign to…</option>
-          {ctx.admins.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-              {a.isApprover ? " (approver)" : ""}
-            </option>
-          ))}
-        </select>
+          <input
+            className={FIELD}
+            inputMode="numeric"
+            placeholder="Quote to offer (₹)"
+            value={draft.quote || ""}
+            onChange={set("quote")}
+          />
+        </MoveForm>
       )}
 
-      {row.approval_note && (
-        <p className="text-[10px] text-gray-500">
-          <span className="font-semibold">Sign-off:</span> {row.approval_note}
-        </p>
-      )}
-      {row.outreach_note && (
-        <p className="text-[10px] text-gray-500">
-          <span className="font-semibold">Outreach:</span> {row.outreach_note}
-        </p>
+      {open === "markReached" && (
+        <MoveForm
+          hint="How did you reach out?"
+          onSubmit={() => run("markReached", { channel: draft.channel })}
+          working={working}
+          disabled={!draft.channel}
+        >
+          <div className="flex gap-1.5">
+            {["Email", "Instagram DM"].map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, channel: c }))}
+                className={draft.channel === c ? PICK_ON : PLAIN}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </MoveForm>
       )}
 
-      {/* Who moved this last, and when — and deliberately NOT what they did.
-          The note restated things the row already shows: "Agreed Rs 7,500"
-          duplicates the Agreed column and "sent for sign-off" duplicates the
-          badge above. The actor and the timestamp are the only part of the
-          event not already on screen, so that is the only part shown. The
-          full note is still written to campaign_booking_events. */}
-      {lastAction && (
-        <p className="text-[10px] text-gray-400" title={lastAction.note}>
-          updated by {lastAction.actorName} · {lastAction.at}
-        </p>
+      {open === "submitQuote" && (
+        <MoveForm
+          hint={`Goes to ${ctx.approverName} for sign-off, not straight onto the campaign.`}
+          onSubmit={() => run("submitQuote", { quote: Number(draft.quote) })}
+          working={working}
+          disabled={!draft.quote}
+        >
+          <input
+            className={FIELD}
+            inputMode="numeric"
+            placeholder="Quote the creator agreed to (₹)"
+            value={draft.quote || ""}
+            onChange={set("quote")}
+          />
+        </MoveForm>
       )}
 
+      {open === "markReimbursed" && (
+        <MoveForm
+          hint="The creator buys the product; record what you paid them back."
+          onSubmit={() => run("markReimbursed", { reimb: Number(draft.reimb) })}
+          working={working}
+          disabled={!draft.reimb}
+        >
+          <input
+            className={FIELD}
+            inputMode="numeric"
+            placeholder="Amount reimbursed (₹)"
+            value={draft.reimb || ""}
+            onChange={set("reimb")}
+          />
+        </MoveForm>
+      )}
+
+      {open === "submitContent" && (
+        <MoveForm
+          hint={`Goes to ${ctx.approverName} to review.`}
+          onSubmit={() => run("submitContent", { link: draft.link })}
+          working={working}
+          disabled={!draft.link?.trim()}
+        >
+          <input className={FIELD} placeholder="Drive folder or post link" value={draft.link || ""} onChange={set("link")} />
+        </MoveForm>
+      )}
+
+      {open === "dropCreator" && (
+        <MoveForm
+          hint={
+            holdsSeat(row.stage)
+              ? row.hasApplication
+                ? "This frees their outreach slot, but they also applied through the portal and that application still holds a seat."
+                : "This frees up their slot on the campaign."
+              : "They were not holding a slot, so nothing changes on the seat count."
+          }
+          onSubmit={() => run("dropCreator", { note: draft.note })}
+          working={working}
+          disabled={dropNeedsReason(row) && !draft.note?.trim()}
+        >
+          {row.product_cost_paise ? (
+            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+              {rupees(row.product_cost_paise)} was already reimbursed to them — declining does not undo that.
+            </p>
+          ) : null}
+          <input
+            className={FIELD}
+            placeholder={dropNeedsReason(row) ? "Why are they being declined?" : "Reason (optional)"}
+            value={draft.note || ""}
+            onChange={set("note")}
+          />
+        </MoveForm>
+      )}
+
+      {open === "requestChanges" && (
+        <MoveForm
+          hint="Say what should change — the owner only sees this note."
+          onSubmit={() => run("requestChanges", { note: draft.note })}
+          working={working}
+          disabled={!draft.note?.trim()}
+        >
+          <input className={FIELD} placeholder="What should change?" value={draft.note || ""} onChange={set("note")} />
+        </MoveForm>
+      )}
+
+      {open === "closeDeal" && (
+        <MoveForm
+          hint="How is this creator being settled?"
+          onSubmit={() => run("closeDeal", { mode: draft.mode, barter: draft.barter })}
+          working={working}
+          disabled={!draft.mode || (draft.mode === "Barter" && !draft.barter?.trim())}
+        >
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setDraft((d) => ({ ...d, mode: "Cash" }))}
+              className={draft.mode === "Cash" ? PICK_ON : PLAIN}
+            >
+              Pay {rupees(row.agreed_fee_paise) || "the agreed fee"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDraft((d) => ({ ...d, mode: "Barter" }))}
+              className={draft.mode === "Barter" ? PICK_ON : PLAIN}
+            >
+              Barter product
+            </button>
+          </div>
+          {draft.mode === "Barter" && (
+            <input
+              className={FIELD}
+              placeholder="Product sent instead of payment"
+              value={draft.barter || ""}
+              onChange={set("barter")}
+            />
+          )}
+        </MoveForm>
+      )}
+
+      {error && <p className="text-[11px] text-rose-600 dark:text-rose-400">{error}</p>}
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+        {canDrop(row) && (
+          <button
+            type="button"
+            disabled={working}
+            onClick={() => start("dropCreator")}
+            className="text-[11px] font-semibold text-gray-500 hover:text-rose-600 hover:underline dark:hover:text-rose-400 cursor-pointer"
+          >
+            Decline creator
+          </button>
+        )}
+        {canDelete && <DeleteLink row={row} ctx={ctx} armed={armedDelete} setArmed={setArmedDelete} />}
+      </div>
+    </div>
+  );
+}
+
+// Module scope, never nested — a component redefined each render remounts
+// its children, and the inputs would lose focus on every keystroke.
+function MoveForm({
+  hint,
+  children,
+  onSubmit,
+  working,
+  disabled,
+}: {
+  hint: string;
+  children: React.ReactNode;
+  onSubmit: () => void;
+  working: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50/60 p-2 dark:border-gray-800 dark:bg-gray-900/40">
+      <p className="text-[11px] text-gray-500">{hint}</p>
+      {children}
+      <button type="button" disabled={working || disabled} onClick={onSubmit} className={PRIMARY}>
+        {working && <ButtonSpinner />}
+        Save
+      </button>
+    </div>
+  );
+}
+
+function DeleteLink({
+  row,
+  ctx,
+  armed,
+  setArmed,
+}: {
+  row: OutreachRow;
+  ctx: OutreachContext;
+  armed: boolean;
+  setArmed: (v: boolean) => void;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const working = busy || pending;
+
+  if (!armed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setArmed(true)}
+        className="text-[10px] font-semibold text-gray-400 hover:text-rose-600 hover:underline dark:hover:text-rose-400 cursor-pointer"
+      >
+        Remove from tracker
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-1 rounded-lg border border-rose-200 p-2 dark:border-rose-900">
+      <p className="text-[10px] leading-relaxed text-rose-800 dark:text-rose-300">
+        Remove @{row.instagram_username} and their history? They stay in the creator database — this only takes them off
+        this campaign&apos;s tracker.
+      </p>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          disabled={working}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            const res = await deleteBooking(ctx.campaignId, row.id);
+            setBusy(false);
+            if (res.error) return setError(res.error);
+            startTransition(() => router.refresh());
+          }}
+          className={`${BTN} bg-rose-600 text-white hover:bg-rose-500`}
+        >
+          {working && <ButtonSpinner />}
+          Remove
+        </button>
+        <button type="button" disabled={working} onClick={() => setArmed(false)} className={PLAIN}>
+          Cancel
+        </button>
+      </div>
       {error && <p className="text-[10px] text-rose-600 dark:text-rose-400">{error}</p>}
     </div>
   );
 }
 
-// ── The "Action" column ──────────────────────────────────────────────────
-
-export function OutreachAction({ row, ctx }: { row: OutreachRow; ctx: OutreachContext }) {
+/** The assignee picker, for the Owner column. */
+export function OwnerControl({ row, ctx }: { row: OutreachRow; ctx: OutreachContext }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
-  const [choice, setChoice] = useState<OutreachStatus | "">("");
-  const [amount, setAmount] = useState(
-    row.agreed_fee_paise ? String(Math.round(row.agreed_fee_paise / 100)) : "",
-  );
-  const [note, setNote] = useState("");
-  const [rejecting, setRejecting] = useState(false);
+  const working = busy || pending;
+  const owner = ctx.admins.find((a) => a.id === row.assigned_to);
+  // A team member can hand their own row on; only a super_admin takes one
+  // off somebody else, so a negotiation cannot be quietly reassigned
+  // mid-conversation.
+  const mayChange =
+    !ctx.actor.isViewer && (ctx.actor.isSuperAdmin || !row.assigned_to || row.assigned_to === ctx.actor.actorId);
 
-  async function run(fn: () => Promise<{ error?: string }>) {
-    setBusy(true);
-    setError("");
-    const res = await fn();
-    setBusy(false);
-    if (res.error) return setError(res.error);
-    setChoice("");
-    setNote("");
-    setRejecting(false);
-    router.refresh();
+  if (!mayChange) {
+    return <span className="text-[12px] text-gray-600 dark:text-gray-300">{owner?.name || "—"}</span>;
   }
-
-  const canDecide = mayDecide(row, ctx);
-  const canRecord = mayRecord(row, ctx);
-
-  // Waiting on a sign-off that is not this person's to give.
-  if (row.approval_state === "pending" && !canDecide && !canRecord) {
-    return (
-      <p className="text-[11px] text-gray-400">
-        {row.outreach_owner === ctx.currentAdminId && !ctx.isSuperAdmin
-          ? "Someone else signs this off."
-          : "Waiting for an approver."}
-      </p>
-    );
-  }
-
-  if (!canDecide && !canRecord) {
-    return <span className="text-[11px] text-gray-300 dark:text-gray-600">—</span>;
-  }
-
-  // BOTH blocks can show at once, and for a super_admin on a settled row
-  // they do: they can revise the decision AND correct the outcome behind
-  // it. For everyone else only one is ever true, so nothing changes.
   return (
-    <div className="space-y-2">
-      {canDecide &&
-        (!rejecting ? (
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void run(() => decideApproval(ctx.campaignId, row.id, "approved"))}
-              className={`${BTN} bg-emerald-600 text-white hover:bg-emerald-500`}
-            >
-              {busy && <ButtonSpinner />}
-              {row.approval_state === "approved" ? "Re-approve" : "Approve"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void run(() => decideApproval(ctx.campaignId, row.id, "renegotiate"))}
-              className={`${BTN} border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}
-            >
-              Send back
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setRejecting(true)}
-              className={`${BTN} border border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300`}
-            >
-              Reject
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <input
-              className={FIELD}
-              placeholder="Why is the price rejected?"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              disabled={busy}
-            />
-            <div className="flex gap-1">
-              <button
-                type="button"
-                disabled={busy || !note.trim()}
-                onClick={() => void run(() => decideApproval(ctx.campaignId, row.id, "rejected", note))}
-                className={`${BTN} bg-rose-600 text-white hover:bg-rose-500`}
-              >
-                {busy && <ButtonSpinner />}
-                Reject price
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setRejecting(false)}
-                className={`${BTN} border border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300`}
-              >
-                Cancel
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-400">The negotiator needs to know why, so this one is required.</p>
-          </div>
+    <div className="space-y-1">
+      <select
+        value={row.assigned_to || ""}
+        disabled={working}
+        onChange={async (e) => {
+          if (!e.target.value) return;
+          setBusy(true);
+          setError("");
+          const res = await assignBooking(ctx.campaignId, row.id, e.target.value);
+          setBusy(false);
+          if (res.error) return setError(res.error);
+          startTransition(() => router.refresh());
+        }}
+        className="w-full rounded-lg border border-gray-300 bg-white px-1.5 py-1 text-[11px] dark:border-gray-700 dark:bg-gray-950"
+      >
+        <option value="">Unassigned</option>
+        {ctx.admins.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
         ))}
-
-      {canRecord && (
-        <div className="space-y-1">
-          {canDecide && (
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Correct the outcome</p>
-          )}
-          <select
-            className={SELECT}
-            value={choice}
-            disabled={busy}
-            onChange={(e) => setChoice(e.target.value as OutreachStatus | "")}
-          >
-            <option value="">Set outcome…</option>
-            {OUTREACH_STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {OUTREACH_LABEL[st]}
-              </option>
-            ))}
-          </select>
-
-          {choice === "agreed" && (
-            <input
-              className={FIELD}
-              inputMode="numeric"
-              placeholder="Amount (₹)"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              disabled={busy}
-            />
-          )}
-
-          {choice && (
-            <>
-              {choice === "agreed" && (
-                <p className="text-[10px] text-gray-400">Goes to an approver, not straight onto the campaign.</p>
-              )}
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={busy || (choice === "agreed" && !amount.trim())}
-                  onClick={() =>
-                    void run(() =>
-                      recordOutreachOutcome(
-                        ctx.campaignId,
-                        row.id,
-                        choice,
-                        choice === "agreed" ? Number(amount) : null,
-                        note,
-                      ),
-                    )
-                  }
-                  className={`${BTN} bg-indigo-600 text-white hover:bg-indigo-500`}
-                >
-                  {busy && <ButtonSpinner />}
-                  Save
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setChoice("")}
-                  className={`${BTN} border border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300`}
-                >
-                  Cancel
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
+      </select>
       {error && <p className="text-[10px] text-rose-600 dark:text-rose-400">{error}</p>}
     </div>
   );

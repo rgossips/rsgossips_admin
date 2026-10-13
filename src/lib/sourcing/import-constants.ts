@@ -25,41 +25,39 @@ export const BACKFILL_CHUNK_SIZE = 50;
 
 // ── What stage a sheet is allowed to assert ──────────────────────────────
 //
-// Two allowlists, because "importing a sheet" means two different things.
+// Both lists are expressed in the NINE-STAGE pipeline (rgossips_web
+// migration 085). They used to name the old 18-stage ladder, which still
+// compiled after the replacement — they are plain string arrays — but every
+// value was one the new CHECK rejects, so an import would have failed with
+// a hard 400 on the first row. Nothing in TypeScript catches that; it has
+// to be kept in step by hand with lib/sourcing/stages.ts.
 //
 // IMPORTABLE_STAGES — a LIVE campaign being sourced now. Capped at
-// `confirmed`: a cell reading "Reimbursed" is someone's memory of a
-// payment, and importing it would make the portal assert a payout with no
-// record of who made it. The later stages get walked in the portal, where
-// each one is logged and the payout legs are queued by the transition.
-export const IMPORTABLE_STAGES = ["shortlisted", "price_agreed", "confirmed", "declined"] as const;
+// `quote_review`: a cell reading "Reimbursed" is someone's memory of a
+// payment, and importing it would make the portal assert money moved with
+// no record of who moved it. The later stages get walked in the tracker,
+// where each move is logged against an admin.
+export const IMPORTABLE_STAGES = ["proposed", "shortlisted", "outreach", "quote_review", "dropped"] as const;
 
 // HISTORICAL_STAGES — a FINISHED campaign being recorded after the fact. A
 // row reading "Live" with a link to prove it is a fact, not optimism, so
-// the ladder opens up.
+// the pipeline opens up to the end.
 //
-// Absent from BOTH lists, and that is the point:
-//
-//   product_purchased / product_approved / reimbursed
-//       product_approved is one of the two entries in PAYOUT_ON_ENTER, so
-//       landing there queues a reimbursement for money settled offline
-//       months ago.
-//   product_shipped / product_delivered
-//       would fabricate a dispatch record — a tracking number nobody has.
-//
-// So no import of either kind can write a money stage, rather than merely
-// trying not to.
+// `product` is in here where the old list excluded its equivalents: in the
+// new pipeline it means "the team is handling the product", not "a payout
+// has been queued" — nothing is queued by entering a stage any more, since
+// settlement is recorded explicitly at `closed` with a mode and an amount.
 export const HISTORICAL_STAGES = [
-  "contacted",
-  "confirmed",
-  "script_shared",
-  "draft_received",
-  "revision_needed",
-  "admin_approved",
-  "brand_approved",
-  "live",
-  "fee_paid",
-  "declined",
+  "proposed",
+  "shortlisted",
+  "outreach",
+  "quote_review",
+  "product",
+  "content",
+  "content_review",
+  "payout",
+  "closed",
+  "dropped",
 ] as const;
 
 export type HistoricalStage = (typeof HISTORICAL_STAGES)[number];

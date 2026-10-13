@@ -33,9 +33,14 @@ const label = "block text-[11px] font-semibold uppercase tracking-wider text-gra
 export function AddBookingButton({
   campaignId,
   defaultMode = "reimburse",
+  isApprover = false,
+  approverName = "an approver",
 }: {
   campaignId: string;
   defaultMode?: FulfilmentMode;
+  /** Approvers shortlist straight away; everyone else suggests. */
+  isApprover?: boolean;
+  approverName?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -59,6 +64,7 @@ export function AddBookingButton({
   // Who will own reaching out. Required, because an unassigned creator is
   // one nobody is chasing.
   const [assignTo, setAssignTo] = useState("");
+  const [platform, setPlatform] = useState("Instagram");
   const [admins, setAdmins] = useState<AssignableAdmin[]>([]);
   // The tier follows the follower count, so there is nothing to store.
   const derivedTier = tierForFollowers(form.followersCount);
@@ -114,6 +120,7 @@ export function AddBookingButton({
       quotedFee: form.quotedFee ? Number(form.quotedFee) : null,
       fulfilmentMode: defaultMode,
       assignTo: assignTo || null,
+      platform,
     });
     setBusy(false);
     if (res.error) return setError(res.error);
@@ -140,7 +147,7 @@ export function AddBookingButton({
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
-        Add creator
+        {isApprover ? "Add creator" : "Suggest a creator"}
       </button>
     );
   }
@@ -245,6 +252,13 @@ export function AddBookingButton({
         {/* Rupees in, paise in the column — the action does the one conversion. */}
         <div><label className={label}>Quoted (₹)</label><input className={input} inputMode="numeric" value={form.quotedFee} onChange={set("quotedFee")} /></div>
         <div>
+          <label className={label}>Platform</label>
+          <select className={input} value={platform} onChange={(e) => setPlatform(e.target.value)}>
+            <option>Instagram</option>
+            <option>YouTube</option>
+          </select>
+        </div>
+        <div className={isApprover ? "" : "hidden"}>
           <label className={label}>Assign to *</label>
           <select
             className={input}
@@ -266,14 +280,17 @@ export function AddBookingButton({
         <button
           type="button"
           onClick={submit}
-          disabled={busy || !form.instagramUsername.trim() || !assignTo}
+          disabled={busy || !form.instagramUsername.trim() || (isApprover && !assignTo)}
           className="inline-flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-[13px] font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           {busy && <ButtonSpinner />}
-          Add to campaign
+          {isApprover ? "Add and assign" : `Send to ${approverName}`}
         </button>
         <p className="text-[11px] text-gray-400">
-          They&apos;re also filed as an invited influencer. The assigned admin records what the creator says next.
+          They&apos;re also filed as an invited influencer.{" "}
+          {isApprover
+            ? "The assigned admin reaches out and records what the creator says."
+            : `${approverName} approves the creator and the quote before any outreach starts.`}
         </p>
       </div>
 

@@ -1,246 +1,181 @@
-// The outreach tracker's state machine.
+// Who may move a booking, and what the move is called.
 //
-// A sourced creator is a person somebody has to actually get hold of, and
-// that was invisible before: a booking sat at `shortlisted` whether nobody
-// had tried yet or three people had tried and given up. This adds the
-// missing axis — who owns the conversation, what came back, and who signed
-// off on the money.
+// The pipeline in stages.ts says WHICH stage comes next; this says who is
+// allowed to make it happen and what the button should say.
 //
-// Plain module, NOT "use server": the table and the forms both need these
-// labels and predicates, and a map exported from a "use server" file becomes
-// a callable client ref.
+// ── Why this file shrank ────────────────────────────────────────────────
 //
-// ── Why this is separate from `stage` ────────────────────────────────────
+// It used to carry its own `outreach_status` (not picked up / did not agree
+// / agreed) and `approval_state` (pending / approved / rejected /
+// renegotiate) machinery, running as a second axis beside `stage`. The
+// nine-stage pipeline absorbed both: `quote_review` IS "agreed, awaiting
+// sign-off", `dropped` IS "declined", and the stage's own actor says
+// whether we are waiting on the team or the approver. Two sources of truth
+// for one question is how a row ends up claiming to be approved and
+// not-yet-contacted at the same time.
 //
-// `stage` says where the DELIVERABLE is. Outreach says whether we have
-// reached the human. They are independent: "contacted, never picked up" tells
-// you nothing about the product leg. But the two are kept in step here rather
-// than left to drift, because an admin reads one row and expects it to make
-// sense — so each outreach transition names the stage that goes with it, and
-// every stage named below ALREADY EXISTS in BOOKING_STAGES. The DB's stage
-// CHECK is untouched by this feature, which is why it needs no migration of
-// its own.
-//
-//   added + assigned          -> shortlisted   (nobody has tried yet)
-//   not picked up             -> contacted     (we tried; no answer)
-//   declined by creator       -> declined      (their no)
-//   price agreed              -> price_agreed  (goes up for sign-off)
-//   approved                  -> confirmed     (the deal is on; takes a seat)
-//   price rejected by us      -> cancelled     (our no — NOT `declined`,
-//                                              which would misattribute it
-//                                              to the creator)
-//   sent back to renegotiate  -> price_agreed  (unchanged; it is still the
-//                                              price under discussion)
+// The columns still exist and 64 rows carry values — nothing reads them to
+// decide anything now, and they are left alone rather than wiped, because
+// they are the only record of what those rows were before the change.
 
-import { ALL_MAIN_STAGES, type BookingStage } from "@/lib/sourcing/stages";
-
-// What the creator said. NULL on a row means nobody has recorded a
-// conversation yet, which is NOT the same as "no answer" — the difference is
-// the whole point of having the field.
-export const OUTREACH_STATUSES = ["not_picked_up", "declined", "agreed"] as const;
-export type OutreachStatus = (typeof OUTREACH_STATUSES)[number];
-
-export const OUTREACH_LABEL: Record<OutreachStatus, string> = {
-  not_picked_up: "Not picked up",
-  // "Did not agree", not "Declined": the stored value is `declined` and the
-  // BOOKING STAGE of the same name means the creator said no to the
-  // collaboration outright. This is the narrower thing — they talked to us
-  // and the money did not work — and the admins asked for it in those words.
-  declined: "Did not agree",
-  agreed: "Agreed",
-};
-
-export const OUTREACH_TONE: Record<OutreachStatus, string> = {
-  not_picked_up: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  declined: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
-  agreed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-};
-
-// The price sign-off, once there is a price to sign off.
-export const APPROVAL_STATES = ["pending", "approved", "rejected", "renegotiate"] as const;
-export type ApprovalState = (typeof APPROVAL_STATES)[number];
-
-export const APPROVAL_LABEL: Record<ApprovalState, string> = {
-  pending: "Waiting for sign-off",
-  approved: "Approved",
-  rejected: "Price rejected",
-  renegotiate: "Back for renegotiation",
-};
-
-export const APPROVAL_TONE: Record<ApprovalState, string> = {
-  pending: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
-  approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  rejected: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
-  renegotiate: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-};
-
-export function isOutreachStatus(v: unknown): v is OutreachStatus {
-  return typeof v === "string" && (OUTREACH_STATUSES as readonly string[]).includes(v);
-}
-export function isApprovalState(v: unknown): v is ApprovalState {
-  return typeof v === "string" && (APPROVAL_STATES as readonly string[]).includes(v);
-}
-
-/** The stage that goes with an outreach outcome. */
-export function stageForOutreach(status: OutreachStatus): BookingStage {
-  if (status === "declined") return "declined";
-  if (status === "agreed") return "price_agreed";
-  return "contacted";
-}
-
-/** The stage that goes with an approval decision. */
-export function stageForApproval(state: Exclude<ApprovalState, "pending">): BookingStage {
-  if (state === "approved") return "confirmed";
-  // Our refusal, not the creator's. `declined` is reserved for their no, so
-  // attributing this to them would make the funnel lie about why a booking
-  // died.
-  if (state === "rejected") return "cancelled";
-  return "price_agreed";
-}
-
-// ── Who may do what ──────────────────────────────────────────────────────
-//
-// Recording an outcome belongs to whoever owns the conversation, because
-// they are the only one who had it. A super_admin can step in — people go on
-// leave mid-negotiation and the row should not be stuck. An approver cannot
-// record an outcome on a row assigned to someone else just by holding the
-// approver flag: approving is a different job from negotiating, and letting
-// one person do both on the same row removes the second pair of eyes that is
-// the entire reason for the sign-off step.
+import { stageIndex, stageSpec, type BookingStage } from "@/lib/sourcing/stages";
 
 export type ActorContext = {
   actorId: string;
+  /** Display name, for "waiting on …". */
+  name: string;
   isSuperAdmin: boolean;
   isApprover: boolean;
+  isViewer: boolean;
 };
 
-// A super_admin can change ANYTHING on the tracker, at any point, including
-// a row that has already been settled. This is deliberate and it is the one
-// rule that overrides the rest: the workflow has handoffs in it, people go
-// on leave mid-negotiation, and somebody records the wrong outcome — a
-// process with no way to correct itself just produces rows that quietly
-// stop being true. The audit trail is what makes that safe rather than the
-// absence of the ability: every one of these writes a campaign_booking_events
-// row and an admin_activity_log entry naming who did it.
-//
-// THESE TWO FUNCTIONS ARE THE ONLY OWNERS of the rule. The row controls
-// import them rather than re-deriving — they had their own copies for one
-// commit and that is exactly how a UI starts offering a button the server
-// then refuses.
-
-export function canRecordOutcome(
-  booking: {
-    assigned_to?: string | null;
-    approval_state?: string | null;
-    outreach_status?: string | null;
-  },
-  actor: ActorContext,
-): boolean {
-  if (actor.isSuperAdmin) return true;
-  // For everyone else the row has to be theirs AND still open: a price
-  // already up for sign-off is out of the negotiator's hands, and a settled
-  // row is settled.
-  if (booking.approval_state === "pending") return false;
-  if (booking.approval_state === "approved" || booking.approval_state === "rejected") return false;
-  if (booking.outreach_status === "declined") return false;
-  return !!booking.assigned_to && booking.assigned_to === actor.actorId;
-}
-
-export function canDecideApproval(
-  booking: {
-    approval_state?: string | null;
-    outreach_owner?: string | null;
-    outreach_status?: string | null;
-  },
-  actor: ActorContext,
-): boolean {
-  // Something has to be on the table: either a price awaiting sign-off, a
-  // decision already made that could be revised, or an agreed amount that
-  // never went up because nobody held the approver flag at the time.
-  const decidable =
-    !!booking.approval_state || booking.outreach_status === "agreed";
-  if (!decidable) return false;
-
-  if (actor.isSuperAdmin) return true;
-  if (!actor.isApprover) return false;
-  // Only a live request, for a normal approver — re-opening a settled
-  // decision is a super_admin's call.
-  if (booking.approval_state !== "pending") return false;
-  // The negotiator does not sign off on their own agreed price. That second
-  // pair of eyes is the entire reason the step exists.
-  if (booking.outreach_owner === actor.actorId) return false;
-  return true;
-}
-
-// Stages that sit beyond the outreach conversation — the product leg and
-// everything after it. Derived from ALL_MAIN_STAGES rather than listed, so
-// a new stage cannot be forgotten here.
-const PAST_OUTREACH = new Set<string>(
-  ALL_MAIN_STAGES.slice(ALL_MAIN_STAGES.indexOf("confirmed") + 1),
-);
-
-/**
- * Has this booking moved beyond what the tracker is for?
- *
- * Approval is the tracker's LAST step: once a price is signed off the
- * creator has an application and is managed from the applications list, so
- * the tracker stops offering controls and just points there.
- *
- * The stage check is for the bookings that predate the tracker. Sixty-three
- * of those exist, some already at `live` or `fee_paid`, and they never went
- * through an approval — without this they would be offered an outreach
- * outcome dropdown on a creator who has already delivered.
- */
-export function isPastOutreach(booking: {
-  approval_state?: string | null;
-  stage?: string | null;
-}): boolean {
-  if (booking.approval_state === "approved") return true;
-  return PAST_OUTREACH.has(String(booking.stage || ""));
-}
-
-/**
- * Is this row still live, or has it ended?
- *
- * Used to grey out finished rows rather than hide them — an admin looking at
- * a campaign wants to see the people who said no, not a list that quietly
- * shrinks.
- */
-export function isOutreachClosed(booking: {
-  outreach_status?: string | null;
-  approval_state?: string | null;
-}): boolean {
-  return booking.outreach_status === "declined" || booking.approval_state === "rejected";
-}
-
-/**
- * One line describing what the row is waiting on, for the table.
- *
- * `stage` is consulted as a fallback because the tracker arrived AFTER the
- * bookings did: 63 rows already exist with outreach_status NULL, several of
- * them at `price_agreed` from the hand-sourcing this replaces. Reading only
- * the outreach fields would caption every one of those "Not contacted yet",
- * which is plainly false for a creator somebody already negotiated with —
- * so a row with no recorded outreach but a stage past the start says that
- * it predates the tracker instead of inventing a status for it.
- */
-export function outreachSummary(booking: {
+export type ActorBooking = {
+  stage: string;
+  /** The team member who owns reaching out. */
   assigned_to?: string | null;
-  outreach_status?: string | null;
-  approval_state?: string | null;
-  stage?: string | null;
-}): string {
-  if (booking.approval_state === "approved") return "Approved — application created";
-  if (booking.approval_state === "rejected") return "Price rejected";
-  if (booking.approval_state === "pending") return "Waiting for sign-off";
-  if (booking.approval_state === "renegotiate") return "Back for renegotiation";
-  if (booking.outreach_status === "declined") return "Creator declined";
-  if (booking.outreach_status === "not_picked_up") return "No answer yet";
-  if (booking.outreach_status === "agreed") return "Amount agreed";
+};
 
-  // Nothing recorded on the outreach axis. Was anything recorded at all?
-  const stage = String(booking.stage || "");
-  if (stage && stage !== "shortlisted") return "Tracked before the outreach tracker";
-  if (!booking.assigned_to) return "Unassigned";
-  return "Not contacted yet";
+/**
+ * Whose move it is: the owning team member, an approver, or nobody.
+ *
+ * Returns an admin id for the team, the literal "approver" for an approver
+ * stage (any approver will do, so there is no single id), and null once the
+ * row is closed or dropped.
+ */
+export function actorFor(booking: ActorBooking): { kind: "team" | "approver" | "none"; adminId: string | null } {
+  const spec = stageSpec(booking.stage);
+  if (!spec.actor) return { kind: "none", adminId: null };
+  if (spec.actor === "approver") return { kind: "approver", adminId: null };
+  return { kind: "team", adminId: booking.assigned_to ?? null };
+}
+
+/**
+ * May this person move the row right now?
+ *
+ * A super_admin can always act — people go on leave mid-negotiation, and a
+ * process with no way to correct itself produces rows that quietly stop
+ * being true. The audit trail is what makes that safe rather than the
+ * absence of the ability: every move writes a campaign_booking_events row
+ * naming who made it.
+ */
+export function canAct(booking: ActorBooking, actor: ActorContext): boolean {
+  if (actor.isViewer) return false;
+  if (actor.isSuperAdmin) return true;
+  const who = actorFor(booking);
+  if (who.kind === "none") return false;
+  if (who.kind === "approver") return actor.isApprover;
+  // A team stage: the owner acts on it. Unassigned rows are open to any
+  // admin, so a creator cannot get stranded because nobody was picked.
+  return !who.adminId || who.adminId === actor.actorId;
+}
+
+/** One line for the row: "Your move" / "Waiting on Saquib" / "". */
+export function waitingLabel(
+  booking: ActorBooking,
+  actor: ActorContext,
+  nameOf: (adminId: string) => string,
+  approverName: string,
+): string {
+  const who = actorFor(booking);
+  if (who.kind === "none") return "";
+  if (canAct(booking, actor)) return "Your move";
+  if (who.kind === "approver") return `Waiting on ${approverName}`;
+  return who.adminId ? `Waiting on ${nameOf(who.adminId)}` : "Unassigned";
+}
+
+// ── The moves ────────────────────────────────────────────────────────────
+//
+// Each stage offers one or two named transitions. Listed here rather than
+// derived, because unlike a ladder these are not all "forward": requesting
+// changes goes back to `content`, negotiating goes back to `outreach`, and
+// a creator can be dropped from several places. A derived version would
+// need the exceptions spelled out anyway, and then the exceptions would be
+// the real list.
+
+export type MoveId =
+  | "approveCreator"
+  | "rejectCreator"
+  | "markReached"
+  | "submitQuote"
+  | "declined"
+  | "approveQuote"
+  | "negotiate"
+  | "markReimbursed"
+  | "submitContent"
+  | "approveContent"
+  | "requestChanges"
+  | "closeDeal"
+  | "reopen"
+  | "dropCreator";
+
+export const MOVES: Record<MoveId, { to: BookingStage; verb: string }> = {
+  approveCreator: { to: "shortlisted", verb: "approved creator" },
+  rejectCreator: { to: "dropped", verb: "marked creator not a fit" },
+  markReached: { to: "outreach", verb: "reached out" },
+  submitQuote: { to: "quote_review", verb: "sent agreed quote for approval" },
+  declined: { to: "dropped", verb: "marked creator declined" },
+  approveQuote: { to: "product", verb: "approved quote" },
+  negotiate: { to: "outreach", verb: "asked to negotiate further" },
+  markReimbursed: { to: "content", verb: "marked product bought and reimbursed" },
+  submitContent: { to: "content_review", verb: "sent content for review" },
+  approveContent: { to: "payout", verb: "approved content" },
+  requestChanges: { to: "content", verb: "requested changes" },
+  closeDeal: { to: "closed", verb: "settled and closed" },
+  reopen: { to: "shortlisted", verb: "reopened as shortlisted" },
+  dropCreator: { to: "dropped", verb: "declined" },
+};
+
+/**
+ * Declining is available from ANY stage, which is why it is not in
+ * MOVES_FROM with the rest.
+ *
+ * The pipeline's own moves are about progress — each one answers the
+ * question that stage asks. Dropping out is not a stage question: a creator
+ * can stop replying after the product has shipped, or pull out once the
+ * content is written. A decline that only worked from `outreach` meant a
+ * row that died later had nowhere to go but `closed`, which claimed a
+ * collaboration that never happened.
+ *
+ * `dropped` is absent from SEAT_HOLDING_STAGES, so this frees the seat as a
+ * consequence of the move rather than through separate bookkeeping that
+ * could drift from it.
+ */
+export function canDrop(booking: { stage: string }): boolean {
+  return booking.stage !== "dropped";
+}
+
+/**
+ * Declining a creator we were committed to needs a reason on the record.
+ *
+ * Past the quote approval there is usually money involved — a reimbursed
+ * product, a fee agreed — and "why did this one stop" is the question
+ * somebody asks three weeks later. Before that it is just a conversation
+ * that went nowhere, and demanding an essay for each one would get an "x"
+ * typed into the box.
+ */
+export function dropNeedsReason(booking: { stage: string }): boolean {
+  return stageIndex(booking.stage) >= stageIndex("product");
+}
+
+/** Which moves are offered from a stage, in button order. */
+export const MOVES_FROM: Record<string, MoveId[]> = {
+  proposed: ["approveCreator", "rejectCreator"],
+  shortlisted: ["markReached"],
+  outreach: ["submitQuote", "declined"],
+  quote_review: ["approveQuote", "negotiate"],
+  product: ["markReimbursed"],
+  content: ["submitContent"],
+  content_review: ["approveContent", "requestChanges"],
+  payout: ["closeDeal"],
+  closed: [],
+  dropped: ["reopen"],
+};
+
+export function movesFrom(stage: string): MoveId[] {
+  return MOVES_FROM[stage] ?? [];
+}
+
+/** Reopening a dropped row is an approver's call, not the team's. */
+export function moveNeedsApprover(move: MoveId): boolean {
+  return move === "reopen";
 }

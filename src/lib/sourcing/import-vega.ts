@@ -120,7 +120,7 @@ export function parseCommercial(raw: unknown): { isBarter: boolean; rupees: numb
 // count. Writing an application status here would assert a state nobody
 // recorded, so blank never touches one.
 
-export type BlankPolicy = "contacted" | "confirmed";
+export type BlankPolicy = "outreach" | "product";
 
 export type TargetState = {
   stage: HistoricalStage;
@@ -139,21 +139,24 @@ export function deriveTargetState(input: {
   const { progress, isBarter, paidOut } = input;
   switch (progress) {
     case "live":
-      if (!isBarter && paidOut) return { stage: "fee_paid", applicationStatus: "completed", markLive: true };
-      if (isBarter) return { stage: "live", applicationStatus: "completed", markLive: true };
-      return { stage: "live", applicationStatus: "live_submitted", markLive: true };
+      // Paid and confirmed paid -> the collaboration is finished.
+      if (!isBarter && paidOut) return { stage: "closed", applicationStatus: "completed", markLive: true };
+      // Barter is settled by sending the product, and the sheets record no
+      // date for that, so it rests at `payout` rather than claiming closed.
+      if (isBarter) return { stage: "payout", applicationStatus: "completed", markLive: true };
+      return { stage: "payout", applicationStatus: "live_submitted", markLive: true };
     case "draft_approval":
-      return { stage: "draft_received", applicationStatus: "submitted", markLive: false };
+      return { stage: "content_review", applicationStatus: "submitted", markLive: false };
     case "rework":
-      return { stage: "revision_needed", applicationStatus: "revision_needed", markLive: false };
+      return { stage: "content", applicationStatus: "revision_needed", markLive: false };
     case "in_progress":
-      return { stage: "script_shared", applicationStatus: "approved", markLive: false };
+      return { stage: "content", applicationStatus: "approved", markLive: false };
     case "product_not_received":
-      return { stage: "confirmed", applicationStatus: "approved", markLive: false };
+      return { stage: "product", applicationStatus: "approved", markLive: false };
     case "blank":
     default:
       return {
-        stage: input.blankPolicy === "confirmed" ? "confirmed" : "contacted",
+        stage: input.blankPolicy === "product" ? "product" : "outreach",
         applicationStatus: null,
         markLive: false,
       };
@@ -344,7 +347,7 @@ export function deriveVegaRow(
 
   const target =
     progress === null
-      ? { stage: "contacted" as HistoricalStage, applicationStatus: null, markLive: false }
+      ? { stage: "outreach" as HistoricalStage, applicationStatus: null, markLive: false }
       : deriveTargetState({ progress, isBarter, paidOut: payment?.paidOut ?? false, blankPolicy: opts.blankPolicy });
 
   const fulfilmentMode = deriveFulfilmentMode(row);
@@ -404,16 +407,12 @@ export function deriveVegaRow(
     liveAt: target.markLive ? (row.liveDate ?? now) : null,
     notes: proseParts.filter(Boolean).join(" · "),
     notesSuffix: importMarkerSuffix({ sheet: row.sheet, line: row.line }),
-    revisionNote: target.stage === "revision_needed" ? "Imported: sheet said Video Rework" : "",
+    revisionNote: progress === "rework" ? "Imported: sheet said Video Rework" : "",
     // Everything imported was contacted at some point, by definition.
     contactedAt: now,
-    confirmedAt: target.stage === "contacted" ? null : now,
+    confirmedAt: target.stage === "outreach" || target.stage === "shortlisted" ? null : now,
     scriptSharedAt:
-      target.stage === "script_shared" ||
-      target.stage === "draft_received" ||
-      target.stage === "revision_needed" ||
-      target.stage === "live" ||
-      target.stage === "fee_paid"
+      target.stage === "content" || target.stage === "content_review" || target.stage === "payout" || target.stage === "closed"
         ? now
         : null,
     warnings,

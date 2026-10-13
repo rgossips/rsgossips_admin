@@ -496,7 +496,7 @@ export default function BackfillPanel() {
                           {s.blankCount} row(s) have no Progress. Record them as
                         </span>
                         <select
-                          value={blankPolicy[s.sheet] || "contacted"}
+                          value={blankPolicy[s.sheet] || "outreach"}
                           disabled={busy}
                           onChange={(e) => {
                             setBlankPolicy({ ...blankPolicy, [s.sheet]: e.target.value as BlankPolicy });
@@ -511,12 +511,12 @@ export default function BackfillPanel() {
                           }}
                           className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
                         >
-                          <option value="contacted">Contacted — does not take a seat</option>
-                          <option value="confirmed">Confirmed — takes a seat</option>
+                          <option value="outreach">In outreach — does not take a seat</option>
+                          <option value="product">Product &amp; reimburse — takes a seat</option>
                         </select>
                       </label>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
-                        Contacted is the safer default: the sheet only proves somebody reached out. Neither option
+                        In outreach is the safer default: the sheet only proves somebody reached out. Neither option
                         touches an application.
                       </p>
                     </div>
@@ -544,7 +544,7 @@ export default function BackfillPanel() {
                           {Object.entries(histogram)
                             .sort((a, b) => b[1] - a[1])
                             .map(([stage, n]) => (
-                              <Chip key={stage} tone={stage === "fee_paid" ? "green" : "gray"}>
+                              <Chip key={stage} tone={stage === "closed" ? "green" : "gray"}>
                                 {STAGE_LABEL[stage as BookingStage] || stage}: {n}
                               </Chip>
                             ))}
