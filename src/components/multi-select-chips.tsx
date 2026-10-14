@@ -48,10 +48,12 @@ export function MultiSelectChips({
 
   return (
     <div ref={ref} className="relative">
-      <label className={labelClass}>
-        {label}
-        {required && <span className="text-red-400 ml-1">*</span>}
-      </label>
+      {label ? (
+        <label className={labelClass}>
+          {label}
+          {required && <span className="text-red-400 ml-1">*</span>}
+        </label>
+      ) : null}
       <button
         type="button"
         onClick={() => (open ? close() : setOpen(true))}
@@ -60,7 +62,9 @@ export function MultiSelectChips({
         <span className={selected.length > 0 ? "text-gray-900 dark:text-white" : "text-gray-400"}>
           {selected.length > 0
             ? t("selectedCount", { count: selected.length })
-            : t("selectPlaceholder", { label: label.toLowerCase() })}
+            : label
+              ? t("selectPlaceholder", { label: label.toLowerCase() })
+              : t("selectPlaceholderGeneric")}
         </span>
         <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -93,7 +97,11 @@ export function MultiSelectChips({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("searchPlaceholder", { label: label.toLowerCase() })}
+                placeholder={
+                  label
+                    ? t("searchPlaceholder", { label: label.toLowerCase() })
+                    : t("searchPlaceholderGeneric")
+                }
                 className="w-full px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-indigo-400"
                 onClick={(e) => e.stopPropagation()}
               />

@@ -928,6 +928,8 @@
     "appliedDate": "Applied {date}",
     "downloadExcel": "Download Excel",
     "downloadExcelTitle": "Download the applicant list as an Excel file",
+    "downloadRoster": "Download everyone",
+    "downloadRosterTitle": "Download everyone on this campaign — applicants and sourced creators — as one Excel file",
     "exporting": "Preparing…",
     "exportFailed": "Couldn't export the applicant list. Please try again.",
     "approveLinks": "Approve & complete",
@@ -2199,7 +2201,9 @@
     "selectedCount": "{count} selected",
     "selectPlaceholder": "Select {label}",
     "searchPlaceholder": "Search {label}...",
-    "noMatches": "No matches for \"{search}\""
+    "noMatches": "No matches for \"{search}\"",
+    "selectPlaceholderGeneric": "Select…",
+    "searchPlaceholderGeneric": "Search…"
   },
   "NotificationBell": {
     "title": "Notifications",

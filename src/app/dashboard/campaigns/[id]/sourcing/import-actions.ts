@@ -235,6 +235,24 @@ export async function importSourcingRows(
         skippedNew++;
         continue;
       }
+      // A creator new to us needs a name, because this is the moment they
+      // join the permanent creator database and influencer_invitations
+      // .full_name is NOT NULL — as every other invitation writer already
+      // assumes (the single invite form and bulk invite both refuse a
+      // nameless row, and all 1,735 existing invitations carry one).
+      //
+      // Caught HERE rather than at the insert, which is the real severity
+      // of the bug this replaces: one nameless row failed the WHOLE batch
+      // with a 23502, dropped it into one sequential insert per row — the
+      // round-trip cost this import exists to avoid — and then lost every
+      // nameless creator anyway behind the message "Could not add them to
+      // the creator database", which named neither the cause nor the fix.
+      // Measured on the run that reported it: of 85 new creators, 46 were
+      // saved by the retry loop and 39 were lost.
+      if (!clampLen(row.name || "", NAME_MAX)) {
+        failed.push({ handle: row.handle, reason: "No name in the sheet for them — add one and import again" });
+        continue;
+      }
       needInvitation.push(row);
       continue;
     }
@@ -247,7 +265,8 @@ export async function importSourcingRows(
   let invitationsCreated = 0;
   if (needInvitation.length) {
     const invitationRows = needInvitation.map((row) => ({
-      full_name: clampLen(row.name || "", NAME_MAX) || null,
+      // Guaranteed non-empty by the check above, and NOT NULL in the DB.
+      full_name: clampLen(row.name || "", NAME_MAX),
       instagram_username: row.handle,
       // category_raw is the brand's wording and must NOT become a canonical
       // category — those drive campaign matching. It rides along as prose.

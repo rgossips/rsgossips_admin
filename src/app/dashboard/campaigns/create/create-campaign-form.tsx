@@ -8,6 +8,8 @@ import { FullPageLoader } from "@/components/spinner";
 
 import { CATEGORIES } from "@/lib/categories";
 import { INDIAN_LANGUAGES } from "@/lib/languages";
+import { INDIAN_CITIES } from "@/lib/cities";
+import { MultiSelectChips } from "@/components/multi-select-chips";
 
 // Shape passed in when the form is in edit mode. Optional fields mirror
 // the columns we read off `campaigns` + the metadata we pack into the
@@ -56,12 +58,13 @@ export interface CampaignInitial {
 }
 
 const PLATFORMS = ["Instagram"];
-const CITIES = [
-  "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune", "Chennai",
-  "Kolkata", "Ahmedabad", "Jaipur", "Lucknow", "Chandigarh", "Indore",
-  "Bhopal", "Kochi", "Remote",
-];
 const GENDERS = ["Male", "Female", "Any"];
+// Targeting used to be limited to 15 hardcoded names, so a campaign for any
+// other city simply could not be created here — the same gap the brand-side
+// dialog had. The canonical list already lived in lib/cities.ts (used by the
+// influencer invite and edit forms); this form just never used it. "Remote"
+// is not a city, so it is prepended rather than added to that file.
+const CITY_OPTIONS = ["Remote", ...INDIAN_CITIES];
 
 const TIER_RANGES: Record<string, { min: number; max: number }> = {
   nano: { min: 1000, max: 10000 },
@@ -850,11 +853,12 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 </label>
               </div>
               {!allIndia && (
-                <div className="flex flex-wrap gap-2">
-                  {CITIES.map((c) => (
-                    <Chip key={c} label={c} on={selectedCities.includes(c)} onClick={() => toggle(setSelectedCities)(c)} />
-                  ))}
-                </div>
+                <MultiSelectChips
+                  label=""
+                  options={CITY_OPTIONS}
+                  selected={selectedCities}
+                  onChange={setSelectedCities}
+                />
               )}
             </div>
             <div>

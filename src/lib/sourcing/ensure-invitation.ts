@@ -114,11 +114,29 @@ export async function ensureInvitation(
     };
   }
 
-  // Neither — invite them.
+  // Neither — invite them. A name is required at exactly this point and
+  // not before: influencer_invitations.full_name is NOT NULL, but a
+  // creator who is already registered or already invited returned above
+  // without an insert, so demanding one up front would make an admin
+  // retype the name of somebody we already know.
+  //
+  // Returned as a sentence because the alternative is what shipped: the
+  // insert raised a 23502 naming a column no caller has heard of, and the
+  // admin read "Could not create the invitation."
+  const fullName = (input.fullName || "").trim();
+  if (!fullName) {
+    return {
+      outcome: "error",
+      influencerId: null,
+      invitationId: null,
+      error: "Enter the creator's name — they are new to us, so this adds them to the creator database.",
+    };
+  }
+
   const { data: created, error: createErr } = await admin
     .from("influencer_invitations")
     .insert({
-      full_name: input.fullName || null,
+      full_name: fullName,
       instagram_username: handle,
       notes: buildNotes(input) || null,
       created_by: actorId,

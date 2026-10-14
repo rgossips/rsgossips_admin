@@ -316,6 +316,14 @@ export function parseSheet(
     if (!handle) return;
 
     const warnings: string[] = [];
+
+    // Flagged in the PREVIEW and not only at the import, because the
+    // preview is what the admin decides on: a creator new to us cannot be
+    // added without a name (influencer_invitations.full_name is NOT NULL),
+    // so counting their row as importable and then dropping it is the
+    // preview promising something the import refuses.
+    if (!String(get("name") ?? "").trim()) warnings.push("No name in this row — they can only be imported if we already know them");
+
     const { phone, extra } = parsePhone(get("phone"));
     const { email, warning: emailWarn } = parseEmail(get("email"));
     if (emailWarn) warnings.push(emailWarn);
