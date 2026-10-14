@@ -169,7 +169,7 @@ export function ApplicationsList({
   const router = useRouter();
   const { isAdmin } = useRole();
   const [sortMode, setSortMode] = useState<"match" | "newest">("match");
-  const [hideUnderMin, setHideUnderMin] = useState(false);
+  const [hideOffBrief, setHideOffBrief] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkReason, setBulkReason] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -207,19 +207,42 @@ export function ApplicationsList({
     );
   }, [scored, sortMode]);
 
-  // "Under the follower minimum" means KNOWN to be under it. A creator whose
-  // follower count we do not hold is never swept up by this — hiding or
-  // rejecting someone for missing data would be a different decision than
-  // the one the button describes.
-  const underMin = useMemo(() => ordered.filter((s) => s.match.belowFollowerMin), [ordered]);
+  // Applicants who are KNOWN not to match the brief — under the follower
+  // minimum, the gender it excludes, or outside every city it names.
+  //
+  // "Known" is the whole rule and it is enforced in the scorer, not here:
+  // each flag is set only on a `miss`, never on an `unknown`. That matters
+  // because missing data is the common case, not the edge case — measured
+  // over 500 profiles, gender is on file for 51% and location for 14%. A
+  // filter that swept up every creator we simply hold no city for would
+  // hide most of the list and call it a mismatch, and the bulk reject
+  // beside it would then email those people a decision nobody made.
+  //
+  // The brief has to name something for a dimension to count at all: the
+  // scorer drops "All India" and friends as the wildcard they are, so a
+  // campaign open to the whole country never reports a location mismatch.
+  const offBrief = useMemo(
+    () => ordered.filter((s) => s.match.belowFollowerMin || s.match.genderMismatch || s.match.locationMismatch),
+    [ordered],
+  );
+  // Counted per REASON for the summary line, so the sentence says what is
+  // actually wrong rather than only how many. One applicant can fail two
+  // dimensions, which is why these do not sum to offBrief.length.
+  const offBriefCounts = useMemo(() => ({
+    followers: offBrief.filter((s) => s.match.belowFollowerMin).length,
+    gender: offBrief.filter((s) => s.match.genderMismatch).length,
+    location: offBrief.filter((s) => s.match.locationMismatch).length,
+  }), [offBrief]);
   // Only the undecided ones can be bulk rejected; the server enforces this
   // again, and the count here has to agree with what it will actually do.
   const rejectable = useMemo(
-    () => underMin.filter((s) => s.app.status === "pending" || s.app.status === "on_hold"),
-    [underMin],
+    () => offBrief.filter((s) => s.app.status === "pending" || s.app.status === "on_hold"),
+    [offBrief],
   );
 
-  const visible = hideUnderMin ? ordered.filter((s) => !s.match.belowFollowerMin) : ordered;
+  const visible = hideOffBrief
+    ? ordered.filter((s) => !(s.match.belowFollowerMin || s.match.genderMismatch || s.match.locationMismatch))
+    : ordered;
 
   const followerMin = Number(targeting?.followerMin) || 0;
 
@@ -295,20 +318,34 @@ export function ApplicationsList({
           many would remain, and the button gave no clue which state it was
           in. A checkbox shows its own state, and the sentence owns the
           count. */}
-      {followerMin > 0 && underMin.length > 0 && (
+      {offBrief.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-100 bg-amber-50/60 px-6 py-3 dark:border-gray-800 dark:bg-amber-950/20">
           <p className="text-xs text-amber-900 dark:text-amber-200">
-            {t("underMinSummary", {
-              count: underMin.length,
-              total: applications.length,
-              min: followerMin.toLocaleString(),
-            })}
+            {t("offBriefSummary", { count: offBrief.length, total: applications.length })}{" "}
+            {/* The breakdown is the point: "3 do not match the brief" alone
+                does not tell you whether to act, and the three reasons carry
+                very different weight — a creator just under a follower
+                minimum is a judgement call, one in the wrong city may be
+                fine for a remote shoot, and the gender rule is one the
+                brand set. Reasons with a count of zero are left out rather
+                than printed as "0". */}
+            <span className="text-amber-800/80 dark:text-amber-300/80">
+              {[
+                offBriefCounts.followers > 0
+                  ? t("offBriefReasonFollowers", { count: offBriefCounts.followers, min: followerMin.toLocaleString() })
+                  : "",
+                offBriefCounts.gender > 0 ? t("offBriefReasonGender", { count: offBriefCounts.gender }) : "",
+                offBriefCounts.location > 0 ? t("offBriefReasonLocation", { count: offBriefCounts.location }) : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
           </p>
           <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
             <input
               type="checkbox"
-              checked={hideUnderMin}
-              onChange={(e) => setHideUnderMin(e.target.checked)}
+              checked={hideOffBrief}
+              onChange={(e) => setHideOffBrief(e.target.checked)}
               className="h-3.5 w-3.5 cursor-pointer"
             />
             {t("hideThem")}
@@ -526,9 +563,23 @@ function ApplicationRow({
                   whyLabel={t("matchWhy")}
                 />
               )}
+              {/* One badge per reason the row is off-brief, so a row the
+                  "hide" filter would remove still says WHY while the filter
+                  is off. Same three flags the filter reads, so what is
+                  badged and what is hidden cannot drift apart. */}
               {match?.belowFollowerMin && followerMin ? (
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
                   {t("underMinBadge", { min: formatCount(followerMin) })}
+                </span>
+              ) : null}
+              {match?.genderMismatch ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                  {t("genderMismatchBadge")}
+                </span>
+              ) : null}
+              {match?.locationMismatch ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                  {t("locationMismatchBadge")}
                 </span>
               ) : null}
               {inf?.instagram_handle && <InstagramLink handle={inf.instagram_handle} className="text-xs text-gray-400" />}

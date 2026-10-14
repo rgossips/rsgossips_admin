@@ -31,7 +31,7 @@
 // app uses for the same ordering. Mirror any change there, the same way
 // gender-target.ts mirrors _shared/gender-match.ts.
 
-import { requiredGender, genderLabel } from "@/lib/gender-target";
+import { requiredGender, genderExcludes, genderLabel } from "@/lib/gender-target";
 
 export type MatchTarget = {
   categories?: string[] | null;
@@ -68,6 +68,16 @@ export type MatchResult = {
   belowFollowerMin: boolean;
   /** Known to be the gender the brief excludes. */
   genderMismatch: boolean;
+  /**
+   * Known to be outside every city the brief names.
+   *
+   * False whenever the brief names no real city — "All India" and friends
+   * are a wildcard, which is what target_cities holds on most live
+   * campaigns — and false when we hold no location for the creator, which
+   * is 86% of profiles. Like the other two flags, this is "we know they do
+   * not match", never "we cannot tell".
+   */
+  locationMismatch: boolean;
 };
 
 // Followers lead because it is the one thing every brief states and every
@@ -97,6 +107,7 @@ export function scoreApplicant(creator: MatchCreator, target: MatchTarget): Matc
   let achievable = 0;
   let belowFollowerMin = false;
   let genderMismatch = false;
+  let locationMismatch = false;
 
   const add = (
     key: MatchDimension["key"],
@@ -182,7 +193,21 @@ export function scoreApplicant(creator: MatchCreator, target: MatchTarget): Matc
     } else if (theirs === needGender) {
       add("gender", `${genderLabel(theirs) || theirs} — matches brief`, "match", WEIGHTS.gender);
     } else {
-      genderMismatch = true;
+      // The FLAG and the SCORE answer different questions, so they are set
+      // from different rules on purpose.
+      //
+      // Score: "not stated" against a brief that names a gender is a
+      // weaker fit than a confirmed match, so it earns nothing here and
+      // the applicant ranks lower.
+      //
+      // Flag: genderExcludes is the owner, mirroring the rule apply-campaign
+      // itself enforces — only a KNOWN, OPPOSITE gender is an exclusion.
+      // non_binary and prefer_not_to_say are not a contradiction, and
+      // apply-campaign accepts them. Setting the flag on them would let the
+      // admin list hide, and the bulk reject EMAIL, a creator the product
+      // deliberately allowed in — a rejection for declining to state their
+      // gender, which is not a decision anybody made.
+      genderMismatch = genderExcludes(needGender, theirs);
       add("gender", `${genderLabel(theirs) || theirs} — brief asks for ${needGender}`, "miss", WEIGHTS.gender);
     }
   }
@@ -196,6 +221,7 @@ export function scoreApplicant(creator: MatchCreator, target: MatchTarget): Matc
     } else if (cities.some((city) => where.includes(city) || city.includes(where))) {
       add("location", "city match", "match", WEIGHTS.location);
     } else {
+      locationMismatch = true;
       add("location", "different city", "miss", WEIGHTS.location);
     }
   }
@@ -220,6 +246,7 @@ export function scoreApplicant(creator: MatchCreator, target: MatchTarget): Matc
     dimensions,
     belowFollowerMin,
     genderMismatch,
+    locationMismatch,
   };
 }
 
