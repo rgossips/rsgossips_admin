@@ -217,14 +217,19 @@ export default async function CampaignDetailPage({
             />
           )}
           {/* The second intake path. Same seats, different door.
-              whitespace-nowrap because this label is two words where
-              "Sourcing" was one: without it the text wrapped inside the
-              fixed h-9 and the button read as squashed beside its
-              single-line neighbours. */}
+
+              Sized to match Edit, the status dropdown and Delete exactly
+              — px-4 py-2.5 text-sm — rather than carrying its own h-9
+              px-3 text-[13px], which rendered it 36px tall in a row of
+              40px buttons with smaller text and tighter padding. A fixed
+              height is what made the two-word label need a wrap guard in
+              the first place; the padding now sets the height, as it does
+              for every neighbour, and whitespace-nowrap only keeps the
+              label on one line in a tight row. */}
           {canWrite && (
             <Link
               href={`/dashboard/campaigns/${campaign.campaign_id}/sourcing`}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-[13px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
             >
               Outreach tracker
             </Link>
