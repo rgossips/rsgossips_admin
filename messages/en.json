@@ -462,6 +462,7 @@
       "topic": "Topic",
       "phone": "Phone",
       "preferredTime": "Preferred Time",
+      "device": "Device",
       "notes": "Notes",
       "requestedAt": "Requested",
       "status": "Status"

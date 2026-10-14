@@ -6,6 +6,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { StatusToggle } from "./_components/status-toggle";
 import { SortBar, SortLink } from "@/components/sort-controls";
 import { applySort, compareBy, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
+import { describeDevice, type DeviceInfo } from "@/lib/device-label";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,46 @@ type CallbackRow = {
   notes: string | null;
   status: string;
   created_at: string;
+  /** rgossips_web migration 086. Undefined on a row written before it. */
+  user_agent?: string | null;
 };
+
+/** What device a request came from, and how confident we are about it. */
+type DeviceOrigin = { info: DeviceInfo; guessed: boolean };
+
+// One presenter for both the card and the table, so the phone and the
+// desktop view can never describe the same request differently.
+function DeviceCell({ origin }: { origin?: DeviceOrigin }) {
+  if (!origin || !origin.info.label) {
+    return <span className="text-[13px] text-gray-400">—</span>;
+  }
+  const { info, guessed } = origin;
+  // An in-app webview is the one worth making loud: it is the most
+  // constrained place our pages run and the likeliest explanation for
+  // "I tapped it and nothing happened".
+  const tone =
+    info.surface === "app"
+      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+      : info.surface === "webview"
+        ? "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tone}`}>
+        {info.surfaceLabel}
+      </span>
+      <span className="text-[13px] text-gray-800 dark:text-gray-200">{info.label}</span>
+      {guessed && (
+        <span
+          className="cursor-help text-[11px] font-semibold text-gray-400"
+          title="Not recorded on this request — inferred from the device session that was active when it was sent."
+        >
+          ?
+        </span>
+      )}
+    </span>
+  );
+}
 
 const ROLE_BADGE: Record<string, string> = {
   influencer:
@@ -116,6 +156,56 @@ export default async function CallbacksPage({
   // page loads the whole filtered set rather than a page of it.
   if (sort.key === "requester") {
     rows = compareBy(rows, (r) => namesById[r.user_id] || "", sort.ascending);
+  }
+
+  // ── Which device each request came from ───────────────────────────────
+  //
+  // Two sources, and the UI says which one it used.
+  //
+  // RECORDED (`user_agent`, rgossips_web migration 086) is exact: the
+  // native app overrides navigator.userAgent, so the one value separates
+  // app from web and names in-app webviews too.
+  //
+  // GUESSED is for rows written before that shipped. It finds the
+  // device_sessions row whose active window covers the request. That is
+  // exact for someone with one device and a coin flip for anyone else —
+  // of the four requests on record when this was built, two matched a
+  // single session and two matched several. So it is shown with a "?" and
+  // never presented as fact. Nothing is backfilled, because writing a
+  // guess into the table would turn it into one.
+  const deviceByCallback = new Map<string, DeviceOrigin>();
+  const needGuess = rows.filter((r) => !r.user_agent);
+  for (const r of rows) {
+    if (r.user_agent) deviceByCallback.set(r.id, { info: describeDevice(r.user_agent), guessed: false });
+  }
+  if (needGuess.length > 0) {
+    const { data: sessions } = await admin
+      .from("device_sessions")
+      .select("user_id, user_agent, created_at, last_active_at")
+      .in("user_id", [...new Set(needGuess.map((r) => r.user_id))]);
+    for (const r of needGuess) {
+      const mine = (sessions || []).filter((sx) => sx.user_id === r.user_id);
+      const t = new Date(r.created_at).getTime();
+      // A device_sessions row is a long-lived DEVICE REGISTRATION, not a
+      // short session: it is created once per device and its last_active_at
+      // is bumped on every app open. So "covers this moment" is true of
+      // almost every device the person owns, and it only identifies the
+      // one in their hand when they own exactly one.
+      const covering = mine.filter(
+        (sx) =>
+          new Date(sx.created_at).getTime() <= t &&
+          t <= new Date(sx.last_active_at).getTime() + 60_000,
+      );
+      // Hence: answer only when there is ONE answer. Picking the most
+      // recently used of several looks confident and is routinely wrong —
+      // on the rows here it named a Windows browser for a request that
+      // most likely came from that person's iOS app. A blank cell says "we
+      // did not record this", which is true; a plausible wrong device
+      // sends support to the wrong place.
+      if (covering.length === 1) {
+        deviceByCallback.set(r.id, { info: describeDevice(covering[0].user_agent), guessed: true });
+      }
+    }
   }
 
   // Counts for the filter tabs (open drives the badge).
@@ -229,6 +319,10 @@ export default async function CallbacksPage({
                         <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.preferredTime")}</dt>
                         <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">{r.preferred_time || "—"}</dd>
                       </div>
+                      <div className="col-span-2">
+                        <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.device")}</dt>
+                        <dd className="mt-0.5"><DeviceCell origin={deviceByCallback.get(r.id)} /></dd>
+                      </div>
                     </dl>
 
                     {r.notes && <p className="mt-2 break-words text-[12px] text-gray-600 dark:text-gray-300">{r.notes}</p>}
@@ -247,7 +341,7 @@ export default async function CallbacksPage({
           <table className="w-full min-w-200">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-                {(["requester", "topic", "phone", "preferredTime", "notes", "requestedAt", "status"] as const).map((c) => {
+                {(["requester", "topic", "phone", "device", "preferredTime", "notes", "requestedAt", "status"] as const).map((c) => {
                   // `notes` is free text with no useful order, so it stays a
                   // plain label. Everything else gets a sort link.
                   const option = SORTS.find((o) => o.key === c);
@@ -269,7 +363,7 @@ export default async function CallbacksPage({
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                         <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,6 +419,9 @@ export default async function CallbacksPage({
                         ) : (
                           <span className="text-sm text-gray-400">—</span>
                         )}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <DeviceCell origin={deviceByCallback.get(r.id)} />
                       </td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
                         {r.preferred_time || "—"}
