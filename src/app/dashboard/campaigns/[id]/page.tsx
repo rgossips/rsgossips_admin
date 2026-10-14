@@ -10,6 +10,7 @@ import { normalizeShippingMode, type ShippingMode } from "@/lib/barter-fulfilmen
 import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
 import { CampaignReviewActions } from "./review-actions";
+import { ExportRosterButton } from "./export-roster-button";
 import { getTranslations } from "next-intl/server";
 import { listAllAuthUsers } from "@/lib/phone-search";
 
@@ -399,6 +400,13 @@ export default async function CampaignDetailPage({
                         .join(" · ")
                     : undefined
                 }
+                // Under the slots line because this is the number it
+                // explains: the sheet carries Source and Holds Seat
+                // columns, so filtering Holds Seat to Yes reproduces the
+                // figure above it exactly. Viewers may download it — it is
+                // a read — but it carries email, phone and home addresses,
+                // so the action is gated and audit-logged server-side.
+                action={<ExportRosterButton campaignId={campaign.campaign_id} />}
               />
               <StatRow label={t("campaignType")} value={typeLabels[campaign.campaign_type] || campaign.campaign_type || "—"} />
               <StatRow label={t("budgetTotal")} value={campaign.budget_total ? `₹${campaign.budget_total.toLocaleString()}` : "—"} />
@@ -499,12 +507,15 @@ function StatRow({
   value,
   sub,
   tone,
+  action,
 }: {
   label: string;
   value: string;
   /** A quieter second line under the value, for a breakdown. */
   sub?: string;
   tone?: "warn";
+  /** Something to do with this stat, sitting under the breakdown. */
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between gap-3 px-6 py-3.5">
@@ -518,6 +529,7 @@ function StatRow({
           {value}
         </span>
         {sub && <span className="text-[11px] text-gray-400">{sub}</span>}
+        {action}
       </span>
     </div>
   );

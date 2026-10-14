@@ -57,7 +57,11 @@ export type SeatCount = {
 // A creator is the same creator whether they came through the portal or a
 // DM. Prefer their profile id; fall back to the lowercased handle, which is
 // all a sourced creator has until they sign up.
-function identityOf(x: { influencer_id?: string | null; instagram_username?: string | null }): string | null {
+// Exported because the campaign roster export has to merge the same two
+// lists into one spreadsheet. If it decided for itself who counts as the
+// same creator, a file downloaded from under the "12 of 20" line could
+// show 14 people — which would make one of the two numbers wrong.
+export function identityOf(x: { influencer_id?: string | null; instagram_username?: string | null }): string | null {
   if (x.influencer_id) return `id:${x.influencer_id}`;
   const handle = String(x.instagram_username || "").trim().toLowerCase().replace(/^@/, "");
   return handle ? `ig:${handle}` : null;
