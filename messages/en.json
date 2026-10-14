@@ -2201,7 +2201,9 @@
   },
   "FilterBar": {
     "clearSelection": "Clear selection",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "search": "Search",
+    "searchHint": "Press Enter or click to search"
   },
   "MultiSelectChips": {
     "selectedCount": "{count} selected",

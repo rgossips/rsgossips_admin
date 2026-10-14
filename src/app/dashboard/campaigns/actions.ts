@@ -40,6 +40,50 @@ export async function uploadCampaignImage(formData: FormData): Promise<{ error?:
   return { url: data.publicUrl };
 }
 
+// A campaign whose application deadline has already passed can never be
+// applied to — it publishes, gets approved, and reaches nobody. The web
+// brand dialog and the brand-campaigns edge function both refuse one now,
+// but the admin console writes to the campaigns table DIRECTLY and so
+// bypassed that guard entirely.
+//
+// End-of-day semantics, matching supabase/functions/_shared/campaign-dates.ts:
+// a deadline of TODAY is still open. The calendar date is read out of the
+// string rather than via new Date(), because the stored values carry no
+// timezone and would otherwise resolve differently depending on the server's
+// zone — the exact defect that made a same-day deadline read as closed.
+function deadlineAlreadyPassed(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const ymd = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!ymd) return false;
+  const endOfDay = Date.UTC(
+    Number(ymd[1]),
+    Number(ymd[2]) - 1,
+    Number(ymd[3]),
+    23, 59, 59, 999,
+  );
+  return endOfDay < Date.now();
+}
+
+const DEADLINE_IN_PAST =
+  "The application deadline has already passed. Pick today or a later date, or creators will never be able to apply.";
+
+const END_DATE_IN_PAST =
+  "The delivery end date has already passed. Pick today or a later date.";
+
+const START_DATE_IN_PAST =
+  "Pick a start date from today onwards for a new campaign.";
+
+const DEADLINE_BEFORE_START =
+  "The application deadline cannot be before the campaign start date.";
+
+// yyyy-mm-dd sorts chronologically, so a string compare is enough — and it
+// avoids Date parsing, which has no timezone on these values.
+function deadlineIsBeforeStart(start?: string | null, deadline?: string | null): boolean {
+  const s = (start || "").slice(0, 10);
+  const d = (deadline || "").slice(0, 10);
+  return !!s && !!d && d < s;
+}
+
 export async function createCampaign(formData: FormData): Promise<{ error?: string; success?: boolean }> {
   const gate = await adminGate();
   if (gate) return gate;
@@ -118,6 +162,11 @@ export async function createCampaign(formData: FormData): Promise<{ error?: stri
     return { error: "Application deadline must be on or before the campaign end date" };
   }
   const finalDeadline = deadline;
+  if (deadlineAlreadyPassed(finalDeadline)) return { error: DEADLINE_IN_PAST };
+  if (deadlineAlreadyPassed(endDate)) return { error: END_DATE_IN_PAST };
+  // Only on create — a running campaign legitimately started in the past.
+  if (deadlineAlreadyPassed(startDate)) return { error: START_DATE_IN_PAST };
+  if (deadlineIsBeforeStart(startDate, finalDeadline)) return { error: DEADLINE_BEFORE_START };
 
   // Parse brand selection — format is "type:id" (e.g. "registered:uuid" or "invited:uuid")
   const [brandType, brandUuid] = brandId.includes(":") ? brandId.split(":", 2) : ["registered", brandId];
@@ -574,7 +623,12 @@ export async function updateCampaign(campaignId: string, formData: FormData): Pr
   };
   if (startDate) updates.campaign_start_date = startDate;
   if (endDate) updates.campaign_end_date = endDate;
-  if (deadline) updates.application_deadline = deadline;
+  if (deadline) {
+    if (deadlineAlreadyPassed(deadline)) return { error: DEADLINE_IN_PAST };
+    updates.application_deadline = deadline;
+  }
+  if (endDate && deadlineAlreadyPassed(endDate)) return { error: END_DATE_IN_PAST };
+  if (deadlineIsBeforeStart(startDate, deadline)) return { error: DEADLINE_BEFORE_START };
   if (status) updates.status = status;
 
   // Optional brand reassignment. We allow it because the inline edit

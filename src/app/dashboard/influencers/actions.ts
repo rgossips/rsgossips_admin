@@ -71,6 +71,27 @@ export async function updateInfluencerPlan(
     subscription_plan: plan,
     billing_cycle: cycle,
     payment_gateway: "admin",
+    // Granting a plan retires any earlier cancellation — the same three
+    // columns the gateway webhooks' setUserPlan clears, and for the same
+    // reason (migration 069): getEffectivePlan() resolves to "free" once
+    // plan_expires_at has passed, whatever subscription_plan says.
+    //
+    // Leaving them out was a real, observed bug. A creator who had cancelled
+    // kept auto_renew=false and a plan_expires_at in the past; an admin
+    // comped them a tier; the consumer app still showed the old plan because
+    // the resolver read the row as lapsed; and within the hour
+    // subscription-lapse-sweep normalised subscription_plan back to "free",
+    // silently undoing the grant. Caught on @rudanboss: payment_gateway
+    // "admin", updated the same day, plan "free", plan_expires_at
+    // 2026-10-11.
+    //
+    // NULL expiry means "no known end, never lapses" — correct for a comp,
+    // which an admin ends by setting the plan back rather than by a date.
+    // Only paid tiers are settable here (starter/pro/elite), so this always
+    // applies.
+    auto_renew: true,
+    subscription_cancelled_at: null,
+    plan_expires_at: null,
     updated_at: new Date().toISOString(),
   };
   if (templateNoLongerAllowed) update.media_kit_template = "classic";

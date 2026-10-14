@@ -156,10 +156,25 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
   );
   // "total" | "per" — which box the admin typed in last.
   const [budgetSource, setBudgetSource] = useState<"total" | "per">("total");
+
+  // Date floors, so a campaign that is dead on arrival cannot be assembled.
+  // The deadline is floored at the LATER of today and the start date —
+  // applications must not close before the campaign has begun.
+  //
+  // The start floor relaxes when editing a campaign that already began —
+  // pinning it to today would make a running campaign's own start date
+  // invalid and unsavable.
+  const todayInput = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
   const [tier, setTier] = useState(initial?.target_influencer_tier || "all");
   const [followerMin, setFollowerMin] = useState(initial?.target_follower_min ? String(initial.target_follower_min) : "");
   const [followerMax, setFollowerMax] = useState(initial?.target_follower_max ? String(initial.target_follower_max) : "");
   const [startDate, setStartDate] = useState(initial?.campaign_start_date?.split("T")[0] || "");
+  const startDateMin = initial && startDate && startDate < todayInput ? startDate : todayInput;
+  // yyyy-mm-dd sorts chronologically, so a plain string compare is safe.
+  const deadlineMin = startDate && startDate > todayInput ? startDate : todayInput;
   const [endDate, setEndDate] = useState(initial?.campaign_end_date?.split("T")[0] || "");
   const [applicationDeadline, setApplicationDeadline] = useState(initial?.application_deadline?.split("T")[0] || "");
   const [minEngagement, setMinEngagement] = useState(initial?.min_engagement_rate ? String(initial.min_engagement_rate) : "");
@@ -1025,6 +1040,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 name="campaign_start_date"
                 type="date"
                 required
+                min={startDateMin}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className={inputClass}
@@ -1036,6 +1052,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 name="application_deadline"
                 type="date"
                 required
+                min={deadlineMin}
                 value={applicationDeadline}
                 onChange={(e) => setApplicationDeadline(e.target.value)}
                 className={inputClass}
@@ -1048,6 +1065,7 @@ export function CreateCampaignForm({ brands, initial }: { brands: Brand[]; initi
                 name="campaign_end_date"
                 type="date"
                 required
+                min={todayInput}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 className={inputClass}

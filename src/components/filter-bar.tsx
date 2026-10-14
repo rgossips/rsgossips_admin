@@ -28,45 +28,70 @@ function DebouncedInput({
   initialValue: string;
   onDebouncedChange: (name: string, value: string) => void;
 }) {
+  const t = useTranslations("FilterBar");
   const [value, setValue] = useState(initialValue);
-  const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Hold the callback in a ref rather than depending on it. It's a
-  // useCallback over `searchParams`, so its identity changes on EVERY
-  // navigation — as an effect dep it re-armed the debounce after our own
-  // push, which pushed again, and so on: an endless ?_rsc= refetch loop.
+  // Searching is EXPLICIT: Enter, or the button. It used to fire on a 400ms
+  // debounce after every keystroke, and each fire is a full server round
+  // trip — these pages are server components that re-run their whole query
+  // from the URL — so typing a handle cost several searches of which only
+  // the last was wanted. On a slow list that is both the perceived lag and
+  // a pile of avoidable load.
+  //
+  // Keeping the callback in a ref is still worth it: it is a useCallback
+  // over `searchParams`, so its identity changes on every navigation.
   const cbRef = useRef(onDebouncedChange);
   useEffect(() => {
     cbRef.current = onDebouncedChange;
   });
 
-  // Sync when URL params change externally (e.g. clear filters)
+  // Sync when URL params change externally (e.g. Clear filters).
   useEffect(() => {
     setValue(initialValue);
   }, [initialValue]);
 
-  useEffect(() => {
-    // Already in sync with the URL, so there's nothing to push. This covers
-    // the first render and — crucially — the settle after our own push, which
-    // is what stops the loop rather than merely delaying it.
+  // Nothing to do when the box already matches the URL — pressing Enter on
+  // an unchanged term should not re-run the query.
+  const submit = () => {
     if (value === initialValue) return;
-    if (timeout.current) clearTimeout(timeout.current);
-    timeout.current = setTimeout(() => {
-      cbRef.current(name, value);
-    }, 400);
-    return () => {
-      if (timeout.current) clearTimeout(timeout.current);
-    };
-  }, [value, initialValue, name]);
+    cbRef.current(name, value);
+  };
+
+  const dirty = value !== initialValue;
 
   return (
-    <input
-      type="text"
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      className="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-    />
+    <div className="flex items-stretch">
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        className="px-3 py-2 rounded-l-lg bg-white dark:bg-gray-800 border border-r-0 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        aria-label={t("search")}
+        title={t("searchHint")}
+        className={`px-3 rounded-r-lg border text-sm transition-colors ${
+          dirty
+            ? "bg-indigo-500 border-indigo-500 text-white hover:bg-indigo-600 cursor-pointer"
+            : "bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-400 cursor-default"
+        }`}
+      >
+        {/* Inline SVG — this repo has no lucide-react. */}
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.2-3.2" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
