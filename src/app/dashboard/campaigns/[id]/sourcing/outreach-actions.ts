@@ -110,6 +110,95 @@ export type MoveResult = { error?: string; success?: boolean };
  * stops two admins on the same row from both "approving" a quote, and what
  * makes a stale tab harmless.
  */
+/**
+ * Put an approved creator on the campaign as a real application.
+ *
+ * This is the handoff: the tracker finds and negotiates, and the moment the
+ * quote is signed off the creator belongs on the campaign's application
+ * list beside everyone who applied through the portal.
+ *
+ * MOST SOURCED CREATORS HAVE NO ACCOUNT — 51 of 65 when this was written —
+ * so the row hangs off their INVITATION (rgossips_web migration 088) rather
+ * than a profile. ensureInvitation has already created that invitation, so
+ * there is always something to attach to. When they do sign up, the claim
+ * trigger fills influencer_id and the application is simply there on their
+ * profile, which is the point: the record waits for them instead of being
+ * lost because they had not joined yet.
+ *
+ * Deliberately NOT updateApplicationStatus: that emails the creator AND the
+ * brand and sends a push. Nobody applied here — an admin negotiated this by
+ * DM — so there is no decision for the creator to be told about, and most
+ * of them have no account to tell. A direct write fires nothing; there is
+ * no trigger on this table.
+ *
+ * Idempotent by lookup, because a retry after a half-failed handoff must
+ * not create a second application for the same creator.
+ */
+async function applicationForBooking(
+  admin: ReturnType<typeof createAdminClient>,
+  booking: Record<string, unknown>,
+): Promise<{ id?: string; error?: string }> {
+  const campaignId = String(booking.campaign_id);
+  const influencerId = booking.influencer_id ? String(booking.influencer_id) : null;
+  const invitationId = booking.invitation_id ? String(booking.invitation_id) : null;
+
+  if (!influencerId && !invitationId) {
+    // The CHECK in 087 would refuse this anyway; saying so plainly beats a
+    // constraint violation surfacing as "could not save".
+    return { error: "This creator is not linked to a profile or an invitation yet, so they cannot be added to the campaign." };
+  }
+
+  // Already there? Either from a previous attempt, or because they applied
+  // through the portal themselves while we were negotiating.
+  let existing = admin.from("campaign_applications").select("id").eq("campaign_id", campaignId).limit(1);
+  existing = influencerId
+    ? existing.eq("influencer_id", influencerId)
+    : existing.eq("influencer_invitation_id", invitationId as string);
+  const { data: found } = await existing;
+  if (found?.length) return { id: String(found[0].id) };
+
+  // Paise on the booking, RUPEES on the application. The likeliest bug in
+  // anything that touches both tables.
+  const toRupees = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.round(v / 100) : null;
+
+  const { data: created, error } = await admin
+    .from("campaign_applications")
+    .insert({
+      campaign_id: campaignId,
+      influencer_id: influencerId,
+      influencer_invitation_id: invitationId,
+      // An existing status rather than a new one: the consumer app routes
+      // it, seats.ts counts it, and the brand app understands it. The admin
+      // list relabels it for outreach rows.
+      status: "approved",
+      // Nobody applied — we went to them. apply-campaign writes
+      // "influencer" on every portal application, so this one value
+      // separates the two sources everywhere.
+      initiated_by: "admin",
+      proposed_rate: toRupees(booking.quoted_fee_paise),
+      final_agreed_rate: toRupees(booking.agreed_fee_paise),
+      shipping_address: booking.shipping_address || null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) {
+    // influencer_invitation_id is 087. Without it the insert fails with
+    // 42703 and the admin would read a database error for a button that
+    // simply is not live yet.
+    if (String(error?.code) === UNDEFINED_COLUMN) {
+      logError("outreach.handoff", error, { hint: "migration 088 not applied" });
+      return {
+        error:
+          "Adding an approved creator to the campaign needs database migration 088 applied. Until then they stay in the tracker.",
+      };
+    }
+    return { error: friendlyDbError("outreach.handoff", error, "Could not add them to the campaign") };
+  }
+  return { id: String(created.id) };
+}
+
 export async function moveBooking(
   campaignId: string,
   bookingId: string,
@@ -264,6 +353,16 @@ export async function moveBooking(
       break;
   }
 
+  // The handoff happens BEFORE the stage write, so a failure leaves the
+  // booking exactly where it was and the admin can press again. The reverse
+  // order would mark a creator as handed over to an application that does
+  // not exist.
+  if (spec.to === "handed_off") {
+    const app = await applicationForBooking(admin, booking);
+    if (app.error) return { error: app.error };
+    updates.application_id = app.id;
+  }
+
   const { error } = await admin
     .from("campaign_bookings")
     .update(updates)
@@ -285,11 +384,14 @@ export async function moveBooking(
   // Money moves and the decisions that lead to them go in the activity log
   // AND the admin audit log — the first is for the team, the second is for
   // whoever asks later who approved what.
-  if (["approveQuote", "markReimbursed", "closeDeal", "approveCreator", "dropCreator"].includes(moveId)) {
+  if (["approveQuote", "handOver", "markReimbursed", "closeDeal", "approveCreator", "dropCreator"].includes(moveId)) {
     await auditLog("outreach_move", actorId, `${campaignId}/${bookingId}: ${spec.verb}${detail}`);
   }
 
   revalidatePath(`/dashboard/campaigns/${campaignId}/sourcing`);
+  // A handoff adds a row to the campaign's application list and fills a
+  // seat, so the detail page is stale the moment this returns.
+  if (spec.to === "handed_off") revalidatePath(`/dashboard/campaigns/${campaignId}`);
   return { success: true };
 }
 

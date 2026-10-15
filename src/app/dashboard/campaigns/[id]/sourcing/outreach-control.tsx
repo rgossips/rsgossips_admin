@@ -60,7 +60,8 @@ const MOVE_LABEL: Record<MoveId, string> = {
   markReached: "Mark as reached out",
   submitQuote: "Send for approval",
   declined: "Creator declined",
-  approveQuote: "Approve quote",
+  approveQuote: "Approve quote and add to campaign",
+  handOver: "Add to campaign now",
   negotiate: "Negotiate further",
   markReimbursed: "Product bought and reimbursed",
   submitContent: "Send content for review",
@@ -72,6 +73,7 @@ const MOVE_LABEL: Record<MoveId, string> = {
 };
 
 const PRIMARY_MOVES = new Set<MoveId>([
+  "handOver",
   "approveCreator",
   "markReached",
   "submitQuote",

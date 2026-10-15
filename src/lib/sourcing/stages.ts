@@ -24,6 +24,7 @@ export const BOOKING_STAGES = [
   "shortlisted",
   "outreach",
   "quote_review",
+  "handed_off",
   "product",
   "content",
   "content_review",
@@ -53,6 +54,16 @@ export const PIPELINE: StageSpec[] = [
   { id: "shortlisted", label: "Shortlisted", actor: "team", next: "Reach out by email or DM" },
   { id: "outreach", label: "In outreach", actor: "team", next: "Close on a quote" },
   { id: "quote_review", label: "Quote approval", actor: "approver", next: "Approve the agreed quote" },
+  // Where the tracker ends. Approving the quote creates a real application
+  // on the campaign and the ordinary application flow takes the creator the
+  // rest of the way, so there is nothing left to do HERE.
+  { id: "handed_off", label: "On the campaign", actor: null, next: "Tracked as an application" },
+  // ── Legacy, kept only because live rows sit in them ─────────────────
+  // These ran the collaboration inside the tracker before the handoff
+  // existed. Nothing moves INTO them any more; the three bookings that
+  // were already here are offered the same hand-over move so they can
+  // finish the normal way. Deleting them would invalidate those rows and
+  // lose the history of what the tracker used to do.
   { id: "product", label: "Product & reimburse", actor: "team", next: "Creator buys product, team reimburses" },
   { id: "content", label: "Content in progress", actor: "team", next: "Collect review and reels" },
   { id: "content_review", label: "Content review", actor: "approver", next: "Review the submitted content" },
@@ -100,9 +111,22 @@ export const STAGE_STYLE: Record<string, string> = Object.fromEntries(
   ]),
 );
 
-/** Still being worked, as opposed to closed or dropped. */
+/** Still being worked, as opposed to handed over, closed or dropped. */
 export function isActiveStage(stage: string): boolean {
-  return stage !== "closed" && stage !== "dropped";
+  return stage !== "handed_off" && stage !== "closed" && stage !== "dropped";
+}
+
+/**
+ * The tracker has finished with this booking — the campaign's application
+ * list has the creator now.
+ *
+ * Deliberately a STAGE and not merely "application_id is set": the stage is
+ * what the UI reads everywhere, and a booking whose application row was
+ * later deleted should still read as handed over rather than silently
+ * reappearing in the queue as if nobody had approved it.
+ */
+export function isHandedOff(stage: string): boolean {
+  return stage === "handed_off";
 }
 
 // Which stages occupy one of the campaign's seats.
@@ -119,6 +143,10 @@ export function isActiveStage(stage: string): boolean {
 // and delivered.
 //
 // See lib/sourcing/seats.ts, which owns the total across both intake paths.
+// `handed_off` is NOT here, and that is load counting, not an oversight:
+// once a booking becomes an application the APPLICATION holds the seat, and
+// counting both would show 2 of 20 taken for one creator. seats.ts skips
+// handed-over bookings for the same reason.
 export const SEAT_HOLDING_STAGES: BookingStage[] = [
   "product",
   "content",

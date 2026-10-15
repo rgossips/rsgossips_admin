@@ -99,6 +99,7 @@ export type MoveId =
   | "submitQuote"
   | "declined"
   | "approveQuote"
+  | "handOver"
   | "negotiate"
   | "markReimbursed"
   | "submitContent"
@@ -114,7 +115,8 @@ export const MOVES: Record<MoveId, { to: BookingStage; verb: string }> = {
   markReached: { to: "outreach", verb: "reached out" },
   submitQuote: { to: "quote_review", verb: "sent agreed quote for approval" },
   declined: { to: "dropped", verb: "marked creator declined" },
-  approveQuote: { to: "product", verb: "approved quote" },
+  approveQuote: { to: "handed_off", verb: "approved the quote and placed them on the campaign" },
+  handOver: { to: "handed_off", verb: "placed them on the campaign" },
   negotiate: { to: "outreach", verb: "asked to negotiate further" },
   markReimbursed: { to: "content", verb: "marked product bought and reimbursed" },
   submitContent: { to: "content_review", verb: "sent content for review" },
@@ -163,10 +165,17 @@ export const MOVES_FROM: Record<string, MoveId[]> = {
   shortlisted: ["markReached"],
   outreach: ["submitQuote", "declined"],
   quote_review: ["approveQuote", "negotiate"],
-  product: ["markReimbursed"],
-  content: ["submitContent"],
-  content_review: ["approveContent", "requestChanges"],
-  payout: ["closeDeal"],
+  // Terminal. The campaign's application list has them now.
+  handed_off: [],
+  // ── Legacy stages ───────────────────────────────────────────────────
+  // Nothing moves into these any more; they hold the bookings that were
+  // mid-collaboration when the tracker still ran the whole thing. Each is
+  // offered the hand-over so it can rejoin the normal flow, and keeps its
+  // old forward move so an admin part-way through is not stranded.
+  product: ["handOver", "markReimbursed"],
+  content: ["handOver", "submitContent"],
+  content_review: ["handOver", "approveContent", "requestChanges"],
+  payout: ["handOver", "closeDeal"],
   closed: [],
   dropped: ["reopen"],
 };
@@ -177,5 +186,7 @@ export function movesFrom(stage: string): MoveId[] {
 
 /** Reopening a dropped row is an approver's call, not the team's. */
 export function moveNeedsApprover(move: MoveId): boolean {
-  return move === "reopen";
+  // handOver puts a creator on the campaign and fills a seat, which is the
+  // same decision approveQuote makes — so it needs the same signature.
+  return move === "reopen" || move === "handOver";
 }

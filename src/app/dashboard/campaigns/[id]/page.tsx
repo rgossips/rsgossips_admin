@@ -11,6 +11,7 @@ import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
 import { CampaignReviewActions } from "./review-actions";
 import { ExportRosterButton } from "./export-roster-button";
+import { invitationAsProfile } from "@/lib/invitation-meta";
 import { getTranslations } from "next-intl/server";
 import { listAllAuthUsers } from "@/lib/phone-search";
 
@@ -43,6 +44,31 @@ export default async function CampaignDetailPage({
     .select("*, influencer_profiles(full_name, username, profile_photo_url, followers_count, instagram_handle, categories, bio, engagement_rate, email, media_kit_published, location, gender)")
     .eq("campaign_id", id)
     .order("created_at", { ascending: false });
+
+  // An application can belong to an INVITATION rather than a profile — an
+  // outreach creator approved before they ever signed up (rgossips_web
+  // migration 088). PostgREST returns no influencer_profiles for those, so
+  // without this the row would render with no name, no handle and no
+  // followers, and the match scorer would read every dimension as unknown.
+  //
+  // Dressed as a profile HERE, once, rather than teaching the list, the
+  // scorer and the Excel export that a creator comes in two shapes.
+  const unlinked = (applications || []).filter(
+    (a) => !a.influencer_profiles && a.influencer_invitation_id,
+  );
+  if (unlinked.length > 0) {
+    const { data: invites } = await supabase
+      .from("influencer_invitations")
+      .select("id, full_name, instagram_username, profile_photo_url, notes")
+      .in("id", [...new Set(unlinked.map((a) => a.influencer_invitation_id))]);
+    const byId = new Map((invites || []).map((i) => [String(i.id), i]));
+    for (const a of unlinked) {
+      const inv = byId.get(String(a.influencer_invitation_id));
+      // A missing invitation leaves the row as it was. Better a sparse row
+      // than a fabricated creator.
+      if (inv) a.influencer_profiles = invitationAsProfile(inv);
+    }
+  }
 
   // Resolve brand info from either registered profile or invitation
   const brandName = campaign.brand_profiles?.brand_name || campaign.brand_invitations?.brand_name || "—";

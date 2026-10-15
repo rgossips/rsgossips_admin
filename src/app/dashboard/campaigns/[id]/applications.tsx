@@ -28,6 +28,8 @@ interface Application {
   campaign_id: string;
   influencer_id: string;
   initiated_by: string;
+  /** Set when the application came from the outreach tracker (migration 088). */
+  influencer_invitation_id?: string | null;
   proposed_rate: number | null;
   brand_offered_rate: number | null;
   final_agreed_rate: number | null;
@@ -142,6 +144,20 @@ function MatchBadge({ result, label, whyLabel }: { result: MatchResult; label: s
   );
 }
 
+/**
+ * Did this creator come to us, or did we go to them?
+ *
+ * Two markers because there are two cases. An outreach creator who never
+ * signed up has an invitation id and no profile; one who HAD signed up has
+ * a normal influencer_id and would otherwise be indistinguishable from a
+ * portal applicant — so the handoff also stamps initiated_by "admin", which
+ * apply-campaign never writes (it writes "influencer" on all 897 live
+ * portal applications).
+ */
+function isFromOutreach(a: { initiated_by?: string | null; influencer_invitation_id?: string | null }): boolean {
+  return !!a.influencer_invitation_id || a.initiated_by === "admin";
+}
+
 export function ApplicationsList({
   campaignId,
   applications,
@@ -221,6 +237,12 @@ export function ApplicationsList({
   // The brief has to name something for a dimension to count at all: the
   // scorer drops "All India" and friends as the wildcard they are, so a
   // campaign open to the whole country never reports a location mismatch.
+  // Where this campaign's applicants came from. Both numbers are shown
+  // only when both are non-zero: on a campaign nobody was sourced for,
+  // "26 from the portal · 0 from outreach" is noise.
+  const fromOutreach = useMemo(() => scored.filter((s) => isFromOutreach(s.app)).length, [scored]);
+  const fromPortal = applications.length - fromOutreach;
+
   const offBrief = useMemo(
     () => ordered.filter((s) => s.match.belowFollowerMin || s.match.genderMismatch || s.match.locationMismatch),
     [ordered],
@@ -291,6 +313,11 @@ export function ApplicationsList({
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs">
           {pending > 0 && <span className="text-amber-600 dark:text-amber-400 font-semibold">{t("pendingCount", { count: pending })}</span>}
+          {fromOutreach > 0 && (
+            <span className="text-gray-500 dark:text-gray-400" title={t("sourceSplitHint")}>
+              {t("sourceSplit", { portal: fromPortal, outreach: fromOutreach })}
+            </span>
+          )}
           {approved > 0 && <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{t("approvedCount", { count: approved })}</span>}
           <label className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
             <span>{t("sortLabel")}</span>
@@ -570,6 +597,14 @@ function ApplicationRow({
               {match?.belowFollowerMin && followerMin ? (
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
                   {t("underMinBadge", { min: formatCount(followerMin) })}
+                </span>
+              ) : null}
+              {/* Says how this creator got here. Only on outreach rows: the
+                  portal is the default and badging all 897 of those would be
+                  labelling the norm. */}
+              {isFromOutreach(application) ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                  {t("fromOutreachBadge")}
                 </span>
               ) : null}
               {match?.genderMismatch ? (
