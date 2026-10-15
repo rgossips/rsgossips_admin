@@ -58,6 +58,10 @@ function campaignSorts(label: (k: string) => string): SortOption[] {
     { key: "brand", column: "created_at", label: label("brand"), defaultDir: "asc" },
     { key: "status", column: "status", label: label("status"), defaultDir: "asc" },
     { key: "slots", column: "max_influencers", label: label("slots"), defaultDir: "desc", nullsLast: true },
+    // Biggest first on the first click — the reason to sort by budget is to
+    // find the campaigns with money in them. nullsLast is belt and braces:
+    // every row carries a value today, but a future insert need not.
+    { key: "budget", column: "budget_total", label: label("budget"), defaultDir: "desc", nullsLast: true },
     { key: "start", column: "campaign_start_date", label: label("start"), defaultDir: "desc", nullsLast: true },
     { key: "deadline", column: "application_deadline", label: label("deadline"), defaultDir: "asc", nullsLast: true },
   ];
@@ -96,7 +100,7 @@ export default async function CampaignsPage({
     // several times over outweigh the rest of the payload. Same shape as the
     // influencer list selecting instagram_access_token purely to derive a
     // status from it.
-    .select("campaign_id, title, status, max_influencers, campaign_start_date, campaign_end_date, application_deadline, target_categories, brand_id, brand_invitation_id, created_by_admin, description, brand_profiles(brand_name), brand_invitations(brand_name)");
+    .select("campaign_id, title, status, max_influencers, budget_total, campaign_start_date, campaign_end_date, application_deadline, target_categories, brand_id, brand_invitation_id, created_by_admin, description, brand_profiles(brand_name), brand_invitations(brand_name)");
   query = applySort(query, sort);
 
   if (searchTerm) {

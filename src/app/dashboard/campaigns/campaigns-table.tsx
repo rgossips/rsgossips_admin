@@ -19,6 +19,8 @@ interface Campaign {
   title: string | null;
   status: string | null;
   max_influencers: number | null;
+  /** Rupees, not paise. 0 on every barter campaign — 55 of the 78 live. */
+  budget_total: number | null;
   campaign_start_date: string | null;
   campaign_end_date: string | null;
   application_deadline: string | null;
@@ -28,6 +30,14 @@ interface Campaign {
   created_by_admin: boolean | null;
   brand_profiles: { brand_name: string | null } | null;
   brand_invitations: { brand_name: string | null } | null;
+}
+
+// A barter campaign has no cash budget and stores 0, which is 55 of the 78
+// live campaigns — printing "₹0" down the column would be noise standing in
+// for "not applicable". Falsy covers both 0 and null, and matches what the
+// campaign detail page already renders.
+function formatBudget(v: number | null | undefined): string {
+  return v ? `₹${v.toLocaleString("en-IN")}` : "—";
 }
 
 const statusColors: Record<string, string> = {
@@ -172,7 +182,9 @@ export function CampaignsTable({
   };
 
   const showChecks = isSuperAdmin;
-  const colSpan = showChecks ? 6 : 5;
+  // title, brand, status, slots, budget, dates — plus the checkbox
+  // column when bulk delete is available.
+  const colSpan = showChecks ? 7 : 6;
 
   return (
     <>
@@ -255,7 +267,7 @@ export function CampaignsTable({
                   />
                 </th>
               )}
-              {(["title", "brand", "status", "slots", "dates"] as const).map((c) => {
+              {(["title", "brand", "status", "slots", "budget", "dates"] as const).map((c) => {
                 // The Dates cell shows the start date, so its header sorts
                 // by that; the application deadline is offered in the sort
                 // menu, which has room to name both.
@@ -375,6 +387,10 @@ function Row({
             <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">{campaign.max_influencers ?? "—"}</dd>
           </div>
           <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.budget")}</dt>
+            <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">{formatBudget(campaign.budget_total)}</dd>
+          </div>
+          <div>
             <dt className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("columns.dates")}</dt>
             <dd className="mt-0.5 text-[13px] text-gray-800 dark:text-gray-200">
               {formatDate(campaign.campaign_start_date)}
@@ -435,6 +451,9 @@ function Row({
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         {campaign.max_influencers ?? "—"}
+      </td>
+      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+        {formatBudget(campaign.budget_total)}
       </td>
       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
         <div>{formatDate(campaign.campaign_start_date)}</div>
