@@ -10,6 +10,8 @@ import { ReferralLinkCard } from "./referral-link-card";
 import { Avatar } from "@/components/avatar";
 import { InstagramLink } from "@/components/instagram-link";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
+import { PaymentMethodsCard } from "./payment-methods-card";
+import { maskPaymentMethod, type PaymentMethodRow } from "./payment-methods";
 import { applicationBadge } from "@/lib/application-status";
 import { logError } from "@/lib/log";
 import { getTranslations } from "next-intl/server";
@@ -54,6 +56,26 @@ export default async function InfluencerDetailPage({
   }
 
   const [superAdmin, canWrite] = await Promise.all([isSuperAdmin(), isAdminOrAbove()]);
+
+  // Payout details, for the admin who has to actually pay this creator —
+  // payouts have been manual since RazorpayX was removed.
+  //
+  // Only for admin and above. This page is readable by a `viewer`, and a
+  // read-only account has no reason to see somebody's bank account.
+  // Masked before it leaves the server: a value that reaches the browser
+  // is in the RSC payload whether or not it is painted, so hiding it in
+  // the markup would not be hiding it. The reveal action is gated and
+  // audit-logged.
+  let payoutMethods: PaymentMethodRow[] = [];
+  if (canWrite) {
+    const { data: pm } = await supabase
+      .from("payment_methods")
+      .select("*")
+      .eq("user_id", id)
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: true });
+    payoutMethods = ((pm || []) as PaymentMethodRow[]).map(maskPaymentMethod);
+  }
 
   // Every campaign this creator applied to, newest first. Brand name comes
   // from the registered profile or, for an admin-created campaign, the
@@ -210,6 +232,8 @@ export default async function InfluencerDetailPage({
               <InfoItem label={t("info.state")} value={inf.state || "—"} />
             </div>
           </Card>
+
+          {canWrite && <PaymentMethodsCard influencerId={id} methods={payoutMethods} />}
 
           {/* Applied campaigns — only the campaign name links out. */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">

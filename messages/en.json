@@ -1578,6 +1578,23 @@
       "doneEmailed": "Account restored. We emailed the creator to tell them.",
       "doneNoEmail": "Account restored. We have no email address for this creator, so tell them yourself — they cannot sign in until they know.",
       "doneEmailFailed": "Account restored, but the notification email failed to send. Tell the creator yourself."
+    },
+    "payouts": {
+      "title": "Payout methods",
+      "empty": "No payout method saved — this creator cannot be paid until they add one.",
+      "reveal": "Show full details",
+      "revealing": "Checking…",
+      "revealHint": "Shows the full account number. The access is recorded against your name.",
+      "revealedNote": "Full details shown · access recorded",
+      "revealFailed": "Could not load the payout details. Please try again.",
+      "upi": "UPI",
+      "bank": "Bank account",
+      "primary": "Primary",
+      "upiId": "UPI ID",
+      "accountNumber": "Account number",
+      "ifsc": "IFSC",
+      "bankName": "Bank",
+      "holder": "Account holder"
     }
   },
   "DashboardInfluencersIdChangePlan": {
