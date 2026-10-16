@@ -1829,7 +1829,10 @@
       "processedAt": "Paid on",
       "scheduledAt": "Scheduled",
       "status": "Status"
-    }
+    },
+    "owesBoth": "Pay + ship",
+    "owesProduct": "Ship product",
+    "alsoShipHint": "This campaign also sends a product to the creator, and it has not been confirmed delivered yet."
   },
   "DashboardPayoutsComponentsMarkPaidForm": {
     "markAsPaid": "Mark as paid",

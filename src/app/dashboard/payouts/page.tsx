@@ -7,6 +7,7 @@ import { FixPayoutDetails } from "./_components/fix-payout-details";
 import { BarterDeliveries } from "./_components/barter-deliveries";
 import { SortMenu } from "@/components/sort-controls";
 import { applySort, resolveSort, sortHref, type SortOption } from "@/lib/sorting";
+import { fulfilmentState, normalizeShippingMode, type ShippingMode } from "@/lib/barter-fulfilment";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,38 @@ function payoutSorts(label: (k: string) => string): SortOption[] {
     { key: "scheduledAt", column: "payout_scheduled_at", label: label("scheduledAt"), defaultDir: "desc", nullsLast: true, tiebreak },
     { key: "status", column: "payout_status", label: label("status"), defaultDir: "asc", tiebreak },
   ];
+}
+
+/**
+ * What this creator is owed, in PAISE.
+ *
+ * Two columns hold the figure and they are in different units.
+ * `escrow_amount` is paise and is written by the escrow flow;
+ * `final_agreed_rate` is RUPEES and is what an admin types on the campaign
+ * page. A barter or hand-run campaign only ever has the second, which is
+ * why the queue showed "—" for a creator the campaign page said was owed
+ * Rs 2,000. Resolved once, here, because multiplying by 100 in the wrong
+ * branch is a hundredfold error in somebody's bank transfer.
+ */
+/**
+ * Still needs the money sent.
+ *
+ * `scheduled` is the escrow flow's way of saying it; `status = payment`
+ * with no payout row is the admin flow's. Both mean an admin has to make a
+ * transfer, so both get the Mark-paid form — otherwise a creator shows in
+ * the queue with no way to action them, which is worse than not showing.
+ */
+function awaitingTransfer(app: { payout_status?: string | null; status?: string | null }): boolean {
+  if (app.payout_status === "processed" || app.payout_status === "completed") return false;
+  return app.payout_status === "scheduled" || (!app.payout_status && app.status === "payment");
+}
+
+function owedPaise(app: { escrow_amount?: number | null; final_agreed_rate?: number | null }): number | null {
+  if (typeof app.escrow_amount === "number" && Number.isFinite(app.escrow_amount)) return app.escrow_amount;
+  if (typeof app.final_agreed_rate === "number" && Number.isFinite(app.final_agreed_rate)) {
+    return Math.round(app.final_agreed_rate * 100);
+  }
+  return null;
 }
 
 const formatINR = (paise: number | null | undefined) =>
@@ -80,13 +113,26 @@ export default async function PayoutsPage({
   let q = admin
     .from("campaign_applications")
     .select(
-      "id, influencer_id, campaign_id, escrow_amount, payout_status, payout_release_at, payout_scheduled_at, payout_processed_at, payout_utr, payout_method",
+      "id, influencer_id, campaign_id, escrow_amount, final_agreed_rate, status, payout_status, payout_release_at, payout_scheduled_at, payout_processed_at, payout_utr, payout_method, shipping_address, shipping_address_requested_at, shipping_tracking_url, shipping_expected_at, product_received, product_received_at",
     );
 
-  if (filter === "scheduled") q = q.eq("payout_status", "scheduled");
+  // WHAT COUNTS AS OWED, and why this is not just payout_status.
+  //
+  // payout_status is written by the consumer app's escrow-release flow. An
+  // admin who moves an application to `payment` from the campaign page —
+  // which is how every barter and hand-run campaign gets there — never
+  // touches it. So the campaign page said "Payment released — Rs 2,000" and
+  // this queue showed "Ready to pay 0" for the same creator, because the two
+  // screens were reading different columns. Money owed is money owed however
+  // it got there, so `status = payment` with no payout_status yet counts.
+  //
+  // Constants only in these .or() strings — no user input is interpolated,
+  // which is the thing sanitizeSearchTerm exists to guard.
+  const OWED_BY_STATUS = "and(status.eq.payment,payout_status.is.null)";
+  if (filter === "scheduled") q = q.or(`payout_status.eq.scheduled,${OWED_BY_STATUS}`);
   else if (filter === "pending_creator_info") q = q.eq("payout_status", "pending_creator_info");
   else if (filter === "processed") q = q.eq("payout_status", "processed");
-  else q = q.in("payout_status", ["scheduled", "pending_creator_info", "processed", "failed"]);
+  else q = q.or(`payout_status.in.(scheduled,pending_creator_info,processed,failed),${OWED_BY_STATUS}`);
 
   // The default order depends on the tab, and both defaults are deliberate:
   // an open queue is FIFO by release date (oldest money owed first), while
@@ -111,7 +157,7 @@ export default async function PayoutsPage({
     campaignIds.length > 0
       ? admin
           .from("campaigns")
-          .select("campaign_id, title, brand_id, brand_invitation_id")
+          .select("campaign_id, title, brand_id, brand_invitation_id, description")
           .in("campaign_id", campaignIds)
       : Promise.resolve({ data: [] as any[] }),
     creatorIds.length > 0
@@ -124,6 +170,33 @@ export default async function PayoutsPage({
           .eq("is_primary", true)
       : Promise.resolve({ data: [] as any[] }),
   ]);
+
+  // Is a PRODUCT owed on this campaign too, and has it gone yet?
+  //
+  // An admin settling a creator needs to know whether they owe money, a
+  // parcel, or both — paying someone and forgetting the product is the
+  // failure this answers. Shipping mode lives in the campaign description
+  // trailer and fulfilmentState (lib/barter-fulfilment.ts) owns the stage,
+  // so neither rule is re-invented here.
+  //
+  // The separator is SIX characters. The barter-deliveries component slices
+  // sep + 5 and gets away with it only because JSON.parse tolerates the
+  // stray leading newline; spelling it correctly here avoids relying on that.
+  const CAMPAIGN_TRAILER = "\n\n---\n";
+  const shippingMode = new Map<string, ShippingMode>();
+  for (const c of (campaignsRes.data || []) as { campaign_id: string; description: string | null }[]) {
+    const desc = String(c.description || "");
+    const at = desc.indexOf(CAMPAIGN_TRAILER);
+    const json = at !== -1 ? desc.slice(at + CAMPAIGN_TRAILER.length) : desc.trim().startsWith("{") ? desc : "";
+    if (!json) continue;
+    try {
+      shippingMode.set(c.campaign_id, normalizeShippingMode(JSON.parse(json).shipping_required));
+    } catch {
+      // A malformed trailer means we simply do not know, which is the same
+      // as "nothing ships" for this chip. One bad campaign must not take
+      // the payout queue down.
+    }
+  }
 
   const creators = new Map<string, any>(
     (creatorsRes.data || []).map((c: any) => [c.influencer_id, c]),
@@ -138,13 +211,18 @@ export default async function PayoutsPage({
   // Tab counts
   const { data: allRows } = await admin
     .from("campaign_applications")
-    .select("payout_status");
-  const allStatuses = (allRows || []).map((r: any) => r.payout_status);
+    .select("payout_status, status");
+  const rows = (allRows || []) as { payout_status: string | null; status: string | null }[];
+  // Same predicate the query above uses. Written once as a function so the
+  // tab count and the list it leads to cannot drift — a tab reading 0 over
+  // a list with a row in it is exactly the bug this whole change fixes.
+  const owedWithoutPayoutRow = (r: { payout_status: string | null; status: string | null }) =>
+    !r.payout_status && r.status === "payment";
   const counts: Record<string, number> = {
-    scheduled: allStatuses.filter((s) => s === "scheduled").length,
-    pending_creator_info: allStatuses.filter((s) => s === "pending_creator_info").length,
-    processed: allStatuses.filter((s) => s === "processed").length,
-    all: allStatuses.filter((s) => !!s).length,
+    scheduled: rows.filter((r) => r.payout_status === "scheduled" || owedWithoutPayoutRow(r)).length,
+    pending_creator_info: rows.filter((r) => r.payout_status === "pending_creator_info").length,
+    processed: rows.filter((r) => r.payout_status === "processed").length,
+    all: rows.filter((r) => !!r.payout_status || owedWithoutPayoutRow(r)).length,
   };
 
   return (
@@ -205,17 +283,29 @@ export default async function PayoutsPage({
               const creator = creators.get(app.influencer_id);
               const campaign = campaigns.get(app.campaign_id);
               const pm = paymentMethods.get(app.influencer_id);
+              // Does a parcel still owe this creator too? Only campaigns
+              // that ship anything can, and fulfilmentState decides where
+              // it has got to.
+              const mode = shippingMode.get(app.campaign_id) || "no";
+              const delivery = mode === "no" ? null : fulfilmentState(app, mode).stage;
+              const productOutstanding =
+                !!delivery && delivery !== "received" && delivery !== "not_applicable";
               const statusBase = STATUS_LABEL[app.payout_status];
+              // A row owed by application status has no payout_status to
+              // label, and "—" would read as "no idea". It is ready to pay.
               const statusInfo = statusBase
                 ? { label: t(statusBase.key), class: statusBase.class }
-                : {
-                    label: app.payout_status || "—",
-                    class: "bg-slate-100 text-slate-500",
-                  };
+                : awaitingTransfer(app)
+                  ? { label: t("status.scheduled"), class: "bg-amber-50 text-amber-700" }
+                  : {
+                      label: app.payout_status || "—",
+                      class: "bg-slate-100 text-slate-500",
+                    };
               return (
                 <PayoutRow
                   key={app.id}
                   app={app}
+                  productOutstanding={productOutstanding}
                   creator={creator}
                   campaign={campaign}
                   paymentMethod={pm}
@@ -238,6 +328,7 @@ async function PayoutRow({
   campaign,
   paymentMethod,
   statusInfo,
+  productOutstanding,
   canWrite,
 }: {
   app: any;
@@ -245,6 +336,8 @@ async function PayoutRow({
   campaign: any;
   paymentMethod: any;
   statusInfo: { label: string; class: string };
+  /** A parcel is owed on this campaign as well as the money. */
+  productOutstanding: boolean;
   canWrite: boolean;
 }) {
   const t = await getTranslations("DashboardPayouts");
@@ -272,6 +365,19 @@ async function PayoutRow({
 
   const isPaid = app.payout_status === "processed";
 
+  // What is still outstanding for this creator, in one chip, because
+  // "payment or product or both" is the question an admin opens this page
+  // with. Money is implied by being in this queue at all; the chip exists
+  // to stop a parcel being forgotten once the transfer is made.
+  const owesChip = productOutstanding ? (
+    <span
+      className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+      title={t("alsoShipHint")}
+    >
+      {isPaid ? t("owesProduct") : t("owesBoth")}
+    </span>
+  ) : null;
+
   const creatorBlock = creator?.influencer_id ? (
     <Link href={`/dashboard/influencers/${creator.influencer_id}`} className="font-bold text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline">
       {creatorName}
@@ -290,10 +396,11 @@ async function PayoutRow({
           {handle && <span className="text-[11px] text-gray-400 ml-1">{handle}</span>}
           {campaign?.title && <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate mt-0.5">{campaign.title}</p>}
         </div>
-        <span className="text-sm font-black text-gray-900 dark:text-white shrink-0">{formatINR(app.escrow_amount)}</span>
+        <span className="text-sm font-black text-gray-900 dark:text-white shrink-0">{formatINR(owedPaise(app))}</span>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${statusInfo.class}`}>{statusInfo.label}</span>
+        {owesChip}
         <span className="text-[11px] text-gray-400">
           {isPaid ? `${t("paid")} · ${formatDate(app.payout_processed_at)}` : `${t("released")} · ${formatDate(app.payout_release_at || app.payout_scheduled_at)}`}
         </span>
@@ -301,7 +408,7 @@ async function PayoutRow({
       {methodLine && methodLine !== "—" && (
         <p className="text-[12px] font-mono text-gray-700 dark:text-gray-300 break-all">{methodLine}{methodHint ? ` · ${methodHint}` : ""}</p>
       )}
-      {!isPaid && app.payout_status === "scheduled" && (
+      {!isPaid && awaitingTransfer(app) && (
         <MarkPaidForm applicationId={app.id} defaultMethod={paymentMethod?.type === "upi" ? "upi" : "imps"} canWrite={canWrite} />
       )}
       {!isPaid && app.payout_status === "pending_creator_info" && (
@@ -351,12 +458,13 @@ async function PayoutRow({
 
       {/* Amount + status */}
       <div className="col-span-2">
-        <p className="text-base font-black text-gray-900 dark:text-white">{formatINR(app.escrow_amount)}</p>
+        <p className="text-base font-black text-gray-900 dark:text-white">{formatINR(owedPaise(app))}</p>
         <span
           className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${statusInfo.class}`}
         >
           {statusInfo.label}
         </span>
+        {owesChip && <span className="ml-1 inline-block">{owesChip}</span>}
       </div>
 
       {/* Payment method */}
@@ -395,7 +503,7 @@ async function PayoutRow({
 
       {/* Action */}
       <div className="col-span-2 flex justify-end">
-        {!isPaid && app.payout_status === "scheduled" && (
+        {!isPaid && awaitingTransfer(app) && (
           <MarkPaidForm
             applicationId={app.id}
             defaultMethod={paymentMethod?.type === "upi" ? "upi" : "imps"}
