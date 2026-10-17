@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { InstagramLink } from "@/components/instagram-link";
-import { PIPELINE, DROPPED, STAGE_STYLE, stageSpec, stageIndex } from "@/lib/sourcing/stages";
+import { PIPELINE, LEGACY_PIPELINE, DROPPED, STAGE_STYLE, stageSpec, stageIndex, isLegacyStage } from "@/lib/sourcing/stages";
 import { actorFor } from "@/lib/sourcing/outreach";
 import { OutreachControl, OwnerControl, type OutreachContext } from "./outreach-control";
 
@@ -95,7 +95,11 @@ export function OutreachDesk({
       // history, and leaving them in means scrolling past last month's work
       // to reach this week's.
       if (stageFilter === "all") {
-        if (b.stage === "closed" || b.stage === "dropped") return false;
+        // handed_off joins closed and dropped here: the tracker is done
+        // with them. They remain reachable through their own tile, which
+        // is the point of keeping it — "who did we put on this campaign"
+        // is a real question, it is just not a queue.
+        if (b.stage === "closed" || b.stage === "dropped" || b.stage === "handed_off") return false;
       } else if (b.stage !== stageFilter) return false;
       if (scope === "mine" && !needsMe(b)) return false;
       if (q && !`${b.creator_name || ""} ${b.instagram_username}`.toLowerCase().includes(q)) return false;
@@ -105,11 +109,21 @@ export function OutreachDesk({
 
   const countFor = (id: string) =>
     id === "all"
-      ? bookings.filter((b) => b.stage !== "closed" && b.stage !== "dropped").length
+      ? bookings.filter(
+          (b) => b.stage !== "closed" && b.stage !== "dropped" && b.stage !== "handed_off",
+        ).length
       : bookings.filter((b) => b.stage === id).length;
 
   const selected = selId ? bookings.find((b) => b.id === selId) || null : null;
 
+  // The live ladder, in order, ending at "On the campaign" — that is where
+  // the tracker finishes, so nothing may sit to the right of it and read as
+  // a later step.
+  //
+  // The legacy stages follow Dropped and ONLY when a booking is still in
+  // one. They are real and reachable, so hiding them outright would strand
+  // those rows; showing an empty one would re-suggest a path nothing takes
+  // any more.
   const tiles = [
     { id: "all", label: "All active", actor: "" },
     ...PIPELINE.map((s) => ({
@@ -118,6 +132,11 @@ export function OutreachDesk({
       actor: s.actor === "approver" ? ctx.approverName : s.actor ? "Team" : "",
     })),
     { id: DROPPED.id, label: DROPPED.label, actor: "" },
+    ...LEGACY_PIPELINE.filter((s) => bookings.some((b) => b.stage === s.id)).map((s) => ({
+      id: s.id,
+      label: s.label,
+      actor: s.actor === "approver" ? ctx.approverName : s.actor ? "Team" : "",
+    })),
   ];
 
   return (
@@ -312,6 +331,7 @@ function DetailPanel({
 }) {
   const spec = stageSpec(b.stage);
   const idx = stageIndex(b.stage);
+  const legacy = isLegacyStage(b.stage);
   const owner = ctx.admins.find((a) => a.id === b.assigned_to);
   const who = actorFor(b);
 
@@ -417,8 +437,11 @@ function DetailPanel({
         <h3 className="text-sm font-semibold">Progress</h3>
         <ol className="space-y-1.5">
           {PIPELINE.map((s, k) => {
-            const done = b.stage === "closed" ? true : idx > k;
-            const cur = b.stage !== "closed" && idx === k;
+            // A legacy booking is not on this ladder at all — stageIndex
+            // gives -1 — so it is shown as having cleared the live path it
+            // did pass through, with its real stage named beneath.
+            const done = b.stage === "closed" || legacy ? true : idx > k;
+            const cur = b.stage !== "closed" && !legacy && idx === k;
             return (
               <li
                 key={s.id}

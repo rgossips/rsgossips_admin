@@ -93,13 +93,13 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
   }
 
   const bookings = (bookingsRes.data || []) as Booking[];
-  // The tracker ends at the quote approval. A handed-over creator is on the
-  // campaign now and is worked from the application list, so leaving them in
-  // this queue would be asking someone to act on a row with nothing left to
-  // do. They are still counted — seats and the funnel below read the full
-  // list — just not queued.
-  const working = bookings.filter((b) => b.stage !== "handed_off");
-  const handedOff = bookings.length - working.length;
+  // The tracker ends at the quote approval, so a handed-over creator is no
+  // longer queued — OutreachDesk drops them from "All active" and from
+  // every stage view except their own "On the campaign" tile. The whole
+  // list is still passed down: filtering here instead would leave that
+  // tile permanently reading 0, and "who did we put on this campaign" is
+  // worth being able to answer.
+  const handedOff = bookings.filter((b) => b.stage === "handed_off").length;
 
   const events: Record<string, BookingEvent[]> = {};
   if (bookings.length) {
@@ -288,14 +288,14 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
 
           <div>
             <h2 className="mb-2 text-sm font-bold text-gray-900 dark:text-white">
-              Sourced by hand <span className="font-normal text-gray-400">({working.length})</span>
+              Sourced by hand <span className="font-normal text-gray-400">({bookings.length - handedOff})</span>
               {handedOff > 0 && (
                 <span className="ml-2 text-xs font-normal text-gray-400">
                   · {handedOff} approved and now on the campaign
                 </span>
               )}
             </h2>
-            <OutreachDesk bookings={working} ctx={outreachCtx} events={events} />
+            <OutreachDesk bookings={bookings} ctx={outreachCtx} events={events} />
           </div>
         </>
       )}

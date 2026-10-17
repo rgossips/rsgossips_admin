@@ -18,7 +18,7 @@
 // decide anything now, and they are left alone rather than wiped, because
 // they are the only record of what those rows were before the change.
 
-import { stageIndex, stageSpec, type BookingStage } from "@/lib/sourcing/stages";
+import { isLegacyStage, stageSpec, type BookingStage } from "@/lib/sourcing/stages";
 
 export type ActorContext = {
   actorId: string;
@@ -143,6 +143,12 @@ export const MOVES: Record<MoveId, { to: BookingStage; verb: string }> = {
  * could drift from it.
  */
 export function canDrop(booking: { stage: string }): boolean {
+  // Not once they are on the campaign. From `handed_off` the APPLICATION
+  // is the record: dropping the booking would free no seat (the
+  // application holds it) and would leave that application live, so the
+  // row would read "declined" while the creator was still booked. The
+  // decision belongs on the applications list from here.
+  if (booking.stage === "handed_off") return false;
   return booking.stage !== "dropped";
 }
 
@@ -156,7 +162,12 @@ export function canDrop(booking: { stage: string }): boolean {
  * typed into the box.
  */
 export function dropNeedsReason(booking: { stage: string }): boolean {
-  return stageIndex(booking.stage) >= stageIndex("product");
+  // Named explicitly rather than compared by position. `product` and the
+  // rest are no longer in PIPELINE — they are LEGACY_PIPELINE — so
+  // stageIndex returns -1 for them, and `index >= -1` is true of every
+  // stage: the old comparison would have demanded a reason for dropping
+  // somebody nobody had even contacted.
+  return isLegacyStage(booking.stage);
 }
 
 /** Which moves are offered from a stage, in button order. */

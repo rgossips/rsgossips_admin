@@ -54,16 +54,26 @@ export const PIPELINE: StageSpec[] = [
   { id: "shortlisted", label: "Shortlisted", actor: "team", next: "Reach out by email or DM" },
   { id: "outreach", label: "In outreach", actor: "team", next: "Close on a quote" },
   { id: "quote_review", label: "Quote approval", actor: "approver", next: "Approve the agreed quote" },
-  // Where the tracker ends. Approving the quote creates a real application
-  // on the campaign and the ordinary application flow takes the creator the
-  // rest of the way, so there is nothing left to do HERE.
+  // Where the tracker ends, and therefore the LAST entry here. Approving
+  // the quote creates a real application on the campaign and the ordinary
+  // application flow takes the creator the rest of the way, so there is
+  // nothing left to do in the tracker.
   { id: "handed_off", label: "On the campaign", actor: null, next: "Tracked as an application" },
-  // ── Legacy, kept only because live rows sit in them ─────────────────
-  // These ran the collaboration inside the tracker before the handoff
-  // existed. Nothing moves INTO them any more; the three bookings that
-  // were already here are offered the same hand-over move so they can
-  // finish the normal way. Deleting them would invalidate those rows and
-  // lose the history of what the tracker used to do.
+];
+
+/**
+ * Stages from before the handoff existed, when the tracker ran the whole
+ * collaboration itself.
+ *
+ * Separate from PIPELINE rather than tacked onto the end of it, because
+ * PIPELINE is "the path a creator takes" — it drives the progress ladder
+ * and the order of the stage tiles, and anything listed after
+ * `handed_off` would read as a step that comes AFTER the tracker has
+ * finished. They are still valid stages: live bookings sit in them, the DB
+ * CHECK still accepts them, and each is offered the hand-over move so it
+ * can rejoin the normal flow. Nothing ever moves into them again.
+ */
+export const LEGACY_PIPELINE: StageSpec[] = [
   { id: "product", label: "Product & reimburse", actor: "team", next: "Creator buys product, team reimburses" },
   { id: "content", label: "Content in progress", actor: "team", next: "Collect review and reels" },
   { id: "content_review", label: "Content review", actor: "approver", next: "Review the submitted content" },
@@ -71,9 +81,16 @@ export const PIPELINE: StageSpec[] = [
   { id: "closed", label: "Closed", actor: null, next: "Done" },
 ];
 
+const LEGACY_IDS = new Set<string>(LEGACY_PIPELINE.map((s) => String(s.id)));
+
+/** A stage only reachable by a booking that predates the handoff. */
+export function isLegacyStage(stage: string): boolean {
+  return LEGACY_IDS.has(stage);
+}
+
 export const DROPPED: StageSpec = { id: "dropped", label: "Dropped", actor: null, next: "Not proceeding" };
 
-const BY_ID = new Map<string, StageSpec>([...PIPELINE, DROPPED].map((s) => [s.id, s]));
+const BY_ID = new Map<string, StageSpec>([...PIPELINE, ...LEGACY_PIPELINE, DROPPED].map((s) => [s.id, s]));
 
 export function stageSpec(stage: string): StageSpec {
   // An unknown value reads as Dropped rather than throwing. A booking whose
@@ -92,14 +109,14 @@ export function isBookingStage(value: unknown): value is BookingStage {
 }
 
 export const STAGE_LABEL: Record<string, string> = Object.fromEntries(
-  [...PIPELINE, DROPPED].map((s) => [s.id, s.label]),
+  [...PIPELINE, ...LEGACY_PIPELINE, DROPPED].map((s) => [s.id, s.label]),
 );
 
 // Tone per stage, by WHO is waiting rather than by position: an admin
 // scanning the list is looking for their own work, and colouring by actor
 // makes that one glance instead of reading every label.
 export const STAGE_STYLE: Record<string, string> = Object.fromEntries(
-  [...PIPELINE, DROPPED].map((s) => [
+  [...PIPELINE, ...LEGACY_PIPELINE, DROPPED].map((s) => [
     s.id,
     s.id === "closed"
       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
