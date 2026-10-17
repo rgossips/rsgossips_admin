@@ -957,7 +957,12 @@
     "kpiTotal": "Total",
     "kpiNeedsAction": "Needs action",
     "kpiApproved": "Approved",
-    "kpiCompleted": "Completed"
+    "kpiCompleted": "Completed",
+    "searchPlaceholder": "Search by name, handle or email",
+    "searchAction": "Search",
+    "searchClear": "Clear",
+    "searchResults": "{shown} of {total} match “{query}” in this tab.",
+    "searchNoMatches": "No applicant in this tab matches that search."
   },
   "DashboardSubscriptions": {
     "title": "Subscriptions",

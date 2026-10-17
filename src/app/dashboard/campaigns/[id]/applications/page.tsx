@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pagination } from "@/components/pagination";
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -8,6 +9,12 @@ import { ApplicationsList } from "../applications";
 import { loadCampaignApplications, countByStatus } from "../load-applications";
 
 export const dynamic = "force-dynamic";
+
+// One campaign has 169 applications and the list renders a rich row for
+// each — match ranking, delivery state, deliverable links, the action
+// buttons. Rendering all of them was the page's own contribution to how
+// slow it feels.
+const PER_PAGE = 25;
 
 // The order the tabs appear in, which is the order an application moves
 // through. `rejected`/`withdrawn` sit at the end because they are outcomes,
@@ -88,12 +95,34 @@ export default async function CampaignApplicationsPage({
   }
 
   const tab = typeof sp.tab === "string" ? sp.tab : "open";
-  const visible =
+  const query = typeof sp.q === "string" ? sp.q.trim() : "";
+  const inTab =
     tab === "all"
       ? applications
       : tab === "open"
         ? applications.filter((a) => OPEN_STATUSES.has(String(a.status)))
         : applications.filter((a) => String(a.status) === tab);
+
+  // Name, handle and email — the three things an admin actually has when
+  // they are looking for someone. Matched in memory rather than through
+  // PostgREST: the page already holds every application for this campaign,
+  // so a query would be a round trip for data in hand, and it would have to
+  // reach across the influencer_profiles embed AND the invitation-backed
+  // rows that have no profile row at all.
+  const needle = query.toLowerCase();
+  const visible = needle
+    ? inTab.filter((a) => {
+        const p2 = a.influencer_profiles || {};
+        return `${p2.full_name || ""} ${p2.username || ""} ${p2.instagram_handle || ""} ${p2.email || ""}`
+          .toLowerCase()
+          .includes(needle);
+      })
+    : inTab;
+
+  // Paged AFTER the tab and the search, so the count beside the search
+  // describes the whole match and not just the slice on screen.
+  const pageNum = Math.max(1, Number(sp.page) || 1);
+  const paged = visible.slice((pageNum - 1) * PER_PAGE, pageNum * PER_PAGE);
 
   const openCount = applications.filter((a) => OPEN_STATUSES.has(String(a.status))).length;
   const tabs = [
@@ -111,6 +140,11 @@ export default async function CampaignApplicationsPage({
   const href = (id2: string) => {
     const q = new URLSearchParams();
     if (id2 !== "open") q.set("tab", id2);
+    // Carried across tabs on purpose: searching for someone and then
+    // checking another status is one task, not two.
+    if (query) q.set("q", query);
+    // Deliberately NOT carrying `page`: switching tab is a new list, and
+    // page 3 of the old one is usually past the end of the new one.
     const qs = q.toString();
     return `/dashboard/campaigns/${id}/applications${qs ? `?${qs}` : ""}`;
   };
@@ -158,13 +192,58 @@ export default async function CampaignApplicationsPage({
         </div>
       </div>
 
+      {/* A plain GET form, like the tabs are plain links: every view stays
+          a shareable URL, the back button behaves, and it needs no
+          JavaScript. The tab rides along in a hidden field so searching
+          does not silently throw you back to "Needs action". */}
+      <form method="GET" className="flex flex-wrap items-center gap-2">
+        {tab !== "open" && <input type="hidden" name="tab" value={tab} />}
+        <div className="relative min-w-0 flex-1">
+          <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+          </svg>
+          <input
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder={t("searchPlaceholder")}
+            aria-label={t("searchPlaceholder")}
+            className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100"
+          />
+        </div>
+        <button
+          type="submit"
+          className="h-10 shrink-0 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-500"
+        >
+          {t("searchAction")}
+        </button>
+        {query && (
+          <Link
+            href={tab === "open" ? `/dashboard/campaigns/${id}/applications` : `/dashboard/campaigns/${id}/applications?tab=${tab}`}
+            className="h-10 shrink-0 rounded-xl border border-gray-200 px-3 text-sm font-medium leading-10 text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {t("searchClear")}
+          </Link>
+        )}
+      </form>
+
+      {/* The tab counts above stay UNFILTERED on purpose — they answer "how
+          many are in each status", which is still true while a search is
+          running, and they are how you notice the person you want is
+          sitting under a different tab. This line is what the search did. */}
+      {query && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {t("searchResults", { shown: visible.length, total: inTab.length, query })}
+        </p>
+      )}
+
       {/* The list itself is unchanged — it already carries the match
           ranking, the off-brief filter, bulk reject and every per-row
           action. Moving it here rather than rebuilding it as a plain table
           keeps all of that working. */}
       <ApplicationsList
         campaignId={campaign.campaign_id}
-        applications={visible}
+        applications={paged}
         budgetPerInfluencer={campaign.budget_per_influencer || 0}
         campaignType={campaign.campaign_type || "barter"}
         shippingMode={shippingMode}
@@ -177,6 +256,17 @@ export default async function CampaignApplicationsPage({
           gender: targetGender,
           minEngagementRate: engagementRate,
         }}
+      />
+
+      {/* The shared control: <Link>s only, so it adds no client JS and
+          keeps the tab and the search in the URL as it pages. */}
+      <Pagination
+        basePath={`/dashboard/campaigns/${id}/applications`}
+        pageParam="page"
+        currentParams={{ tab: tab === "open" ? undefined : tab, q: query || undefined }}
+        page={pageNum}
+        perPage={PER_PAGE}
+        total={visible.length}
       />
     </div>
   );
