@@ -4,9 +4,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { CampaignDetailActions } from "./detail-actions";
 import { EditCampaignButton } from "./edit-campaign";
 import { RefreshButton } from "@/components/refresh-button";
-import { ApplicationsList } from "./applications";
+import { ApplicationsSummary } from "./applications-summary";
 import { countSeats } from "@/lib/sourcing/seats";
-import { normalizeShippingMode, type ShippingMode } from "@/lib/barter-fulfilment";
 import { isAdminOrAbove, isSuperAdmin } from "@/lib/require-super-admin";
 import { DeleteCampaignButton } from "./delete-campaign";
 import { CampaignReviewActions } from "./review-actions";
@@ -116,11 +115,6 @@ export default async function CampaignDetailPage({
   let bannerUrl: string | null = null;
   let galleryUrls: string[] = [];
   let engagementRate: number | null = null;
-  let shippingMode: ShippingMode = "no";
-  // The brief’s gender restriction lives only in the trailer, and the match
-  // ranking needs it. requiredGender() treats "Any"/both/absent as no
-  // restriction, so this being null is the common case.
-  let targetGender: string[] | null = null;
 
   const metaSeparator = description.indexOf("\n\n---\n");
   if (metaSeparator !== -1) {
@@ -131,8 +125,6 @@ export default async function CampaignDetailPage({
       bannerUrl = meta.banner_image || null;
       galleryUrls = meta.gallery_images || [];
       engagementRate = meta.min_engagement_rate || null;
-      shippingMode = normalizeShippingMode(meta.shipping_required);
-      targetGender = Array.isArray(meta.target_gender) ? meta.target_gender : null;
     } catch { /* ignore */ }
   } else if (description.startsWith("{")) {
     try {
@@ -140,17 +132,19 @@ export default async function CampaignDetailPage({
       bannerUrl = meta.banner_image || null;
       galleryUrls = meta.gallery_images || [];
       engagementRate = meta.min_engagement_rate || null;
-      shippingMode = normalizeShippingMode(meta.shipping_required);
-      targetGender = Array.isArray(meta.target_gender) ? meta.target_gender : null;
       description = "";
     } catch { /* ignore */ }
   }
 
-  const deliverableIcons: Record<string, { icon: string; color: string; bgColor: string }> = {
-    reels: { icon: "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z", color: "text-rose-600 dark:text-rose-400", bgColor: "bg-rose-50 dark:bg-rose-900/20" },
-    posts: { icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z", color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-900/20" },
-    stories: { icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z", color: "text-amber-600 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-900/20" },
-    videos: { icon: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z", color: "text-purple-600 dark:text-purple-400", bgColor: "bg-purple-50 dark:bg-purple-900/20" },
+  // Colour per deliverable type. The SVG paths that used to live here went
+  // with the icons; only the palette is still read, so the name is now
+  // slightly off but every call site uses it and renaming would touch more
+  // than it is worth.
+  const deliverableIcons: Record<string, { color: string; bgColor: string }> = {
+    reels: { color: "text-rose-600 dark:text-rose-400", bgColor: "bg-rose-50 dark:bg-rose-900/20" },
+    posts: { color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-900/20" },
+    stories: { color: "text-amber-600 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-900/20" },
+    videos: { color: "text-purple-600 dark:text-purple-400", bgColor: "bg-purple-50 dark:bg-purple-900/20" },
   };
 
   const tierLabels: Record<string, string> = {
@@ -275,6 +269,17 @@ export default async function CampaignDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Applications — the HEADLINE only.
+
+              The list itself moved to /applications, a full-width page with
+              status tabs. It had grown a match ranking, an off-brief filter,
+              bulk reject and a dozen per-row actions, and it was sitting in
+              a two-thirds column underneath the brief: the page an admin
+              opens to make decisions was the hardest place to make them.
+              What belongs here is the number and whether it needs
+              attention. */}
+          <ApplicationsSummary campaignId={campaign.campaign_id} applications={applications || []} />
+
           {/* Description */}
           {description && (
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
@@ -290,52 +295,6 @@ export default async function CampaignDetailPage({
               </div>
               <div className="p-6">
                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{description}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Applications */}
-          <ApplicationsList campaignId={campaign.campaign_id} applications={applications || []} budgetPerInfluencer={campaign.budget_per_influencer || 0} campaignType={campaign.campaign_type || "barter"} shippingMode={shippingMode} phones={Object.fromEntries(phoneMap)}
-            targeting={{
-              categories: campaign.target_categories || null,
-              cities: campaign.target_cities || null,
-              followerMin: campaign.target_follower_min,
-              followerMax: campaign.target_follower_max,
-              gender: targetGender,
-              minEngagementRate: engagementRate,
-            }}
-          />
-
-          {/* Content Deliverables */}
-          {Object.keys(deliverables).length > 0 && (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/30 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t("contentDeliverables")}</h2>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {Object.entries(deliverables).map(([type, count]) => {
-                    const config = deliverableIcons[type] || { icon: "", color: "text-gray-600", bgColor: "bg-gray-50 dark:bg-gray-800" };
-                    return (
-                      <div key={type} className={`${config.bgColor} rounded-2xl p-5 text-center`}>
-                        <div className="flex justify-center mb-2">
-                          <svg className={`w-5 h-5 ${config.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={config.icon} />
-                          </svg>
-                        </div>
-                        <p className={`text-3xl font-bold ${config.color}`}>{count}</p>
-                        <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 capitalize mt-1 uppercase tracking-wider">{type}</p>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             </div>
           )}
@@ -437,6 +396,28 @@ export default async function CampaignDetailPage({
               <StatRow label={t("campaignType")} value={typeLabels[campaign.campaign_type] || campaign.campaign_type || "—"} />
               <StatRow label={t("budgetTotal")} value={campaign.budget_total ? `₹${campaign.budget_total.toLocaleString()}` : "—"} />
               <StatRow label={t("perInfluencer")} value={campaign.budget_per_influencer ? `₹${campaign.budget_per_influencer.toLocaleString()}` : "—"} />
+              {/* Deliverables, as a row of this card rather than a card of
+                  its own. It is three numbers describing the brief, which is
+                  what every other row here is; as a full-width panel further
+                  down the page it took a whole screen band to say "1 reel, 2
+                  stories". Hidden entirely when the brief names none —
+                  an empty band read as "deliverables not set up yet". */}
+              {Object.keys(deliverables).length > 0 && (
+                <div className="px-6 py-3.5">
+                  <p className="text-[13px] text-gray-500 dark:text-gray-400">{t("contentDeliverables")}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {Object.entries(deliverables).map(([type, count]) => {
+                      const config = deliverableIcons[type] || { color: "text-gray-600", bgColor: "bg-gray-50 dark:bg-gray-800" };
+                      return (
+                        <div key={type} className={`${config.bgColor} flex items-center gap-2 rounded-xl px-3 py-2`}>
+                          <span className={`text-base font-bold ${config.color}`}>{count}</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{type}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
