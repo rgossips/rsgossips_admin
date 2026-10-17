@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { Timer, withTiming } from "@/lib/server-timing";
 
 export const updateSession = async (request: NextRequest) => {
   // Token-authenticated machine endpoints (the desktop widget). They have no
@@ -42,10 +43,16 @@ export const updateSession = async (request: NextRequest) => {
   // user — transient auth races during token refresh can briefly return null
   // and would log users out on every page refresh. The dashboard layout does
   // the actual auth gate with a proper retry-friendly check.
+  // Timed because this is the single most expensive thing on the critical
+  // path: measured against the deployed site, a bare /dashboard redirect
+  // (middleware and nothing else) costs ~680ms against ~380ms for /login,
+  // which does no Supabase work at all. That ~300ms is paid on EVERY
+  // request, including every filter and sort click.
+  const timer = new Timer();
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await timer.span("auth_getUser", () => supabase.auth.getUser());
 
   // Public routes that don't require an authenticated session:
   // - /login              the login page itself
@@ -59,15 +66,15 @@ export const updateSession = async (request: NextRequest) => {
   if (!user && !error && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return withTiming(NextResponse.redirect(url), timer);
   }
 
   // If user is logged in and tries to access login, redirect to dashboard
   if (user && request.nextUrl.pathname.startsWith("/login")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return withTiming(NextResponse.redirect(url), timer);
   }
 
-  return supabaseResponse;
+  return withTiming(supabaseResponse, timer);
 };

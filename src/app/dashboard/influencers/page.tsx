@@ -1,3 +1,4 @@
+import { Timer, logTimings } from "@/lib/server-timing";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { FilterBar } from "@/components/filter-bar";
 import { InfluencerRow, InfluencerCard } from "./influencer-row";
@@ -70,6 +71,14 @@ export default async function InfluencersPage({
 }) {
   const t = await getTranslations("DashboardInfluencers");
   const params = await searchParams;
+
+  // This page is the one people describe as slow, and the slowness is
+  // round trips rather than query time — a warm Supabase call is ~90ms
+  // while a bare middleware redirect already costs ~680ms. A page cannot
+  // set a Server-Timing header (headers() is read-only in a Server
+  // Component), so the breakdown is logged instead: one line per render
+  // in the Netlify function log.
+  const timer = new Timer();
   const { search, status, followers, category, tab, invite_page, page } = params;
   const igstatus = IG_STATUSES.includes(params.igstatus as IgStatus) ? (params.igstatus as IgStatus) : "";
   // Each validated against its allowlist before it reaches a query.
@@ -96,11 +105,11 @@ export default async function InfluencersPage({
   // Category options and the phone map are both independent of the row query
   // and of each other — started together so the page waits once, not three
   // times (every round trip crosses to the Mumbai project).
-  const [categoryOptions, authUsers, canWrite] = await Promise.all([
+  const [categoryOptions, authUsers, canWrite] = await timer.span("prefetch", () => Promise.all([
     getCreatorCategoryOptions(),
     listAllAuthUsers(supabase).catch(() => [] as AuthUserLite[]),
     isAdminOrAbove(),
-  ]);
+  ]));
 
   const filterFields = [
     { name: "search", label: t("filter.search"), type: "text" as const, placeholder: t("filter.searchPlaceholder") },
@@ -124,7 +133,7 @@ export default async function InfluencersPage({
   // number is resolved to ids here and OR-ed into the name search below.
   const phoneQuery = phoneQueryDigits(search);
   const phoneInfluencerIds = phoneQuery ? authIdsByPhone(authUsers, phoneQuery) : [];
-  const phoneInviteIds = phoneQuery ? await influencerInvitationIdsByPhone(supabase, phoneQuery) : [];
+  const phoneInviteIds = phoneQuery ? await timer.span("phoneSearch", () => influencerInvitationIdsByPhone(supabase, phoneQuery)) : [];
 
   // Fetch influencers — one page at a time. `count: exact` gives the filtered
   // total for the tab badge and the pager; the id tiebreak keeps rows with the
@@ -193,7 +202,7 @@ export default async function InfluencersPage({
   const [
     { data: influencerRows, error, count: influencerCount },
     { data: pendingInvites, error: invitesError, count: pendingInviteCount },
-  ] = await Promise.all([query, inviteQuery]);
+  ] = await timer.span("rows", () => Promise.all([query, inviteQuery]));
   const influencersTotal = influencerCount ?? 0;
   const invitesTotal = pendingInviteCount ?? 0;
   const influencers = (influencerRows || []).map(
@@ -212,12 +221,14 @@ export default async function InfluencersPage({
   // Which platforms each visible creator signs in from. Scoped to the 25
   // ids on this page, so it is one small query rather than a scan of every
   // session — and it runs after the row query because it needs those ids.
-  const platformMap = await platformsForUsers(
+  const platformMap = await timer.span("platforms", () => platformsForUsers(
     supabase,
     influencers.map((i) => i.influencer_id),
-  );
+  ));
 
   const allCount = influencersTotal + invitesTotal;
+
+  logTimings(`influencers ${params.tab || "all"}`, timer);
 
   return (
     <div>
