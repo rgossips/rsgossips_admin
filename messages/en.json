@@ -2278,7 +2278,28 @@
     "newApplicationOnOurCampaign": "New application on our campaign",
     "statusChangedOnOurCampaign": "Application {status} on our campaign",
     "markAllRead": "Mark all read",
-    "markRead": "Mark as read"
+    "markRead": "Mark as read",
+    "pageSubtitle": "Everything waiting on an admin, across every queue.",
+    "showRead": "Show cleared",
+    "truncatedNote": "Each queue shows its ten oldest items, so there may be more behind these counts.",
+    "tabs": {
+      "all": "All",
+      "needsAction": "Needs action",
+      "high": "High importance"
+    },
+    "type": {
+      "campaign_review": "Campaign review",
+      "brand_verification": "Brand verification",
+      "payout_due": "Payout due",
+      "delivery_stalled": "Delivery stalled",
+      "callback": "Callback request",
+      "quote_request": "Quote request",
+      "submission": "Deliverables",
+      "application": "Applications",
+      "admin_campaign_update": "Our campaigns"
+    },
+    "searchPlaceholder": "Search notifications",
+    "noMatches": "Nothing matches that search."
   },
   "Pagination": {
     "showing": "Showing <b>{range}</b> of <b>{count}</b>",

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { getAwaitingActionFeed, markNotificationsRead } from "@/app/dashboard/ops-actions";
 import { formatStatus } from "@/lib/format";
 
-interface Notification {
+export interface Notification {
   id: string;
   type: "quote_request" | "submission" | "application" | "campaign_review" | "brand_verification" | "payout_due" | "delivery_stalled" | "callback" | "admin_campaign_update";
   title: string;
@@ -32,9 +32,13 @@ function parseTimestamp(iso: string): number {
   return new Date(normalized).getTime();
 }
 
-export function NotificationBell() {
+// One owner for the feed, shared by the bell (which needs only the count)
+// and the notifications page (which needs the rows). The mapping from the
+// ops streams to a renderable item is ~170 lines of per-stream wording and
+// hrefs; a second copy would drift, and the first symptom would be the
+// badge disagreeing with the page it links to.
+export function useOpsNotifications() {
   const t = useTranslations("NotificationBell");
-  const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   // Dismissed items, by the bell's own synthetic id. Server-held (migration
   // 082) so the same admin on their phone sees what they already cleared at
@@ -44,15 +48,7 @@ export function NotificationBell() {
   // True when a stream came back full, so the badge count is a floor.
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,141 +244,128 @@ export function NotificationBell() {
     await markNotificationsRead(keys).catch(() => {});
   };
 
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="relative p-2.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        {unread.length > 0 && (
-          // The real number. It used to clamp to "9+", which hid the
-          // difference between ten things waiting and sixty — and the feed
-          // itself capped each stream at 10, so even the uncapped number
-          // would have been wrong. The badge widens to fit instead, and only
-          // shows a "+" when a stream genuinely hit FEED_LIMIT.
-          <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center tabular-nums">
-            {unread.length}
-            {truncated ? "+" : ""}
-          </span>
-        )}
-      </button>
+  return { notifications, readKeys, loading, truncated, unread, dismiss, formatTime };
+}
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden z-50">
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">{t("title")}</h3>
-            <div className="flex items-center gap-3">
-              {unread.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => dismiss(unread.map((n) => n.id))}
-                  className="text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400 cursor-pointer"
-                >
-                  {t("markAllRead")}
-                </button>
-              )}
-              <span className="text-[10px] font-semibold text-gray-400">
-                {unread.length}/{notifications.length}{truncated ? "+" : ""}
-              </span>
-            </div>
-          </div>
-          <div className="max-h-96 overflow-y-auto">
-            {loading ? (
-              <div className="p-6 text-center text-xs text-gray-400">{t("loading")}</div>
-            ) : notifications.length === 0 ? (
-              <div className="p-8 text-center">
-                <svg className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("empty.title")}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t("empty.subtitle")}</p>
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`group relative border-b border-gray-50 last:border-0 dark:border-gray-800 ${readKeys.has(n.id) ? "opacity-50" : ""}`}
-                >
-                {/* Marking one read without opening it. Outside the Link: a
-                    button inside an anchor is invalid, and on touch the two
-                    targets fight. */}
-                {!readKeys.has(n.id) && (
-                  <button
-                    type="button"
-                    aria-label={t("markRead")}
-                    title={t("markRead")}
-                    onClick={() => dismiss([n.id])}
-                    className="absolute right-2 top-2 z-10 hidden rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-600 group-hover:block dark:hover:bg-gray-800 cursor-pointer"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </button>
-                )}
-                <Link
-                  href={n.href}
-                  onClick={() => {
-                    // Opening it counts as reading it.
-                    dismiss([n.id]);
-                    setOpen(false);
-                  }}
-                  className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                    n.type === "quote_request"
-                      ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                      : n.type === "campaign_review"
-                      ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
-                      : n.type === "brand_verification"
-                      ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400"
-                      : n.type === "payout_due"
-                      ? "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400"
-                      : n.type === "delivery_stalled"
-                      ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
-                      : n.type === "callback"
-                      ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                      : n.type === "admin_campaign_update"
-                      ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
-                      : "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
-                  }`}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {n.type === "quote_request" ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      ) : n.type === "campaign_review" ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                      ) : n.type === "payout_due" ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      ) : n.type === "admin_campaign_update" ? (
-                        // A megaphone: our own campaign moved.
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                      ) : n.type === "callback" ? (
-                        // A telephone handset.
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      ) : n.type === "delivery_stalled" ? (
-                        // A parcel.
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      ) : n.type === "brand_verification" ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      )}
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{n.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{n.subtitle}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{formatTime(n.time)}</p>
-                  </div>
-                </Link>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+// The per-type icon and colour. Lifted verbatim out of the popover so the
+// bell's old look survives on the page that replaced it.
+function NotificationIcon({ n }: { n: Notification }) {
+  return (
+    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+      n.type === "quote_request"
+        ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+        : n.type === "campaign_review"
+        ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
+        : n.type === "brand_verification"
+        ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400"
+        : n.type === "payout_due"
+        ? "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400"
+        : n.type === "delivery_stalled"
+        ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
+        : n.type === "callback"
+        ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+        : n.type === "admin_campaign_update"
+        ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+        : "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
+    }`}>
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {n.type === "quote_request" ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        ) : n.type === "campaign_review" ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+        ) : n.type === "payout_due" ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+        ) : n.type === "admin_campaign_update" ? (
+          // A megaphone: our own campaign moved.
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+        ) : n.type === "callback" ? (
+          // A telephone handset.
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        ) : n.type === "delivery_stalled" ? (
+          // A parcel.
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        ) : n.type === "brand_verification" ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+        )}
+      </svg>
     </div>
+  );
+}
+
+/** One row. Shared by the page and anything else that lists the feed. */
+export function NotificationRow({
+  n,
+  read,
+  onDismiss,
+  formatTime,
+}: {
+  n: Notification;
+  read: boolean;
+  onDismiss: (ids: string[]) => void;
+  formatTime: (iso: string) => string;
+}) {
+  const t = useTranslations("NotificationBell");
+  return (
+    <div className={`group relative border-b border-gray-50 last:border-0 dark:border-gray-800 ${read ? "opacity-50" : ""}`}>
+      {/* Marking one read without opening it. Outside the Link: a button
+          inside an anchor is invalid, and on touch the two targets fight. */}
+      {!read && (
+        <button
+          type="button"
+          aria-label={t("markRead")}
+          title={t("markRead")}
+          onClick={() => onDismiss([n.id])}
+          className="absolute right-2 top-2 z-10 hidden rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-gray-600 group-hover:block dark:hover:bg-gray-800 cursor-pointer"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </button>
+      )}
+      <Link
+        href={n.href}
+        onClick={() => onDismiss([n.id])}
+        className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
+      >
+        <NotificationIcon n={n} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">{n.title}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{n.subtitle}</p>
+          <p className="mt-1 text-[10px] text-gray-400">{formatTime(n.time)}</p>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * The header bell: a LINK, not a popover.
+ *
+ * It used to open a 96px-tall scrolling panel that showed ten items per
+ * stream and nothing else — no filtering, no way to work through them. The
+ * full page can do both, and a badge whose only job is to say "there is
+ * something" does not need a dropdown to say it.
+ */
+export function NotificationBell() {
+  const t = useTranslations("NotificationBell");
+  const { unread } = useOpsNotifications();
+  return (
+    <Link
+      href="/dashboard/notifications"
+      aria-label={t("title")}
+      title={t("title")}
+      className="relative block rounded-lg p-2.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+      {unread.length > 0 && (
+        <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+          {unread.length > 9 ? "9+" : unread.length}
+        </span>
+      )}
+    </Link>
   );
 }

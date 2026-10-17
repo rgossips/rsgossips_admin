@@ -88,10 +88,21 @@ export const OPS_STREAMS: OpsStream[] = [
   {
     // Payouts are manual (RazorpayX was removed): a scheduled payout whose
     // release time has passed is money an admin owes a creator today.
+    //
+    // TWO shapes, because two things write them. escrow-release sets
+    // payout_status = scheduled with a release date. An admin moving an
+    // application to `payment` on the campaign page — how every barter and
+    // hand-run campaign gets there — sets neither, so money owed that way
+    // was invisible here exactly as it was on the payouts page before it
+    // learned the same lesson. One creator was owed Rs 2,000 and appeared
+    // in no queue at all.
     key: "payoutsDue",
     table: "campaign_applications",
     countColumn: "id",
-    filter: (q, now) => q.eq("payout_status", "scheduled").lte("payout_release_at", now),
+    filter: (q, now) =>
+      q.or(
+        `and(payout_status.eq.scheduled,payout_release_at.lte.${now}),and(status.eq.payment,payout_status.is.null)`,
+      ),
   },
   {
     // Barter deliveries that stalled: dispatched and overdue with no word, or
