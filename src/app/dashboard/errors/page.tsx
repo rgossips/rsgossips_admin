@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { classifyError } from "@/lib/error-triage";
+
+// Upper bound on a derived-filter scan. See the comment at its use.
+const TRIAGE_SCAN_CAP = 2000;
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
@@ -102,12 +106,15 @@ export default async function ErrorsPage({
     sort?: string;
     page?: string;
     status?: string;
+    triage?: string;
   }>;
 }) {
   if (!(await isAdminOrAbove())) redirect("/dashboard");
 
   const sp = await searchParams;
   const status = STATUSES.some((s) => s.id === sp.status) ? (sp.status as string) : "open";
+  // "Our bugs only". Derived, so PostgREST cannot filter it — see below.
+  const oursOnly = sp.triage === "critical";
   const area = sp.area || "";
   const severity = sp.severity || "";
   const source = sp.source || "";
@@ -153,13 +160,32 @@ export default async function ErrorsPage({
     if (safe) query = query.or(`message.ilike.%${safe}%,event.ilike.%${safe}%`);
   }
 
+  // WHY THIS BRANCHES. Criticality is computed from the message, the stack
+  // and the event (lib/error-triage.ts), none of which PostgREST can
+  // evaluate — the strongest signal, an extension named in the top stack
+  // frame, is a substring of a text column we would have to scan anyway.
+  // So the filtered view fetches the matching set, classifies it, and pages
+  // in memory; the ordinary view keeps its server-side .range() untouched.
+  // Capped at TRIAGE_SCAN_CAP: the whole table is 285 rows today and old
+  // rows are purged at ERROR_RETENTION_DAYS, but an unbounded fetch behind
+  // a filter chip is how a page dies quietly in six months.
+  if (oursOnly) query = applySort(admin.from("error_logs").select("*", { count: "exact" }), sort).limit(TRIAGE_SCAN_CAP);
+
   const [{ data, count, error }, oldRes] = await Promise.all([
     query,
     // How many rows the "Delete old" button would remove.
     admin.from("error_logs").select("id", { count: "exact", head: true }).lt("occurred_at", daysAgoIso(ERROR_RETENTION_DAYS)),
   ]);
   const oldCount = oldRes.count ?? 0;
-  const rows: ErrorRow[] = (data as ErrorRow[]) || [];
+  let rows: ErrorRow[] = (data as ErrorRow[]) || [];
+  // Set when the derived filter is on, because `count` then describes the
+  // scanned set rather than the matching one.
+  let triagedTotal: number | null = null;
+  if (oursOnly) {
+    const ours = rows.filter((r) => classifyError(r) === "critical");
+    triagedTotal = ours.length;
+    rows = ours.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }
 
   // Resolve each row's user_id to a creator or brand so the User column can
   // link to their detail page. user_role on the row is the caller's JWT role
@@ -182,7 +208,7 @@ export default async function ErrorsPage({
       };
     }
   }
-  const total = count ?? 0;
+  const total = triagedTotal ?? count ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Migration not applied yet — say so plainly instead of rendering an empty
@@ -240,6 +266,15 @@ export default async function ErrorsPage({
                 </select>
               </label>
             )}
+
+            {/* The one filter an admin actually wants most mornings. A
+                checkbox rather than another dropdown because it is a
+                yes/no on top of whatever else is selected, and it keeps
+                working with the status and date filters beside it. */}
+            <label className="flex h-9 cursor-pointer items-center gap-1.5 self-end rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[13px] font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">
+              <input type="checkbox" name="triage" value="critical" defaultChecked={oursOnly} className="h-3.5 w-3.5 cursor-pointer" />
+              Our bugs only
+            </label>
 
             <label className="flex flex-col gap-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Area</span>

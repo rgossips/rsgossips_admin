@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { classifyError, CLASS_LABEL, CLASS_STYLE, type TriageRow } from "@/lib/error-triage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setErrorLogStatus } from "./actions";
@@ -62,6 +63,29 @@ export type ErrorRow = {
   status?: "open" | "addressed" | null;
   addressed_at?: string | null;
 };
+
+// Severity says how loud the throw was; this says whether it is OURS.
+// A browser extension throws a TypeError exactly like our code does, so
+// without it an admin scanning for something to fix reads 285 rows of
+// which 62 are real. Derived per render — see lib/error-triage.ts for why
+// it is not a stored column.
+function TriageBadge({ row }: { row: TriageRow }) {
+  const cls = classifyError(row);
+  if (cls !== "critical") {
+    // The quiet classes get a muted chip: still visible when you look, but
+    // not competing with the thing that needs fixing.
+    return (
+      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${CLASS_STYLE[cls]}`}>
+        {CLASS_LABEL[cls]}
+      </span>
+    );
+  }
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${CLASS_STYLE[cls]}`}>
+      {CLASS_LABEL[cls]}
+    </span>
+  );
+}
 
 const SEVERITY_STYLE: Record<string, string> = {
   warn: "bg-amber-50 text-amber-700 border-amber-200",
@@ -336,6 +360,7 @@ function ErrorCard({
             <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_STYLE[r.severity] || "border-gray-200 bg-gray-50 text-gray-600"}`}>
               {r.severity}
             </span>
+            <TriageBadge row={r} />
             <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">{r.area}</span>
             {statusLive && (
               <span
@@ -467,6 +492,7 @@ function ErrorTableRow({
         <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase ${SEVERITY_STYLE[r.severity] || "border-gray-200 bg-gray-50 text-gray-600"}`}>
           {r.severity}
         </span>
+        <TriageBadge row={r} />
       </td>
       <td className="whitespace-nowrap px-3 py-2 font-semibold text-gray-700 dark:text-gray-200">{r.area}</td>
       <td className="px-3 py-2 font-mono text-[11px] text-gray-600 dark:text-gray-300">{r.event}</td>
