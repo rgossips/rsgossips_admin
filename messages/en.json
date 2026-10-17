@@ -2304,7 +2304,8 @@
       "admin_campaign_update": "Our campaigns"
     },
     "searchPlaceholder": "Search notifications",
-    "noMatches": "Nothing matches that search."
+    "noMatches": "Nothing matches that search.",
+    "readLabel": "Cleared"
   },
   "Pagination": {
     "showing": "Showing <b>{range}</b> of <b>{count}</b>",
