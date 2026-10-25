@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { EditBrandButton } from "./edit-brand";
+import { BrandVerificationCard } from "./verification-card";
 import { DeleteBrandButton } from "./delete-brand";
 import { isSuperAdmin, isAdminOrAbove } from "@/lib/require-super-admin";
 import { getTranslations } from "next-intl/server";
@@ -196,6 +197,17 @@ export default async function BrandDetailPage({
 
         {/* Right — Sidebar */}
         <div className="space-y-6">
+          {/* Verification — first, because when a brand is pending this is
+              the decision the page exists to support, and everything below
+              (GSTIN, website, contact, campaigns) is the evidence for it.
+              `!isInvited` is load-bearing, not cosmetic: an invited brand has
+              no brand_profiles row — `brand_id` here is the INVITATION id —
+              so updateBrandVerification would match zero rows and report
+              success while changing nothing. */}
+          {!isInvited && canWrite && (
+            <BrandVerificationCard brandId={brand.brand_id} initialStatus={brand.verification_status} />
+          )}
+
           {/* Overview */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">

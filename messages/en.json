@@ -368,7 +368,10 @@
     "timeline": "Timeline",
     "created": "Created",
     "updated": "Updated",
-    "rawData": "Raw Data"
+    "rawData": "Raw Data",
+    "verifyHelpPending": "This brand cannot publish campaigns until it is verified — a pending brand is blocked and waiting on us. Check the GSTIN, website and contact details below before deciding.",
+    "verifyHelpVerified": "This brand is verified and can publish campaigns. Reset it to pending to put it back in the review queue.",
+    "verifyNotifyNote": "The brand is notified of the decision in the app and on their phone. Resetting to pending is silent."
   },
   "DashboardBrandsIdEditBrand": {
     "edit": "Edit",
