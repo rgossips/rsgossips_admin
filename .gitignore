@@ -44,3 +44,8 @@ widget/dist/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI scratch state (project ref, pooler url, version pins).
+# Per-machine and rewritten on every CLI command. `cli-latest` was tracked,
+# which is why .gitignore never covered the rest of the directory.
+supabase/.temp/
