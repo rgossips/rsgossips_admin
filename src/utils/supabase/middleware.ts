@@ -8,7 +8,12 @@ export const updateSession = async (request: NextRequest) => {
   // there's no cookie to refresh. The route checks its own bearer token.
   // Same for creator nudges: the unsubscribe link (HMAC-signed) and the
   // scheduled automatic run (bearer NUDGE_SECRET).
-  if (request.nextUrl.pathname.startsWith("/api/widget/") || request.nextUrl.pathname.startsWith("/api/nudges/")) {
+  if (
+    request.nextUrl.pathname.startsWith("/api/widget/") ||
+    request.nextUrl.pathname.startsWith("/api/nudges/") ||
+    // Cron-authenticated, no browser session to redirect.
+    request.nextUrl.pathname.startsWith("/api/admin-push/")
+  ) {
     return NextResponse.next({ request });
   }
 
