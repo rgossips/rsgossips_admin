@@ -217,6 +217,17 @@ export default async function CampaignsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Housekeeping, not a daily action — a campaign ending is not an
+              event anything listens for, so undecided applicants on a
+              finished campaign wait forever unless someone looks. */}
+          {canWrite && (
+            <Link
+              href="/dashboard/campaigns/close-ended"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              {t("closeEnded")}
+            </Link>
+          )}
           <RefreshButton />
           {canWrite && (
             <Link

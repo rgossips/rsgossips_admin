@@ -744,3 +744,92 @@ function escapeHtml(s: string) {
 function escapeAttr(s: string) {
   return s.replace(/"/g, "&quot;");
 }
+
+/**
+ * One creator, SEVERAL campaigns closed at once.
+ *
+ * The sweep groups by person rather than by application, because across 43
+ * ended campaigns one creator had nine undecided applications — nine
+ * separate "your application closed" emails in a few minutes reads as a
+ * malfunction, whatever each one says. renderCampaignClosedEmail above
+ * still handles the single-campaign case (233 of 319 creators), because it
+ * can show the campaign's banner and the brand's mark; with several
+ * campaigns from several brands there is no single banner to show, so this
+ * one leads with the list instead.
+ */
+export function renderCampaignsClosedEmail({
+  fullName,
+  campaignTitles,
+  suggestionsHtml = "",
+  suggestionsText = "",
+}: {
+  fullName: string;
+  campaignTitles: string[];
+  suggestionsHtml?: string;
+  suggestionsText?: string;
+}) {
+  const n = campaignTitles.length;
+  const subject = `Update on your ${n} campaign applications`;
+  const listHtml = campaignTitles
+    .map(
+      (t) =>
+        `<li style="margin:0 0 6px 0;font-size:15px;line-height:1.6;color:#374151;"><strong>${escapeHtml(t)}</strong></li>`,
+    )
+    .join("");
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Campaigns closed</title></head>
+<body style="margin:0;padding:0;background-color:#F4F5F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1F2937;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#F4F5F8;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="540" style="max-width:540px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,0.08);">
+        <tr><td style="background:linear-gradient(135deg, #64748B 0%, #475569 100%);padding:36px 32px;text-align:center;color:#ffffff;">
+          ${emailLogo()}
+          <div style="font-size:22px;font-weight:700;margin-top:6px;">These campaigns have closed</div>
+        </td></tr>
+        <tr><td style="padding:36px 36px 28px 36px;">
+          <p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#111827;">Hi ${escapeHtml(fullName)},</p>
+          <p style="margin:0 0 14px 0;font-size:15px;line-height:1.65;color:#374151;">
+            ${n} campaigns you applied to have finished, so we're closing your applications to them:
+          </p>
+          <ul style="margin:0 0 18px 0;padding-left:20px;">${listHtml}</ul>
+          <div style="margin:0 0 20px 0;padding:14px 16px;background:#F1F5F9;border-radius:12px;border-left:3px solid #64748B;">
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#334155;">
+              <strong>This isn't a rejection.</strong> Each of them wrapped up before a decision was made on every
+              application, and yours were among them. It says nothing about your work.
+            </p>
+          </div>
+          <p style="margin:0 0 4px 0;font-size:15px;line-height:1.65;color:#374151;">
+            Sorry to leave you waiting. Here's what's open now.
+          </p>
+          ${suggestionsHtml}
+          <hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;" />
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#9CA3AF;">Questions? Just reply to this email.</p>
+        </td></tr>
+        <tr><td style="background:#F9FAFB;padding:20px 36px;text-align:center;border-top:1px solid #E5E7EB;">
+          <p style="margin:0;font-size:12px;color:#6B7280;">&copy; ${new Date().getFullYear()} RGossips &middot; <a href="https://rgossips.com" style="color:#6B7280;text-decoration:none;">rgossips.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const text = [
+    `Hi ${fullName},`,
+    "",
+    `${n} campaigns you applied to have finished, so we're closing your applications to them:`,
+    "",
+    ...campaignTitles.map((t) => `  - ${t}`),
+    "",
+    "This isn't a rejection. Each of them wrapped up before a decision was made on",
+    "every application, and yours were among them. It says nothing about your work.",
+    "",
+    "Sorry to leave you waiting. Here's what's open now.",
+    suggestionsText,
+    "",
+    "— RGossips",
+  ].join("\n");
+
+  return { subject, html, text };
+}

@@ -534,7 +534,8 @@
         "10000": "10k and up",
         "100000": "100k and up"
       }
-    }
+    },
+    "closeEnded": "Close ended"
   },
   "DashboardCampaignsCampaignFilters": {
     "searchPlaceholder": "Search campaigns or brands...",
