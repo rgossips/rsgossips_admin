@@ -52,3 +52,23 @@
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Buttons point.
+ *
+ * Tailwind v4's preflight sets `cursor: default` on buttons, reversing v3
+ * and the browser default. The portal had been papering over it one button
+ * at a time — 160 carried an explicit `cursor-pointer` and 58 did not, so
+ * whether a control looked clickable depended on who wrote it. The Apply
+ * button on the errors filter is the one that got reported, but it was
+ * never the only one.
+ *
+ * Set once here instead. `:not(:disabled)` matters: a disabled control must
+ * NOT invite a click, and the explicit `disabled:cursor-wait` on the
+ * submitting buttons still wins on specificity. The 160 explicit
+ * `cursor-pointer` classes now agree with this rather than fighting it.
+ */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterSubmit } from "@/components/filter-submit";
 import { classifyError } from "@/lib/error-triage";
 
 // Upper bound on a derived-filter scan. See the comment at its use.
@@ -325,10 +326,12 @@ export default async function ErrorsPage({
               />
             </label>
 
-            <button type="submit" className="h-9 rounded-lg bg-gray-900 px-4 text-[13px] font-semibold text-white dark:bg-gray-100 dark:text-gray-900">
-              Apply
-            </button>
-            <Link href="/dashboard/errors" className="h-9 rounded-lg border border-gray-200 px-4 text-[13px] font-semibold leading-9 text-gray-600 dark:border-gray-700 dark:text-gray-300">
+            <FilterSubmit
+              label="Apply"
+              pendingLabel="Applying…"
+              className="bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+            />
+            <Link href="/dashboard/errors" className="h-9 cursor-pointer rounded-lg border border-gray-200 px-4 text-[13px] font-semibold leading-9 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
               Clear
             </Link>
           </form>

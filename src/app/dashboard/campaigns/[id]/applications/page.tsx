@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterSubmit } from "@/components/filter-submit";
 import { Pagination } from "@/components/pagination";
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -211,16 +212,15 @@ export default async function CampaignApplicationsPage({
             className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100"
           />
         </div>
-        <button
-          type="submit"
-          className="h-10 shrink-0 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-500"
-        >
-          {t("searchAction")}
-        </button>
+        <FilterSubmit
+          label={t("searchAction")}
+          pendingLabel={t("searchAction")}
+          className="h-10 shrink-0 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500"
+        />
         {query && (
           <Link
             href={tab === "open" ? `/dashboard/campaigns/${id}/applications` : `/dashboard/campaigns/${id}/applications?tab=${tab}`}
-            className="h-10 shrink-0 rounded-xl border border-gray-200 px-3 text-sm font-medium leading-10 text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="h-10 shrink-0 cursor-pointer rounded-xl border border-gray-200 px-3 text-sm font-medium leading-10 text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             {t("searchClear")}
           </Link>
