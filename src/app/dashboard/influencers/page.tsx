@@ -1,3 +1,5 @@
+import { applyInfluencerFilters, describeFilters } from "@/lib/influencer-filters";
+import { ExportInfluencersButton } from "./export-influencers";
 import { Timer, logTimings } from "@/lib/server-timing";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { FilterBar } from "@/components/filter-bar";
@@ -145,45 +147,14 @@ export default async function InfluencersPage({
     // they never reach the client row.
     .select("influencer_id, full_name, username, profile_photo_url, followers_count, categories, status, instagram_handle, media_kit_published, instagram_access_token, instagram_token_expires_at, instagram_token_invalid_at, instagram_insights_denied_at", { count: "exact" });
   query = applySort(query, sort).range(infFrom, infFrom + INFLUENCERS_PER_PAGE - 1);
-  if (searchTerm) {
-    const clauses = [`full_name.ilike.%${searchTerm}%`, `username.ilike.%${searchTerm}%`];
-    if (phoneInfluencerIds.length > 0) clauses.push(`influencer_id.in.(${phoneInfluencerIds.join(",")})`);
-    query = query.or(clauses.join(","));
-  }
-  if (status) query = query.eq("status", status);
-  if (followers) { const [min, max] = followers.split("-"); if (min) query = query.gte("followers_count", parseInt(min)); if (max) query = query.lte("followers_count", parseInt(max)); }
-  if (category) { const cats = category.split(",").filter(Boolean); if (cats.length > 0) query = query.contains("categories", cats); }
-  if (gender) query = query.eq("gender", gender);
-  if (plan) query = plan === "paid" ? query.in("subscription_plan", PAID_PLANS) : query.eq("subscription_plan", plan);
-  if (mediakit) query = query.eq("media_kit_published", mediakit === "yes");
-  // Engagement bands. `engagement_rate` is a percentage, populated on every
-  // row, and the floors match how briefs are written ("3%+ creators").
-  if (er) { const [min, max] = er.split("-"); if (min) query = query.gte("engagement_rate", Number(min)); if (max) query = query.lte("engagement_rate", Number(max)); }
-  // `location` is a comma-joined scalar, not an array (see CLAUDE.md,
-  // "Cities / location"), so this is a substring match — the same thing the
-  // consumer app's matcher does. Only 14% of profiles have one set, so this
-  // narrows hard by design: it answers "who do we have in Delhi", not
-  // "everyone except Delhi".
-  if (city) query = query.ilike("location", `%${city}%`);
-  if (language) query = query.contains("content_languages", [language]);
-  // Same rules as instagramStatus(), expressed as filters so paging and the
-  // count stay right. Separate .or() params are AND-ed by PostgREST.
-  if (igstatus) {
-    const now = `"${nowIso()}"`;
-    const tokenLive = `instagram_token_expires_at.is.null,instagram_token_expires_at.gte.${now}`;
-    if (igstatus === "not_connected") {
-      query = query.is("instagram_access_token", null);
-    } else if (igstatus === "reconnect") {
-      query = query
-        .not("instagram_access_token", "is", null)
-        .or(`instagram_token_invalid_at.not.is.null,instagram_token_expires_at.lt.${now}`);
-    } else if (igstatus === "insights_denied" || igstatus === "authorized") {
-      query = query.not("instagram_access_token", "is", null).is("instagram_token_invalid_at", null).or(tokenLive);
-      query = igstatus === "insights_denied"
-        ? query.not("instagram_insights_denied_at", "is", null)
-        : query.is("instagram_insights_denied_at", null);
-    }
-  }
+  // Filters live in lib/influencer-filters.ts so the Excel export selects
+  // exactly the same creators. A second copy here is how a spreadsheet
+  // ends up disagreeing with the page it was downloaded from.
+  // Built once: the list query and the export both take THIS object, so
+  // the sheet cannot describe a different set from the page.
+  const exportFilters = { searchTerm, phoneInfluencerIds, status, followers, category, gender, plan, mediakit, er, city, language, igstatus };
+  query = applyInfluencerFilters(query, exportFilters, PAID_PLANS, nowIso());
+
   // Pending invitations — paginated. `count: exact` gives the total so paging
   // stays correct after filtering. Built here so it runs alongside the
   // creator rows rather than after them.
@@ -202,7 +173,17 @@ export default async function InfluencersPage({
   const [
     { data: influencerRows, error, count: influencerCount },
     { data: pendingInvites, error: invitesError, count: pendingInviteCount },
-  ] = await timer.span("rows", () => Promise.all([query, inviteQuery]));
+    { count: allInfluencerCount },
+  ] = await timer.span("rows", () =>
+    Promise.all([
+      query,
+      inviteQuery,
+      // The unfiltered total, for the export dialog's "everyone" option.
+      // In the same Promise.all so it adds no wall time to a page whose
+      // cost is round trips rather than query work.
+      supabase.from("influencer_profiles").select("influencer_id", { count: "exact", head: true }),
+    ]),
+  );
   const influencersTotal = influencerCount ?? 0;
   const invitesTotal = pendingInviteCount ?? 0;
   const influencers = (influencerRows || []).map(
@@ -238,6 +219,17 @@ export default async function InfluencersPage({
           <p className="text-gray-400 dark:text-gray-500 text-sm mt-0.5">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Admin-only: the sheet can carry emails, phone numbers and
+              cities, which is a different thing to hand out than the list
+              on screen. The action gates again on its own side. */}
+          {canWrite && (
+            <ExportInfluencersButton
+              filters={exportFilters}
+              filterSummary={describeFilters(exportFilters)}
+              matching={influencersTotal}
+              totalAll={allInfluencerCount ?? influencersTotal}
+            />
+          )}
           {canWrite && <UpdateMissingDetails />}
           <RefreshButton />
         </div>
