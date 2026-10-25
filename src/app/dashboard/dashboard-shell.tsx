@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { BottomNav } from "@/components/mobile/bottom-nav";
 import { RoleProvider, type AdminRole } from "@/components/role-context";
+import { AppBridge } from "@/components/app-bridge";
 
 export function DashboardShell({
   userEmail,
@@ -25,6 +26,9 @@ export function DashboardShell({
 
   return (
     <RoleProvider role={role}>
+      {/* No-op in a browser; hands the session to the native shell when
+          running inside the admin app. See components/app-bridge.tsx. */}
+      <AppBridge />
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <Sidebar
           userEmail={userEmail}
