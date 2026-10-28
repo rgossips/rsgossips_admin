@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { unwrapUser, extractPhotoUrl, buildExtras, mergeNotes } from "@/lib/instagram-profile";
 import { adminGate, requireAdmin } from "@/lib/require-super-admin";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { friendlyDbError, logError } from "@/lib/log";
@@ -127,93 +128,6 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
   } finally {
     clearTimeout(timer);
   }
-}
-
-// HikerAPI has shipped several response shapes (v1 returns the user object
-// flat, v2 nests it under `user`), and the HD variant isn't always present.
-// Probe rather than assume, so a shape change degrades to "not found"
-// instead of writing `undefined` over a photo.
-function unwrapUser(payload: any): any {
-  return payload?.user ?? payload?.data?.user ?? payload?.data ?? payload;
-}
-
-function extractPhotoUrl(payload: any): string | null {
-  const user = unwrapUser(payload);
-  // _hd is genuinely absent for many real creators (null on @uv_techh but
-  // present on @instagram), so the sd fallback is load-bearing, not padding.
-  const candidate =
-    user?.profile_pic_url_hd ||
-    user?.profile_pic_url ||
-    user?.profile_pic_url_signed ||
-    user?.hd_profile_pic_url_info?.url ||
-    null;
-  return typeof candidate === "string" && candidate.startsWith("http") ? candidate : null;
-}
-
-// Maps a HikerAPI user onto the notes-trailer keys ALREADY in use (written
-// by the old RS_Gossips Apify script, read by the featured-creators /
-// creator-stories pickers). Key names and value shapes must match it exactly:
-// followers/follows/posts are numbers, bio a trimmed string, verified a
-// boolean, businessCategory a string.
-//
-// A key is emitted ONLY when the API actually returned something usable —
-// absent fields must not clobber a populated value with 0/""/false. `verified`
-// and `isPrivate` are the exceptions: false is a real answer, not a blank.
-//
-// Deliberately NOT written: city, categories, gender, languages. Those are
-// admin-curated (city is a canonical comma-joined scalar the RS_Gossips
-// brand-campaigns matcher depends on) and a scraped value would corrupt them.
-function buildExtras(payload: any): Record<string, unknown> {
-  const u = unwrapUser(payload) || {};
-  const extras: Record<string, unknown> = {};
-  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-
-  if (typeof u.follower_count === "number") extras.followers = u.follower_count;
-  if (typeof u.following_count === "number") extras.follows = u.following_count;
-  if (typeof u.media_count === "number") extras.posts = u.media_count;
-  if (typeof u.is_verified === "boolean") extras.verified = u.is_verified;
-  if (typeof u.is_private === "boolean") extras.isPrivate = u.is_private;
-
-  const bio = str(u.biography);
-  if (bio) extras.bio = bio;
-
-  // Apify wrote businessCategoryName here; HikerAPI splits the same idea
-  // across three fields and often only populates `category`.
-  const category = str(u.business_category_name) || str(u.category_name) || str(u.category);
-  if (category) extras.businessCategory = category;
-
-  const email = str(u.public_email);
-  if (email) extras.email = email;
-
-  const externalUrl = str(u.external_url);
-  if (externalUrl) extras.externalUrl = externalUrl;
-
-  const phone = [str(u.public_phone_country_code), str(u.public_phone_number)].filter(Boolean).join(" ");
-  if (phone) extras.phone = phone;
-
-  return extras;
-}
-
-// Preserves the free-text half of `notes` and MERGES into the JSON trailer —
-// never rebuilds it. The trailer holds admin-curated keys this action knows
-// nothing about (city, categories, gender, languages, tags); a wholesale
-// rewrite would wipe them. Mirrors mergeNotes() in the Apify script.
-function mergeNotes(existing: string | null, extras: Record<string, unknown>): string {
-  let text = "";
-  let meta: Record<string, unknown> = {};
-  if (existing) {
-    const sep = existing.indexOf("\n---\n");
-    if (sep >= 0) {
-      text = existing.slice(0, sep);
-      try { meta = JSON.parse(existing.slice(sep + 5)) || {}; } catch { /* keep {} */ }
-    } else if (existing.trim().startsWith("{")) {
-      try { meta = JSON.parse(existing) || {}; } catch { text = existing; }
-    } else {
-      text = existing;
-    }
-  }
-  const merged = { ...meta, ...extras };
-  return text ? `${text}\n---\n${JSON.stringify(merged)}` : JSON.stringify(merged);
 }
 
 // Downloads and re-hosts the photo. Returns null (never throws) so a photo
