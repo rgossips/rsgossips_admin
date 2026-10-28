@@ -25,6 +25,9 @@ const navGroups: NavGroup[] = [
     titleKey: "overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "grid" },
+      // Google Analytics for the consumer WEBSITE. Distinct from the
+      // dashboard above, which counts rows in our own database.
+      { label: "Website Analytics", href: "/dashboard/analytics", icon: "chart", adminOnly: true },
     ],
   },
   {
