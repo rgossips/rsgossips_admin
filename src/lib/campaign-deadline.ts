@@ -32,3 +32,31 @@ export function applicationsClosed(status: string | null, deadline: string | nul
   if (!deadline) return false;
   return new Date(deadline).getTime() < now - ONE_DAY_MS;
 }
+
+/**
+ * True once the whole of the stored day has passed.
+ *
+ * The calendar date is read out of the STRING, not via `new Date()`. These
+ * columns hold a zone-less midnight ("2026-10-24T00:00:00"), so `new Date()`
+ * resolves them in the RUNTIME's zone — correct on Netlify, which is UTC,
+ * and 5.5 hours out when the same code runs on an IST machine. Parsing the
+ * parts makes the answer identical everywhere, which is what rgossips_web's
+ * `_shared/campaign-dates.ts` does and why. Keep the two in step.
+ *
+ * The day itself still counts: a campaign whose end date is today has not
+ * ended. Cutting that short is the bug the upstream module exists to kill.
+ */
+export function dayHasPassed(value: string | null | undefined, now: number = Date.now()): boolean {
+  if (!value) return false;
+  const ymd = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const endOfDay = ymd
+    ? Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 23, 59, 59, 999)
+    : (() => {
+        const d = new Date(value);
+        return Number.isNaN(d.getTime())
+          ? NaN
+          : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999);
+      })();
+  if (Number.isNaN(endOfDay)) return false;
+  return now > endOfDay;
+}

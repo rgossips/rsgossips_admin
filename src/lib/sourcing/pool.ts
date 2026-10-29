@@ -36,6 +36,37 @@ export type PoolCandidate = {
   alreadySourced: boolean;
   /** Already applied through the portal. */
   alreadyApplied: boolean;
+  /**
+   * Their email, where we hold one — 54% of profiles and 57% of pending
+   * invitations. Carried so a matching list can be handed to whoever is
+   * doing the outreach without a second lookup per row.
+   */
+  email: string | null;
+  /**
+   * Their profile photo. Present on 602 of 603 profiles and all 1,727
+   * pending invitations, and re-hosted in our own bucket rather than a
+   * signed Instagram CDN link, so it does not rot (see CLAUDE.md,
+   * "Profile-photo enrichment").
+   */
+  photoUrl: string | null;
+  /**
+   * When we last told THIS creator about THIS campaign, or null if never.
+   *
+   * Two sources, because there are two kinds of creator and only one of
+   * them has an account: a registered creator has a `campaign_invitations`
+   * row, while an invited-only one has a timestamp in their notes trailer
+   * (see lib/campaign-invite.ts). The badge, the filter and the send action
+   * all read this one field, so they cannot disagree about who has already
+   * been contacted — which is the whole point of showing it.
+   */
+  invitedAt: string | null;
+  /**
+   * They answered by applying — `apply-campaign` flips the invitation to
+   * 'responded'. Rarely visible here, because applying also drops them from
+   * the pool; carried so a withdrawn application cannot make an answered
+   * invite look unsent.
+   */
+  inviteResponded: boolean;
 };
 
 export type PoolTargeting = {

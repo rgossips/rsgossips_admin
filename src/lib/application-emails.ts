@@ -18,6 +18,7 @@ import { sendMail } from "@/lib/mailer";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { logError } from "@/lib/log";
 import { emailBanner, emailBrandMark, emailLogo } from "@/lib/email-templates";
+import { CREATOR_SITE } from "@/lib/campaign-invite";
 
 // Local copy: email-templates keeps its own private one, and exporting it
 // just for this would widen that module's surface for a four-line helper.
@@ -29,7 +30,8 @@ function escapeHtml(v: string) {
     .replace(/"/g, "&quot;");
 }
 
-const SITE = "https://rgossips.com";
+// The creator-facing app. ONE owner — see lib/campaign-invite.ts.
+const SITE = CREATOR_SITE;
 
 type Side = "creator" | "brand";
 

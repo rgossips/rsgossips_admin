@@ -247,6 +247,23 @@ export default async function CampaignDetailPage({
               the first place; the padding now sets the height, as it does
               for every neighbour, and whitespace-nowrap only keeps the
               label on one line in a tight row. */}
+          {/* Who should be on this campaign, from the creators we already
+              have. Sits beside the tracker rather than inside it because
+              it is the step BEFORE tracking: you find people, message
+              them, and only then does anyone need chasing. Same padding
+              as its neighbours — px-4 py-2.5 text-sm — so the row keeps
+              one height. */}
+          {canWrite && (
+            <Link
+              href={`/dashboard/campaigns/${campaign.campaign_id}/find-creators`}
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Find matching creators
+            </Link>
+          )}
           {canWrite && (
             <Link
               href={`/dashboard/campaigns/${campaign.campaign_id}/sourcing`}

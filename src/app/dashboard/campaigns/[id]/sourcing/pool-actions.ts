@@ -7,6 +7,7 @@ import { logError } from "@/lib/log";
 import { sanitizeSearchTerm } from "@/lib/validation";
 import { rankCandidates, scoreCandidate, type PoolCandidate } from "@/lib/sourcing/pool";
 import { genderExcludes, requiredGender } from "@/lib/gender-target";
+import { invitedAtFromMeta } from "@/lib/campaign-invite";
 import { toFulfilmentMode, type FulfilmentMode } from "@/lib/sourcing/stages";
 import { readSeatCount } from "@/lib/sourcing/seats";
 
@@ -18,7 +19,35 @@ import { readSeatCount } from "@/lib/sourcing/seats";
 // decided they were worth approaching — so leaving them out would hide most
 // of the pool.
 
-const PAGE = 400;
+// PostgREST caps a single response at 1000 rows, so the pool is READ IN
+// PAGES rather than with one .limit().
+//
+// It used to be a flat .limit(400) per table with no .order(), which on
+// today's base — 603 profiles and 1,727 pending invitations — meant an
+// arbitrary 800 of 2,330 were scored and the other 1,530 could not be
+// found at all. Ranking a third of the base and calling it the best match
+// is worse than slow: the creator an admin was looking for was simply
+// absent, with nothing on screen to say so. Measured, the full read costs
+// 3 requests and ~0.9 MB server-side; only the ranked slice crosses the
+// wire.
+const PAGE = 1000;
+// A bound on a base that grows, not a target. Nothing near it today.
+const SCAN_CAP = 8000;
+
+type Paged<T> = { data: T[] | null; error: { code?: string; message: string } | null };
+
+async function pageAll<T>(build: (from: number, to: number) => PromiseLike<Paged<T>>): Promise<Paged<T>> {
+  const rows: T[] = [];
+  for (let from = 0; from < SCAN_CAP; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1);
+    // Partial rows are returned alongside the error so the caller can
+    // decide; a half-read pool must never be presented as the whole pool.
+    if (error) return { data: rows, error };
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: rows, error: null };
+}
 
 // Two trailers, two separators, and they are NOT the same: a campaign's
 // description uses "\n\n---\n" (the campaign forms write it) while an
@@ -41,8 +70,17 @@ function parseTrailer(raw: string | null | undefined, sep: string): Record<strin
 
 export async function searchCreatorPool(
   campaignId: string,
-  opts?: { search?: string; includeInvited?: boolean },
-): Promise<{ error?: string; candidates?: PoolCandidate[]; excluded?: number }> {
+  // `limit` is how many ranked candidates come back. The inline picker
+  // wants a short list to scroll; the full Find-creators page filters
+  // client-side and wants the whole ranked pool, so it asks for more.
+  opts?: { search?: string; includeInvited?: boolean; limit?: number },
+): Promise<{
+  error?: string;
+  candidates?: PoolCandidate[];
+  excluded?: number;
+  /** How many rows were scored, so a page can say what it looked at. */
+  scanned?: { profiles: number; invitations: number };
+}> {
   const gate = await adminGate();
   if (gate) return { error: gate.error };
 
@@ -71,10 +109,25 @@ export async function searchCreatorPool(
 
   // Who is already spoken for on this campaign, so the picker can say so
   // rather than letting an admin pick someone twice.
-  const [sourcedRes, appliedRes] = await Promise.all([
+  const [sourcedRes, appliedRes, invitedRes] = await Promise.all([
     admin.from("campaign_bookings").select("influencer_id, instagram_username").eq("campaign_id", campaignId),
     admin.from("campaign_applications").select("influencer_id").eq("campaign_id", campaignId),
+    // Who we have already told about this campaign. Scoped to the campaign,
+    // so this is a handful of rows however big the pool is. An invited-only
+    // creator's answer is NOT here — it is in their notes trailer, read
+    // below, because they have no account to address a row to.
+    admin
+      .from("campaign_invitations")
+      .select("influencer_id, status, created_at")
+      .eq("campaign_id", campaignId),
   ]);
+  if (invitedRes.error) logError("sourcing.pool.invited", invitedRes.error, { campaignId });
+  const invitedById = new Map(
+    (invitedRes.data || []).map((r) => [
+      String(r.influencer_id),
+      { at: r.created_at as string | null, responded: r.status === "responded" },
+    ]),
+  );
   const sourcedIds = new Set((sourcedRes.data || []).map((r) => r.influencer_id).filter(Boolean));
   const sourcedHandles = new Set(
     (sourcedRes.data || []).map((r) => String(r.instagram_username || "").toLowerCase()).filter(Boolean),
@@ -84,13 +137,33 @@ export async function searchCreatorPool(
   const candidates: PoolCandidate[] = [];
 
   // Registered creators.
-  let q = admin
-    .from("influencer_profiles")
-    .select("influencer_id, full_name, username, instagram_handle, followers_count, categories, location, engagement_rate, status, gender")
-    .neq("status", "pending_deletion")
-    .limit(PAGE);
-  if (term) q = q.or(`full_name.ilike.%${term}%,instagram_handle.ilike.%${term}%,username.ilike.%${term}%`);
-  const { data: profiles, error: profErr } = await q;
+  const { data: profiles, error: profErr } = await pageAll<{
+    influencer_id: string;
+    full_name: string | null;
+    username: string | null;
+    instagram_handle: string | null;
+    followers_count: number | null;
+    categories: string[] | null;
+    location: string | null;
+    engagement_rate: number | null;
+    gender: string | null;
+    email: string | null;
+    profile_photo_url: string | null;
+  }>((from, to) => {
+    // Ordered, because an unordered .range() is not a stable page: without
+    // it PostgREST may hand back the same row twice across two requests
+    // and never hand back another.
+    let q = admin
+      .from("influencer_profiles")
+      .select(
+        "influencer_id, full_name, username, instagram_handle, followers_count, categories, location, engagement_rate, gender, email, profile_photo_url",
+      )
+      .neq("status", "pending_deletion")
+      .order("influencer_id", { ascending: true })
+      .range(from, to);
+    if (term) q = q.or(`full_name.ilike.%${term}%,instagram_handle.ilike.%${term}%,username.ilike.%${term}%`);
+    return q;
+  });
   if (profErr) {
     logError("sourcing.pool.profiles", profErr, { campaignId });
     return { error: "Could not search creators. Please try again." };
@@ -112,25 +185,40 @@ export async function searchCreatorPool(
       location: p.location ?? null,
       engagementRate: p.engagement_rate ?? null,
       gender: p.gender ?? null,
+      email: p.email || null,
+      photoUrl: p.profile_photo_url || null,
       registered: true,
       score,
       reasons,
       alreadySourced: sourcedIds.has(p.influencer_id) || sourcedHandles.has(String(handle).toLowerCase()),
       alreadyApplied: appliedIds.has(p.influencer_id),
+      invitedAt: invitedById.get(p.influencer_id)?.at ?? null,
+      inviteResponded: invitedById.get(p.influencer_id)?.responded ?? false,
     });
   }
 
   // Invited-but-not-registered creators. Their follower count and categories
   // live in the notes trailer, which is where the enrichment writes them.
+  let invitationsScanned = 0;
   if (opts?.includeInvited !== false) {
-    let qi = admin
-      .from("influencer_invitations")
-      .select("id, full_name, instagram_username, notes")
-      .eq("status", "pending")
-      .limit(PAGE);
-    if (term) qi = qi.or(`full_name.ilike.%${term}%,instagram_username.ilike.%${term}%`);
-    const { data: invites, error: invErr } = await qi;
+    const { data: invites, error: invErr } = await pageAll<{
+      id: string;
+      full_name: string | null;
+      instagram_username: string | null;
+      notes: string | null;
+      profile_photo_url: string | null;
+    }>((from, to) => {
+      let qi = admin
+        .from("influencer_invitations")
+        .select("id, full_name, instagram_username, notes, profile_photo_url")
+        .eq("status", "pending")
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (term) qi = qi.or(`full_name.ilike.%${term}%,instagram_username.ilike.%${term}%`);
+      return qi;
+    });
     if (invErr) logError("sourcing.pool.invites", invErr, { campaignId });
+    invitationsScanned = (invites || []).length;
     for (const i of invites || []) {
       // A malformed trailer just means less to score on.
       const meta = parseTrailer(i.notes, "\n---\n");
@@ -157,11 +245,18 @@ export async function searchCreatorPool(
         location: shaped.location,
         engagementRate: null,
         gender: invGender,
+        email: typeof meta.email === "string" && meta.email.includes("@") ? meta.email : null,
+        photoUrl: i.profile_photo_url || null,
         registered: false,
         score,
         reasons,
         alreadySourced: sourcedHandles.has(String(handle).toLowerCase()),
         alreadyApplied: false,
+        // Email is the only channel they have, so the record of having used
+        // it lives on the invitation itself. Free here — the trailer is
+        // already parsed for their followers and city.
+        invitedAt: invitedAtFromMeta(meta, campaignId),
+        inviteResponded: false,
       });
     }
   }
@@ -178,7 +273,11 @@ export async function searchCreatorPool(
   const engaged = candidates.filter((c) => c.alreadySourced || c.alreadyApplied).length;
   const fresh = candidates.filter((c) => !c.alreadySourced && !c.alreadyApplied);
 
-  return { candidates: rankCandidates(fresh), excluded: engaged };
+  return {
+    candidates: rankCandidates(fresh, opts?.limit ?? 60),
+    excluded: engaged,
+    scanned: { profiles: (profiles || []).length, invitations: invitationsScanned },
+  };
 }
 
 // Bring a selection onto the sourcing list. These creators are already in

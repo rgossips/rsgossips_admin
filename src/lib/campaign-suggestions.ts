@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logError } from "@/lib/log";
 import { applicationsClosedBefore } from "@/lib/campaign-deadline";
 import { genderExcludes, requiredGender } from "@/lib/gender-target";
+import { CREATOR_SITE } from "@/lib/campaign-invite";
 
 export type CampaignSuggestion = {
   id: string;
@@ -150,7 +151,8 @@ export async function suggestCampaignsForCreator(
   }
 }
 
-const SITE = "https://rgossips.com";
+// ONE owner — see lib/campaign-invite.ts.
+const SITE = CREATOR_SITE;
 
 const esc = (s: string) =>
   String(s)

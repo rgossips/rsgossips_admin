@@ -833,3 +833,138 @@ export function renderCampaignsClosedEmail({
 
   return { subject, html, text };
 }
+
+// ── Invited to a campaign (admin picks creators for a brief) ─────────────
+
+interface CampaignInviteParams {
+  fullName: string;
+  campaignTitle: string;
+  brandName?: string;
+  /** What they do next. The campaign for a registered creator, signup for everyone else. */
+  ctaUrl: string;
+  /**
+   * False for a creator who has no account yet. It changes the promise the
+   * email makes — "apply in the app" is not something they can do, and an
+   * email that tells them to would be a dead end.
+   */
+  registered: boolean;
+  /** Optional note from the admin, shown verbatim. */
+  note?: string | null;
+  bannerUrl?: string | null;
+  brandLogoUrl?: string | null;
+  /** Rupees, from the brief. Named money is the strongest reason to open it. */
+  budgetLine?: string | null;
+  deadlineLine?: string | null;
+}
+
+/**
+ * The email half of a campaign invite.
+ *
+ * It exists because the in-app notification only reaches somebody who has
+ * the app open — and for the invited-but-not-registered half of our pool
+ * there IS no in-app notification, so this is the whole message.
+ *
+ * Two shapes, one template: the CTA and one paragraph change on
+ * `registered`. Keeping them in one function is what stops the two drifting
+ * into saying different things about the same campaign.
+ */
+export function renderCampaignInviteEmail({
+  fullName,
+  campaignTitle,
+  brandName,
+  ctaUrl,
+  registered,
+  note,
+  bannerUrl,
+  brandLogoUrl,
+  budgetLine,
+  deadlineLine,
+}: CampaignInviteParams) {
+  const bannerRow = emailBanner(bannerUrl, campaignTitle);
+  const brandRow = brandLogoUrl
+    ? `<p style="margin:0 0 16px;font-size:13px;color:#6B7280;">${emailBrandMark(brandLogoUrl, brandName || "Brand")}<span style="vertical-align:middle;font-weight:600;color:#374151;">${escapeHtml(brandName || "Brand")}</span></p>`
+    : "";
+  const noteBlock = note
+    ? `<div style="margin:0 0 20px;padding:14px 16px;background:#F3F4F6;border-radius:12px;border-left:3px solid ${PRIMARY};">
+         <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#4B5563;text-transform:uppercase;letter-spacing:1px;">From the team</p>
+         <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;white-space:pre-wrap;">${escapeHtml(note)}</p>
+       </div>`
+    : "";
+  const facts = [budgetLine, deadlineLine].filter(Boolean) as string[];
+  const factsBlock = facts.length
+    ? `<ul style="margin:0 0 20px;padding:0 0 0 18px;font-size:14px;line-height:1.8;color:#374151;">
+         ${facts.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}
+       </ul>`
+    : "";
+
+  const ctaLabel = registered ? "Read the brief and apply" : "Join RGossips to apply";
+  // Neither subject may promise money: most of these campaigns are barter,
+  // and "a paid collaboration" in the subject line of a barter brief is a
+  // lie the creator discovers after opening it.
+  const subject = registered
+    ? `You've been picked for "${campaignTitle}"`
+    : `You're invited to collaborate on "${campaignTitle}"`;
+  const lede = registered
+    ? `We went through our creators for <strong>${escapeHtml(campaignTitle)}</strong>${brandName ? ` with ${escapeHtml(brandName)}` : ""} and thought of you. Applications are open now.`
+    : `<strong>${escapeHtml(campaignTitle)}</strong>${brandName ? ` with ${escapeHtml(brandName)}` : ""} is looking for creators like you. You'll need an RGossips account to apply — it takes a minute.`;
+  const closer = registered
+    ? "Being invited doesn't guarantee a spot, so put your name forward while it's open."
+    : "Set up your profile, then apply to this campaign and any other that fits you.";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>You're invited to a campaign</title></head>
+<body style="margin:0;padding:0;background-color:#F4F5F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1F2937;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#F4F5F8;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="540" style="max-width:540px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(99,102,241,0.08);">
+        <tr><td style="background:${GRADIENT};padding:36px 32px;text-align:center;color:#ffffff;">
+          ${emailLogo()}
+          <div style="font-size:22px;font-weight:700;margin-top:6px;">You're invited to a campaign</div>
+        </td></tr>
+        ${bannerRow}
+        <tr><td style="padding:36px 36px 28px 36px;">
+          ${brandRow}
+          <p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#111827;">Hi ${escapeHtml(fullName)},</p>
+          <p style="margin:0 0 18px 0;font-size:15px;line-height:1.65;color:#374151;">${lede}</p>
+          ${factsBlock}
+          ${noteBlock}
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 20px auto;">
+            <tr><td style="background:${GRADIENT};border-radius:12px;">
+              <a href="${escapeAttr(ctaUrl)}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;letter-spacing:0.2px;">
+                ${ctaLabel}
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 4px 0;font-size:14px;line-height:1.65;color:#374151;">${escapeHtml(closer)}</p>
+          <hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;" />
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#9CA3AF;">Not for you? Just ignore this email — nothing happens either way.</p>
+        </td></tr>
+        <tr><td style="background:#F9FAFB;padding:20px 36px;text-align:center;border-top:1px solid #E5E7EB;">
+          <p style="margin:0;font-size:12px;color:#6B7280;">&copy; ${new Date().getFullYear()} RGossips &middot; <a href="https://rgossips.com" style="color:#6B7280;text-decoration:none;">rgossips.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const text = [
+    `Hi ${fullName},`,
+    "",
+    registered
+      ? `We went through our creators for "${campaignTitle}"${brandName ? ` with ${brandName}` : ""} and thought of you. Applications are open now.`
+      : `"${campaignTitle}"${brandName ? ` with ${brandName}` : ""} is looking for creators like you. You'll need an RGossips account to apply — it takes a minute.`,
+    ...(facts.length ? ["", ...facts.map((f) => `- ${f}`)] : []),
+    ...(note ? ["", `From the team: ${note}`] : []),
+    "",
+    `${ctaLabel}: ${ctaUrl}`,
+    "",
+    closer,
+    "",
+    "— RGossips",
+  ].join("\n");
+
+  return { subject, html, text };
+}

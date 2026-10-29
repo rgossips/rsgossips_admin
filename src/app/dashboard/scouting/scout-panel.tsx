@@ -12,6 +12,13 @@ import {
   tierCandidates,
   type ScoutRow,
 } from "./scout-actions";
+import {
+  DEFAULT_OUTREACH_MESSAGE,
+  FIRST_NAME_TOKEN,
+  HANDLE_TOKEN,
+  MESSAGE_TOKEN,
+  fillTemplate,
+} from "@/lib/outreach-message";
 import { SCOUT_EXPORT_COLUMNS } from "./scout-export-columns";
 import { MAX_TIER_PER_RUN, TIER_CHUNK } from "./scout-constants";
 
@@ -51,71 +58,11 @@ const KNOWN_LABEL: Record<string, string> = {
   new: "New to us",
 };
 
-// The outreach note, kept in the browser between searches.
-//
-// `<Creator Name>` is the token, written the way an admin would type it
-// rather than a {{mustache}} — this box is meant to be edited by whoever is
-// doing the outreach, not maintained like code. `<handle>` is offered too
-// because plenty of Instagram accounts carry no display name at all.
-const MESSAGE_TOKEN = "<Creator Name>";
-const FIRST_NAME_TOKEN = "<First Name>";
-const HANDLE_TOKEN = "<handle>";
+// The outreach note, kept in the browser between searches. The tokens and
+// the greeting rules live in lib/outreach-message.ts — campaign matching
+// writes the same kind of message, and the "Hi Indian!" problem is not
+// obvious enough to re-derive in a second copy.
 const MESSAGE_STORAGE_KEY = "rg.scouting.outreachMessage";
-
-const DEFAULT_MESSAGE = `Hi ${MESSAGE_TOKEN}!
-
-We have a collaboration opportunity for you related to your niche.
-
-Kindly let us know if you are interested!`;
-
-/**
- * A display name fit to greet someone by.
- *
- * Instagram display names are decorated: emoji, flags, pipes, "| Fashion
- * blogger", stylised unicode. Strip that, then fall back to the handle when
- * nothing legible survives — "Hi riyagadhavi09!" beats "Hi !".
- */
-function displayName(fullName: string | null, username: string): string {
-  const raw = (fullName || "").trim();
-  if (!raw) return username;
-  const cleaned = raw
-    // Everything after a separator is a job title, not a name.
-    .split(/[|•·(–—]/)[0]
-    // Emoji, flags and variation selectors.
-    .replace(/[\p{Extended_Pictographic}\p{Emoji_Component}️‍]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  // Must contain a real letter — Latin or Devanagari covers what we see.
-  return /[A-Za-zऀ-ॿ]/.test(cleaned) ? cleaned : username;
-}
-
-/**
- * The first word of that, for a warmer greeting.
- *
- * NOT the default, and the measurement is why: searching "fashion blogger
- * india" returns mostly AGGREGATOR accounts — "Indian Fashion Bloggers",
- * "Fashion Bloggers India" — and a first-word greeting turns those into
- * "Hi Indian!" and "Hi Fashion!". Across 22 real results only a handful
- * were people. So <Creator Name> uses the whole cleaned name, which is
- * never embarrassing, and <First Name> is offered for when you can see the
- * row is a person.
- */
-function firstName(fullName: string | null, username: string): string {
-  const full = displayName(fullName, username);
-  if (full === username) return username;
-  const first = full.split(/\s+/)[0] || "";
-  return /[A-Za-zऀ-ॿ]/.test(first) ? first : full;
-}
-
-function fillTemplate(template: string, fullName: string | null, username: string): string {
-  return template
-    .split(MESSAGE_TOKEN)
-    .join(displayName(fullName, username))
-    .split(FIRST_NAME_TOKEN)
-    .join(firstName(fullName, username))
-    .split(HANDLE_TOKEN)
-    .join(`@${username}`);
-}
 
 type Filters = {
   tiers: Set<Tier>;
@@ -179,11 +126,11 @@ export function ScoutPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_MESSAGE;
+    if (typeof window === "undefined") return DEFAULT_OUTREACH_MESSAGE;
     try {
-      return window.localStorage.getItem(MESSAGE_STORAGE_KEY) || DEFAULT_MESSAGE;
+      return window.localStorage.getItem(MESSAGE_STORAGE_KEY) || DEFAULT_OUTREACH_MESSAGE;
     } catch {
-      return DEFAULT_MESSAGE;
+      return DEFAULT_OUTREACH_MESSAGE;
     }
   });
   const [copied, setCopied] = useState<string | null>(null);
@@ -240,7 +187,7 @@ export function ScoutPanel() {
           source: note || `${MODE_LABEL[mode]}: ${query}`,
           profileUrl: `https://instagram.com/${r.username}`,
           dmUrl: `https://ig.me/m/${r.username}`,
-          message: fillTemplate(message, r.fullName, r.username),
+          message: fillTemplate(message, { fullName: r.fullName, username: r.username }),
         };
         return SCOUT_EXPORT_COLUMNS.map((c) => cell[c.key] ?? "");
       });
@@ -272,7 +219,7 @@ export function ScoutPanel() {
   };
 
   const copyFor = async (r: ScoutRow) => {
-    const text = fillTemplate(message, r.fullName, r.username);
+    const text = fillTemplate(message, { fullName: r.fullName, username: r.username });
     try {
       await navigator.clipboard.writeText(text);
       setCopied(r.username);
@@ -641,7 +588,7 @@ export function ScoutPanel() {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-bold text-gray-900 dark:text-white">Outreach message</h2>
               <button
-                onClick={() => updateMessage(DEFAULT_MESSAGE)}
+                onClick={() => updateMessage(DEFAULT_OUTREACH_MESSAGE)}
                 className="text-[11px] font-semibold text-gray-500 hover:underline dark:text-gray-400"
               >
                 Reset to default
@@ -668,7 +615,7 @@ export function ScoutPanel() {
                 <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Preview · @{visible[0].username}
                 </span>
-                {fillTemplate(message, visible[0].fullName, visible[0].username)}
+                {fillTemplate(message, { fullName: visible[0].fullName, username: visible[0].username })}
               </p>
             )}
           </div>
@@ -755,7 +702,7 @@ export function ScoutPanel() {
                           the thread and paste it. */}
                       <button
                         onClick={() => void copyFor(r)}
-                        title={fillTemplate(message, r.fullName, r.username)}
+                        title={fillTemplate(message, { fullName: r.fullName, username: r.username })}
                         className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
                           copied === r.username
                             ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
