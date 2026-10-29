@@ -3,7 +3,6 @@ import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CampaignsTable } from "./campaigns-table";
 import { CampaignFilters } from "./campaign-filters";
-import { applicationsClosedBefore } from "@/lib/campaign-deadline";
 import { RefreshButton } from "@/components/refresh-button";
 import { isAdminOrAbove } from "@/lib/require-super-admin";
 import { sanitizeSearchTerm } from "@/lib/validation";
@@ -11,15 +10,26 @@ import { BrandTypeFilter } from "@/components/brand-type-filter";
 import { BRAND_TYPE_PARAM, brandTypeFilter } from "@/lib/brand-account-type";
 import { applySort, compareBy, resolveSort, type SortOption } from "@/lib/sorting";
 import { FilterBar } from "@/components/filter-bar";
+import { Pagination } from "@/components/pagination";
 import { requiredGender } from "@/lib/gender-target";
+import { applyStatusFilter, resolveStatusFilter } from "./campaign-status-filter";
 
 const BASE = "/dashboard/campaigns";
 
+const PAGE_SIZE = 20;
+
+// Upper bound on the in-memory path's scan (see `needsScan` below). PostgREST
+// will not return more than 1000 rows in one response anyway, so this is both
+// the cap and the honest ceiling: past 1000 matching campaigns the brief
+// filters and the brand sort would describe only the first 1000 of them. 79
+// campaigns exist today, so there is 12x headroom — but an unbounded fetch
+// behind a filter chip is how a page dies quietly in two years.
+const BRIEF_SCAN_CAP = 1000;
+
 // The campaign trailer holds the brief's own fields (see CLAUDE.md,
 // "Description / notes trailer metadata"). PostgREST cannot filter inside a
-// JSON tail in a text column, so these three are filtered IN MEMORY after
-// the query — safe here because this page loads the whole filtered set
-// rather than a page of it, and the result count is taken afterwards.
+// JSON tail in a text column, so these three are filtered IN MEMORY — which
+// is why they force the scanning path rather than a server-side page.
 const CAMPAIGN_TRAILER = "\n\n---\n";
 function parseTrailer(description: string | null | undefined): Record<string, unknown> {
   const raw = String(description || "");
@@ -51,19 +61,28 @@ const FOLLOWER_FLOORS = ["0", "1000", "5000", "10000", "100000"] as const;
 // `brand` is derived — the name comes from brand_profiles OR brand_invitations
 // depending on who owns the campaign — so it is sorted in memory. Everything
 // else is a real column and goes to PostgREST.
+//
+// EVERY option carries the same tiebreak, and it is load-bearing now that the
+// list is paged: PostgREST guarantees no order within equal values, so a page
+// boundary that falls inside a tie shows a row twice or never. These columns
+// tie heavily — `status` has three distinct values across 79 rows, and
+// `slots`/`budget` repeat across a brand's campaigns. `campaign_id` is the
+// primary key, so one tiebreak settles all of them.
+const TIEBREAK = { column: "campaign_id", ascending: true } as const;
+
 function campaignSorts(label: (k: string) => string): SortOption[] {
   return [
-    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc" },
-    { key: "title", column: "title", label: label("title"), defaultDir: "asc" },
-    { key: "brand", column: "created_at", label: label("brand"), defaultDir: "asc" },
-    { key: "status", column: "status", label: label("status"), defaultDir: "asc" },
-    { key: "slots", column: "max_influencers", label: label("slots"), defaultDir: "desc", nullsLast: true },
+    { key: "created", column: "created_at", label: label("created"), defaultDir: "desc", tiebreak: TIEBREAK },
+    { key: "title", column: "title", label: label("title"), defaultDir: "asc", tiebreak: TIEBREAK },
+    { key: "brand", column: "created_at", label: label("brand"), defaultDir: "asc", tiebreak: TIEBREAK },
+    { key: "status", column: "status", label: label("status"), defaultDir: "asc", tiebreak: TIEBREAK },
+    { key: "slots", column: "max_influencers", label: label("slots"), defaultDir: "desc", nullsLast: true, tiebreak: TIEBREAK },
     // Biggest first on the first click — the reason to sort by budget is to
     // find the campaigns with money in them. nullsLast is belt and braces:
     // every row carries a value today, but a future insert need not.
-    { key: "budget", column: "budget_total", label: label("budget"), defaultDir: "desc", nullsLast: true },
-    { key: "start", column: "campaign_start_date", label: label("start"), defaultDir: "desc", nullsLast: true },
-    { key: "deadline", column: "application_deadline", label: label("deadline"), defaultDir: "asc", nullsLast: true },
+    { key: "budget", column: "budget_total", label: label("budget"), defaultDir: "desc", nullsLast: true, tiebreak: TIEBREAK },
+    { key: "start", column: "campaign_start_date", label: label("start"), defaultDir: "desc", nullsLast: true, tiebreak: TIEBREAK },
+    { key: "deadline", column: "application_deadline", label: label("deadline"), defaultDir: "asc", nullsLast: true, tiebreak: TIEBREAK },
   ];
 }
 
@@ -73,7 +92,11 @@ export default async function CampaignsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const params = await searchParams;
-  const { search, status, category } = params;
+  const { search, category } = params;
+  // Absent means the default (Active), never "every status" — see
+  // campaign-status-filter.ts for why that is its own value.
+  const statusFilter = resolveStatusFilter(params.status);
+  const page = Math.max(1, Math.trunc(Number(params.page)) || 1);
   // Each validated against its allowlist before it can reach a query or a
   // comparison — same rule as the sort keys.
   const ctype = (CAMPAIGN_TYPES as readonly string[]).includes(params.ctype || "") ? params.ctype! : "";
@@ -92,105 +115,148 @@ export default async function CampaignsPage({
   // newest-first order it had before sorting existed.
   const sort = resolveSort(params.sort, SORTS, "created");
 
-  let query = supabase
-    .from("campaigns")
-    // `description` is read ONLY to filter on the brief fields packed into
-    // its trailer, and is stripped before the rows reach the client
-    // component — the prose and base64-ish image URLs in there would
-    // several times over outweigh the rest of the payload. Same shape as the
-    // influencer list selecting instagram_access_token purely to derive a
-    // status from it.
-    .select("campaign_id, title, status, max_influencers, budget_total, campaign_start_date, campaign_end_date, application_deadline, target_categories, brand_id, brand_invitation_id, created_by_admin, description, brand_profiles(brand_name), brand_invitations(brand_name)");
-  query = applySort(query, sort);
+  // WHY THIS BRANCHES. Three of the filters below read the brief's JSON
+  // trailer and one of the sorts reads an embedded brand name, and PostgREST
+  // can evaluate neither — so those have to see the whole matching set to
+  // filter or order it. Asking the database for one page of 20 first and then
+  // applying them would filter WITHIN that page: 20 rows in, 3 out, page 2
+  // showing 7, and a total that disagrees with the rows under it. So the
+  // ordinary path takes a server-side `.range()`, and the derived path scans
+  // (capped) and pages in memory. Same shape as the errors list's "our bugs
+  // only" filter — but note the filters are built ONCE below and the branch is
+  // only the final `.range()`/`.limit()`, because rebuilding the query for the
+  // derived path is how that page silently drops its other filters.
+  const needsScan = Boolean(offering || shipping || cgender) || sort.key === "brand";
 
-  if (searchTerm) {
-    query = query.ilike("title", `%${searchTerm}%`);
-  }
-  // Both branches share ONE cutoff with the badge — see lib/campaign-deadline.ts.
-  const closedBefore = applicationsClosedBefore();
-  if (status === "apps_closed") {
-    // "Applications Closed" isn't a DB status — it's active campaigns whose
-    // application window has lapsed. `.lt` on a timestamp excludes NULL
-    // deadlines, which is right: no deadline means the window never closes.
-    query = query.eq("status", "active").lt("application_deadline", closedBefore);
-  } else if (status === "active") {
-    // ...and because the dropdown offers that as a SIBLING of Active, Active
-    // has to exclude it. Otherwise picking Active listed the closed ones too
-    // (they are `status = 'active'` in the DB) and the rows came back wearing
-    // an "Applications Closed" badge — 70 of 75 of them.
-    query = query
-      .eq("status", "active")
-      .or(`application_deadline.is.null,application_deadline.gte.${closedBefore}`);
-  } else if (status) {
-    query = query.eq("status", status);
-  }
-  if (category) {
-    const cats = category.split(",").filter(Boolean);
-    if (cats.length > 0) {
-      query = query.contains("target_categories", cats);
-    }
-  }
-  // Real columns, so these narrow the query rather than the result.
-  if (ctype) query = query.eq("campaign_type", ctype);
-  if (fmin) query = query.gte("target_follower_min", Number(fmin));
+  const COLUMNS =
+    "campaign_id, title, status, max_influencers, budget_total, campaign_start_date, campaign_end_date, application_deadline, target_categories, brand_id, brand_invitation_id, created_by_admin, brand_profiles(brand_name), brand_invitations(brand_name)";
 
   // Brand / agency (migration 075). A campaign is owned by a registered brand
   // (brand_id) or, for admin-created ones, an invitation (brand_invitation_id)
   // — so it counts as an agency's when either owner is labelled agency.
   // Filtering on the agency id lists keeps the URL short: agencies are the
   // minority, and "brand" is expressed as "neither owner is an agency".
+  //
+  // Resolved BEFORE the builder below so that builder can be synchronous and
+  // therefore callable twice — see the out-of-range retry.
+  let agencyProfileIds: string[] = [];
+  let agencyInviteIds: string[] = [];
   if (accountType) {
     const [agencyProfiles, agencyInvites] = await Promise.all([
       supabase.from("brand_profiles").select("brand_id").eq("account_type", "agency"),
       supabase.from("brand_invitations").select("id").eq("account_type", "agency"),
     ]);
-    const profileIds = (agencyProfiles.data || []).map((r) => r.brand_id as string);
-    const inviteIds = (agencyInvites.data || []).map((r) => r.id as string);
-    if (accountType === "agency") {
-      const clauses = [
-        ...(profileIds.length ? [`brand_id.in.(${profileIds.join(",")})`] : []),
-        ...(inviteIds.length ? [`brand_invitation_id.in.(${inviteIds.join(",")})`] : []),
-      ];
-      // No agencies labelled yet → nothing matches.
-      query = clauses.length ? query.or(clauses.join(",")) : query.eq("campaign_id", "00000000-0000-0000-0000-000000000000");
-    } else {
-      if (profileIds.length) query = query.or(`brand_id.is.null,brand_id.not.in.(${profileIds.join(",")})`);
-      if (inviteIds.length) query = query.or(`brand_invitation_id.is.null,brand_invitation_id.not.in.(${inviteIds.join(",")})`);
-    }
+    agencyProfileIds = (agencyProfiles.data || []).map((r) => r.brand_id as string);
+    agencyInviteIds = (agencyInvites.data || []).map((r) => r.id as string);
   }
 
-  const { data: campaigns, error } = await query;
+  // ONE builder, so the retry below cannot possibly carry a different filter
+  // set from the first attempt. (The errors list's derived branch rebuilds its
+  // query inline and silently drops its other filters — this shape is what
+  // stops that happening here.)
+  function buildQuery() {
+    let q = supabase
+      .from("campaigns")
+      // `description` is read ONLY to filter on the brief fields packed into
+      // its trailer, and is stripped before the rows reach the client
+      // component — the prose and base64-ish image URLs in there would
+      // several times over outweigh the rest of the payload (measured: 158 KB
+      // across 79 rows, ~2 KB a row). So it is now selected only on the path
+      // that actually reads it; the paged path never asks for it at all.
+      .select(needsScan ? `${COLUMNS}, description` : COLUMNS, { count: "exact" });
+    q = applySort(q, sort);
+
+    if (searchTerm) q = q.ilike("title", `%${searchTerm}%`);
+    q = applyStatusFilter(q, statusFilter);
+    if (category) {
+      const cats = category.split(",").filter(Boolean);
+      if (cats.length > 0) q = q.contains("target_categories", cats);
+    }
+    // Real columns, so these narrow the query rather than the result.
+    if (ctype) q = q.eq("campaign_type", ctype);
+    if (fmin) q = q.gte("target_follower_min", Number(fmin));
+
+    if (accountType === "agency") {
+      const clauses = [
+        ...(agencyProfileIds.length ? [`brand_id.in.(${agencyProfileIds.join(",")})`] : []),
+        ...(agencyInviteIds.length ? [`brand_invitation_id.in.(${agencyInviteIds.join(",")})`] : []),
+      ];
+      // No agencies labelled yet → nothing matches.
+      q = clauses.length ? q.or(clauses.join(",")) : q.eq("campaign_id", "00000000-0000-0000-0000-000000000000");
+    } else if (accountType) {
+      if (agencyProfileIds.length) q = q.or(`brand_id.is.null,brand_id.not.in.(${agencyProfileIds.join(",")})`);
+      if (agencyInviteIds.length) q = q.or(`brand_invitation_id.is.null,brand_invitation_id.not.in.(${agencyInviteIds.join(",")})`);
+    }
+    return q;
+  }
+
+  // The branch is ONLY the final `.range()`/`.limit()` — every filter above is
+  // already on the builder, so the two paths cannot select different campaigns.
+  // `p` is ignored on the scanning path, which slices in memory further down.
+  const fetchPage = (p: number) =>
+    needsScan
+      ? buildQuery().limit(BRIEF_SCAN_CAP)
+      : buildQuery().range((p - 1) * PAGE_SIZE, p * PAGE_SIZE - 1);
+
+  let effectivePage = page;
+  let { data: campaigns, count, error } = await fetchPage(page);
+
+  // PostgREST answers an offset past the end with PGRST103 ("Requested range
+  // not satisfiable") rather than an empty page, and `count` comes back NULL
+  // with it — so the total it knows cannot be used to clamp. Left alone, a
+  // stale `?page=4` link on a list that has since shrunk renders a red
+  // "failed to load" banner over a perfectly healthy table. Every filter
+  // control drops the page cursor, so reaching this needs a typed or
+  // bookmarked URL: it costs one extra round trip in a case that should not
+  // arise, and never touches the normal path.
+  if (error?.code === "PGRST103" && effectivePage > 1) {
+    effectivePage = 1;
+    ({ data: campaigns, count, error } = await fetchPage(1));
+  }
 
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   let rows = (campaigns as any[]) ?? [];
+  // On the paged path the database has already counted the matching set. On
+  // the scanning path `count` describes what was SCANNED, not what survives
+  // the trailer filters, so it is recomputed after them.
+  let totalCount = count ?? 0;
 
-  // The three brief fields that live in the trailer. Applied BEFORE the
-  // count below, so "12 campaigns" always matches the rows on screen.
-  if (offering || shipping || cgender) {
-    rows = rows.filter((c) => {
-      const meta = parseTrailer(c.description);
-      if (offering && String(meta.offering_type || "") !== offering) return false;
-      if (shipping && String(meta.shipping_required || "") !== shipping) return false;
-      if (cgender) {
-        // requiredGender() is the single owner of what a brief restricts
-        // (lib/gender-target.ts) — null means it names no one gender, which
-        // is what "Open to all" asks for.
-        const req = requiredGender(meta.target_gender);
-        if (cgender === "any" ? req !== null : req !== cgender) return false;
-      }
-      return true;
-    });
+  if (needsScan) {
+    // The three brief fields that live in the trailer. Applied BEFORE the
+    // count, so "12 campaigns" always matches the rows on screen.
+    if (offering || shipping || cgender) {
+      rows = rows.filter((c) => {
+        const meta = parseTrailer(c.description);
+        if (offering && String(meta.offering_type || "") !== offering) return false;
+        if (shipping && String(meta.shipping_required || "") !== shipping) return false;
+        if (cgender) {
+          // requiredGender() is the single owner of what a brief restricts
+          // (lib/gender-target.ts) — null means it names no one gender, which
+          // is what "Open to all" asks for.
+          const req = requiredGender(meta.target_gender);
+          if (cgender === "any" ? req !== null : req !== cgender) return false;
+        }
+        return true;
+      });
+    }
+    // The brand name lives on one of two embedded resources, so PostgREST
+    // cannot order by it. Sorted here instead, across the whole scanned set
+    // — ordering one page of 20 would only shuffle that page.
+    if (sort.key === "brand") {
+      rows = compareBy(
+        rows,
+        (c) => c.brand_profiles?.brand_name || c.brand_invitations?.brand_name || "",
+        sort.ascending,
+      );
+    }
+    totalCount = rows.length;
+    // The scanning path pages in memory, so an out-of-range page is simply an
+    // empty slice — PGRST103 cannot occur here. Clamp it anyway so the
+    // paginator and the rows agree about which page is being shown.
+    if ((effectivePage - 1) * PAGE_SIZE >= totalCount) effectivePage = 1;
+    rows = rows.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE);
   }
-  // The brand name lives on one of two embedded resources, so PostgREST
-  // cannot order by it. Sorted here instead; this page loads the whole
-  // filtered set rather than a page of it, so nothing is missed.
-  if (sort.key === "brand") {
-    rows = compareBy(
-      rows,
-      (c) => c.brand_profiles?.brand_name || c.brand_invitations?.brand_name || "",
-      sort.ascending,
-    );
-  }
+
   const briefFilterFields = [
     { name: "ctype", label: t("filter.allTypes"), type: "select" as const, options: CAMPAIGN_TYPES.map((v) => ({ label: t(`filter.type.${v}`), value: v })) },
     { name: "offering", label: t("filter.allOfferings"), type: "select" as const, options: OFFERING_TYPES.map((v) => ({ label: t(`filter.offering.${v}`), value: v })) },
@@ -199,10 +265,9 @@ export default async function CampaignsPage({
     { name: "fmin", label: t("filter.allFollowers"), type: "select" as const, options: FOLLOWER_FLOORS.map((v) => ({ label: t(`filter.followers.${v}`), value: v })) },
   ];
 
-  const totalCount = rows.length;
-
   // Drop the description now that every filter and sort that needed it has
   // run. Nothing downstream reads it, and it is the biggest field on the row.
+  // Only the scanning path selected it at all; this is a no-op on the other.
   /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const tableRows = rows.map(({ description: _description, ...rest }) => rest);
 
@@ -269,6 +334,15 @@ export default async function CampaignsPage({
 
       {/* Table — checkboxes + bulk delete appear for super admins only */}
       <CampaignsTable campaigns={tableRows} sortOptions={SORTS} sort={sort} params={params} basePath={BASE} />
+
+      <Pagination
+        basePath={BASE}
+        pageParam="page"
+        currentParams={params}
+        page={effectivePage}
+        perPage={PAGE_SIZE}
+        total={totalCount}
+      />
     </div>
   );
 }

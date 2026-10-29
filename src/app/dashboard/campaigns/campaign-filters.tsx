@@ -5,20 +5,10 @@ import { useTranslations } from "next-intl";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 import { CATEGORIES } from "@/lib/categories";
-
-const STATUS_OPTIONS = [
-  { key: "all", value: "" },
-  { key: "draft", value: "draft" },
-  { key: "comingSoon", value: "coming_soon" },
-  { key: "underReview", value: "under_review" },
-  { key: "rejected", value: "rejected" },
-  { key: "active", value: "active" },
-  // Derived sub-state of active: still live but past its application deadline.
-  // The page resolves this to status=active AND application_deadline < now.
-  { key: "appsClosed", value: "apps_closed" },
-  { key: "paused", value: "paused" },
-  { key: "completed", value: "completed" },
-];
+import {
+  CAMPAIGN_STATUS_FILTERS as STATUS_OPTIONS,
+  DEFAULT_STATUS_FILTER,
+} from "./campaign-status-filter";
 
 export function CampaignFilters() {
   const t = useTranslations("DashboardCampaignsCampaignFilters");
@@ -27,7 +17,9 @@ export function CampaignFilters() {
   const searchParams = useSearchParams();
 
   const currentSearch = searchParams.get("search") || "";
-  const currentStatus = searchParams.get("status") || "";
+  // An absent param means the default tab, so the row shows what the page is
+  // actually listing rather than nothing selected.
+  const currentStatus = searchParams.get("status") || DEFAULT_STATUS_FILTER;
   const currentCategories = searchParams.get("category")?.split(",").filter(Boolean) || [];
 
   const [search, setSearch] = useState(currentSearch);
@@ -44,6 +36,12 @@ export function CampaignFilters() {
         } else {
           params.delete(key);
         }
+      }
+      // A new filter is a new result set — drop every page cursor so it opens
+      // on page 1 instead of an empty page N. FilterBar and BrandTypeFilter
+      // already do this; search, status and category all come through here.
+      for (const key of [...params.keys()]) {
+        if (key === "page" || key.endsWith("_page")) params.delete(key);
       }
       router.push(pathname + "?" + params.toString());
     },
@@ -70,8 +68,11 @@ export function CampaignFilters() {
     updateParams({ category: next.join(",") });
   };
 
+  // The default status is not a filter the admin chose, so it must not light
+  // up the badge — otherwise the page opens claiming one active filter and
+  // offering to reset it.
   const activeFilterCount =
-    currentCategories.length + (currentStatus ? 1 : 0);
+    currentCategories.length + (currentStatus !== DEFAULT_STATUS_FILTER ? 1 : 0);
 
   // Quick categories shown as chips (first 4)
   const quickCategories = CATEGORIES.slice(0, 4);
@@ -122,14 +123,20 @@ export function CampaignFilters() {
           </button>
         </div>
 
-        {/* Row 2: Status tabs */}
-        <div className="flex items-center gap-6">
-          <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl gap-0.5">
+        {/* Row 2: Status tabs. Ten of them now, so the group scrolls sideways
+            rather than wrapping — a wrapped pill group breaks its own rounded
+            background in half. */}
+        <div className="flex items-center gap-6 overflow-x-auto">
+          <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl gap-0.5 w-max">
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => updateParams({ status: opt.value })}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                // Three of these tabs select campaigns that are all "active"
+                // and differ only by application window, which no label short
+                // enough to fit this row can convey on its own.
+                title={t(`statusHint.${opt.key}`)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   currentStatus === opt.value
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-200/50 dark:shadow-indigo-900/40"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -210,6 +217,10 @@ export function CampaignFilters() {
               params.set("status", status);
             } else {
               params.delete("status");
+            }
+            // New result set — back to page 1, same as updateParams.
+            for (const key of [...params.keys()]) {
+              if (key === "page" || key.endsWith("_page")) params.delete(key);
             }
             router.push(pathname + "?" + params.toString());
             setShowFilterModal(false);

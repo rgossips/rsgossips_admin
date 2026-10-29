@@ -550,15 +550,28 @@
     "statusLabel": "Status",
     "applyFilters": "Apply Filters",
     "status": {
-      "all": "All",
+      "live": "Active",
+      "open": "Open",
+      "appsClosed": "Apps Closed",
       "draft": "Draft",
-      "active": "Active",
-      "appsClosed": "Applications Closed",
-      "paused": "Paused",
-      "completed": "Completed",
+      "comingSoon": "Coming Soon",
       "underReview": "Under review",
       "rejected": "Rejected",
-      "comingSoon": "Coming Soon"
+      "paused": "Paused",
+      "completed": "Completed",
+      "all": "All"
+    },
+    "statusHint": {
+      "live": "Every live campaign — status Active, whether or not it is still taking applications. This is the default view.",
+      "open": "Live and still accepting applications",
+      "appsClosed": "Live, but the application deadline has passed",
+      "draft": "Not published yet",
+      "comingSoon": "Published as a teaser, not yet open",
+      "underReview": "Submitted by a brand and waiting on an admin decision",
+      "rejected": "Turned down at review",
+      "paused": "Live but temporarily halted",
+      "completed": "Finished",
+      "all": "Every campaign, at any status"
     }
   },
   "DashboardCampaignsCampaignsTable": {
