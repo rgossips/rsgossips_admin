@@ -78,7 +78,11 @@ async function lookupBatch<T extends Record<string, unknown>>(
 
 export async function resolveHandles(
   admin: SupabaseClient,
-  campaignId: string,
+  // Null when the question is simply "do we know these people?" with no
+  // campaign in play — which is what the Instagram DM inbox asks when it
+  // matches a conversation to a creator. Nobody is `sourced` then, and the
+  // bookings query is skipped rather than run against a placeholder id.
+  campaignId: string | null,
   handles: string[],
 ): Promise<{ error?: string; resolved?: Map<string, ResolvedHandle> }> {
   const unique = [...new Set(handles.map((h) => String(h || "").trim().toLowerCase()).filter(Boolean))];
@@ -87,16 +91,20 @@ export async function resolveHandles(
 
   // Already on this campaign. An equality filter on campaign_id, so no
   // handle batching needed — a campaign's own list is small.
-  const bookingsRes = await admin
-    .from("campaign_bookings")
-    .select("instagram_username")
-    .eq("campaign_id", campaignId);
-  if (bookingsRes.error) {
-    return { error: "Could not read this campaign's sourcing list. Please try again." };
+  const sourced = new Set<string>();
+  if (campaignId) {
+    const bookingsRes = await admin
+      .from("campaign_bookings")
+      .select("instagram_username")
+      .eq("campaign_id", campaignId);
+    if (bookingsRes.error) {
+      return { error: "Could not read this campaign's sourcing list. Please try again." };
+    }
+    for (const r of bookingsRes.data || []) {
+      const h = String(r.instagram_username || "").toLowerCase();
+      if (h) sourced.add(h);
+    }
   }
-  const sourced = new Set(
-    (bookingsRes.data || []).map((r) => String(r.instagram_username || "").toLowerCase()).filter(Boolean),
-  );
 
   const [profiles, invites] = await Promise.all([
     lookupBatch<{ influencer_id: string; instagram_handle: string | null; username: string | null; full_name: string | null }>(

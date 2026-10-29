@@ -39,6 +39,7 @@ const navGroups: NavGroup[] = [
       // reads our own database. Admin-only: every search spends prepaid
       // HikerAPI credit.
       { label: "Scout Creators", href: "/dashboard/scouting", icon: "search", adminOnly: true },
+      { label: "Instagram Messages", href: "/dashboard/instagram", icon: "inbox", adminOnly: true },
       { label: "Featured Creators", href: "/dashboard/featured-creators", icon: "star" },
       { label: "Creator Stories", href: "/dashboard/creator-stories", icon: "video" },
       { label: "Subscriptions", href: "/dashboard/subscriptions", icon: "card" },
