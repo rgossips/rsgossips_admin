@@ -13,6 +13,73 @@ const STATE_STYLE: Record<CheckState, { dot: string; text: string; label: string
   skipped: { dot: "bg-gray-300 dark:bg-gray-600", text: "text-gray-400 dark:text-gray-500", label: "Not checked" },
 };
 
+// The order the tiles read in: worst first, because that is what the page is
+// opened to find out.
+const STATE_ORDER: CheckState[] = ["down", "slow", "ok", "skipped"];
+
+const TILE_TONE: Record<CheckState, { on: string; off: string }> = {
+  down: {
+    on: "border-rose-400 bg-rose-50 dark:border-rose-700 dark:bg-rose-900/30",
+    off: "border-rose-200 bg-white hover:bg-rose-50/60 dark:border-rose-900/60 dark:bg-gray-900 dark:hover:bg-rose-900/20",
+  },
+  slow: {
+    on: "border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/30",
+    off: "border-amber-200 bg-white hover:bg-amber-50/60 dark:border-amber-900/60 dark:bg-gray-900 dark:hover:bg-amber-900/20",
+  },
+  ok: {
+    on: "border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/30",
+    off: "border-emerald-200 bg-white hover:bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-gray-900 dark:hover:bg-emerald-900/20",
+  },
+  skipped: {
+    on: "border-gray-400 bg-gray-100 dark:border-gray-600 dark:bg-gray-800",
+    off: "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800",
+  },
+};
+
+// Module scope, not nested in the component: a subcomponent redeclared on
+// every render remounts its children and loses focus (CLAUDE.md, "Client
+// component pitfalls").
+function Tile({
+  state,
+  count,
+  active,
+  onClick,
+}: {
+  state: CheckState;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const st = STATE_STYLE[state];
+  const tone = TILE_TONE[state];
+  // A tile with nothing in it is not a filter — pressing it would empty the
+  // page and say nothing useful. The number still shows, because "0
+  // problems" is the answer this page exists to give.
+  const selectable = count > 0;
+  return (
+    <button
+      type="button"
+      onClick={selectable ? onClick : undefined}
+      aria-pressed={active}
+      disabled={!selectable}
+      title={selectable ? `Show only the ${st.label.toLowerCase()} checks` : `Nothing is ${st.label.toLowerCase()}`}
+      className={`flex min-w-[104px] flex-1 flex-col gap-0.5 rounded-2xl border px-4 py-3 text-left transition-colors disabled:cursor-default disabled:opacity-60 ${
+        active ? tone.on : tone.off
+      }`}
+    >
+      <span className="flex items-center gap-1.5">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${st.dot}`} aria-hidden="true" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          {st.label}
+        </span>
+      </span>
+      <span className={`text-2xl font-bold tabular-nums ${count > 0 ? st.text : "text-gray-300 dark:text-gray-600"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
 // Fixed IST, same string on server and client — no hydration mismatch.
 const TIME_FMT = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
@@ -28,6 +95,13 @@ export function StatusClient() {
   const [checkedAt, setCheckedAt] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [running, setRunning] = useState(false);
+  // Filters deliberately SURVIVE a re-run: you filter to Problem, fix the
+  // thing, and press Check again to see whether it cleared. The empty state
+  // below says so out loud, because an empty page after a re-run otherwise
+  // reads as "nothing ran".
+  const [stateFilter, setStateFilter] = useState<CheckState | "all">("all");
+  const [groupFilter, setGroupFilter] = useState<CheckGroup | "all">("all");
+  const [q, setQ] = useState("");
 
   const run = async () => {
     setRunning(true);
@@ -42,8 +116,36 @@ export function StatusClient() {
     setCheckedAt(res.checkedAt ?? null);
   };
 
-  const problems = results?.filter((r) => r.state === "down").length ?? 0;
-  const slow = results?.filter((r) => r.state === "slow").length ?? 0;
+  const all = results ?? [];
+  const problems = all.filter((r) => r.state === "down").length;
+  const slow = all.filter((r) => r.state === "slow").length;
+
+  // Counts come from the WHOLE run, never from the filtered view: a tile
+  // that changed when you pressed another tile would stop being a summary.
+  const stateCounts = STATE_ORDER.reduce<Record<CheckState, number>>(
+    (acc, s) => ({ ...acc, [s]: all.filter((r) => r.state === s).length }),
+    { ok: 0, slow: 0, down: 0, skipped: 0 },
+  );
+
+  const term = q.trim().toLowerCase();
+  const visible = all.filter((r) => {
+    if (stateFilter !== "all" && r.state !== stateFilter) return false;
+    if (groupFilter !== "all" && r.group !== groupFilter) return false;
+    if (term && !`${r.label} ${r.detail || ""}`.toLowerCase().includes(term)) return false;
+    return true;
+  });
+
+  const filtered = stateFilter !== "all" || groupFilter !== "all" || Boolean(term);
+  const resetFilters = () => {
+    setStateFilter("all");
+    setGroupFilter("all");
+    setQ("");
+  };
+
+  // How long the run took at its worst. A `skipped` check has no ms at all,
+  // so this is over the ones that actually went out on the wire.
+  const timings = all.map((r) => r.ms).filter((m): m is number => typeof m === "number");
+  const slowest = timings.length ? Math.max(...timings) : null;
 
   return (
     <div className="space-y-5">
@@ -92,6 +194,102 @@ export function StatusClient() {
         </p>
       )}
 
+      {/* The numbers, and the filter, as one control: a tile says how many
+          and selects them. Two separate things would be a count you then
+          have to go and find. */}
+      {results && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {STATE_ORDER.map((s) => (
+              <Tile
+                key={s}
+                state={s}
+                count={stateCounts[s]}
+                active={stateFilter === s}
+                onClick={() => setStateFilter((p) => (p === s ? "all" : s))}
+              />
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Area</span>
+            <button
+              type="button"
+              onClick={() => setGroupFilter("all")}
+              className={`rounded-lg px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                groupFilter === "all"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300"
+              }`}
+            >
+              All <span className="font-normal opacity-60">{all.length}</span>
+            </button>
+            {ORDER.map((g) => {
+              const n = all.filter((r) => r.group === g).length;
+              if (n === 0) return null;
+              const bad = all.filter((r) => r.group === g && r.state === "down").length;
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGroupFilter((p) => (p === g ? "all" : g))}
+                  title={GROUP_BLURB[g]}
+                  className={`rounded-lg px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                    groupFilter === g
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300"
+                  }`}
+                >
+                  {GROUP_LABEL[g]} <span className="font-normal opacity-60">{n}</span>
+                  {bad > 0 && (
+                    <span className={groupFilter === g ? "ml-1 text-rose-100" : "ml-1 text-rose-600 dark:text-rose-400"}>
+                      · {bad}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Find a check…"
+              className="h-8 w-40 rounded-lg border border-gray-200 px-2 text-[12px] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            />
+
+            <span className="ml-auto flex items-center gap-3 text-[11px] text-gray-400">
+              <span>
+                Showing {visible.length} of {all.length}
+                {slowest != null && ` · slowest ${slowest.toLocaleString("en-IN")} ms`}
+              </span>
+              {filtered && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="font-semibold text-gray-500 hover:underline dark:text-gray-400"
+                >
+                  Reset
+                </button>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {results && visible.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-gray-300 px-5 py-10 text-center dark:border-gray-700">
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">No check matches those filters</p>
+          <p className="mx-auto mt-1 max-w-md text-[13px] text-gray-500 dark:text-gray-400">
+            {stateFilter === "down"
+              ? "Nothing is failing — which is the answer you wanted."
+              : "The run finished; these filters just hide all of it."}{" "}
+            <button type="button" onClick={resetFilters} className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+              Show everything
+            </button>
+          </p>
+        </div>
+      )}
+
       {!results && !running && (
         <div className="rounded-2xl border border-dashed border-gray-300 px-5 py-10 text-center dark:border-gray-700">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Nothing has been checked yet</p>
@@ -103,7 +301,10 @@ export function StatusClient() {
 
       {results &&
         ORDER.map((group) => {
-          const rows = results.filter((r) => r.group === group);
+          // Filtered rows, not all of them — a section header must describe
+          // what is actually underneath it, or filtering to OK leaves a
+          // header claiming three problems above two healthy rows.
+          const rows = visible.filter((r) => r.group === group);
           if (rows.length === 0) return null;
           const bad = rows.filter((r) => r.state === "down").length;
           return (
