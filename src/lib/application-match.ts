@@ -185,8 +185,13 @@ export function scoreApplicant(creator: MatchCreator, target: MatchTarget): Matc
   // live campaigns. A mismatch is flagged rather than excluded here: unlike
   // the sourcing pool, this creator has already applied, and hiding them
   // from the brand would make an in-flight application vanish.
+  //
+  // `undefined` means the CALLER does not supply the field at all — the web
+  // copy has a surface where that is true while a deploy catches up. null or
+  // "" means the creator has none on file. Only the second is something to
+  // say out loud, so only the second is scored.
   const needGender = requiredGender(target.gender);
-  if (needGender) {
+  if (needGender && creator.gender !== undefined) {
     const theirs = norm(creator.gender);
     if (!theirs) {
       add("gender", "gender not on file", "unknown", WEIGHTS.gender);
